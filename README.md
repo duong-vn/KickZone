@@ -1,6 +1,6 @@
-# GoalSlot
+# KickZone
 
-GoalSlot is a soccer field booking and management system. This repository is an npm-workspace monorepo containing a Next.js frontend and a NestJS API.
+KickZone is a soccer field booking and management system. This repository is an npm-workspace monorepo containing a Next.js frontend and a NestJS API.
 
 ## Requirements
 
@@ -36,4 +36,4 @@ Swagger is available at `http://localhost:3001/docs` while the API is running.
 
 ## Current scope
 
-The repository currently contains development foundation only. Authentication flows, database models, migrations, and GoalSlot business features have not been implemented.
+The repository currently contains development foundation only. Authentication flows, database models, migrations, and KickZone business features have not been implemented.

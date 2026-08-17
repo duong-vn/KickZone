@@ -5,7 +5,7 @@ import { QueryProvider } from '@/providers/query-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'GoalSlot',
+  title: 'KickZone',
   description: 'Soccer field booking and management',
 };
 

@@ -1,6 +1,6 @@
-# AGENTS.md — GoalSlot
+# AGENTS.md — KickZone
 
-> **Project:** GoalSlot — Soccer Field Booking & Management System  
+> **Project:** KickZone — Soccer Field Booking & Management System  
 > **Duration:** 7-day internship final project  
 > **Current phase:** Planning/documentation; implementation has not started  
 > **Stack:** Next.js + NestJS + Prisma + PostgreSQL (Supabase) + Supabase Auth/Storage  
@@ -39,7 +39,7 @@ unless explicitly requested.
 
 ## 2. Project Overview
 
-GoalSlot lets users search soccer fields, view availability, book time slots, manage bookings, review fields, and save favorites.
+KickZone lets users search soccer fields, view availability, book time slots, manage bookings, review fields, and save favorites.
 
 Admins manage bookings, fields, users, images, pricing, field types, and field schedules.
 
@@ -817,7 +817,7 @@ ACTIVE
 INACTIVE
 ```
 
-Inactive users stay in Supabase Auth but are blocked from GoalSlot protected operations.
+Inactive users stay in Supabase Auth but are blocked from KickZone protected operations.
 
 ### Field schedule
 
@@ -1587,7 +1587,7 @@ Original requirement includes:
 
 Current team decisions include:
 
-- GoalSlot name
+- KickZone name
 - exact proposed tables/endpoints
 - UUID IDs
 - integer VND

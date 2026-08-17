@@ -19,8 +19,8 @@ async function bootstrap() {
   );
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('GoalSlot API')
-    .setDescription('GoalSlot REST API')
+    .setTitle('KickZone API')
+    .setDescription('KickZone REST API')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
