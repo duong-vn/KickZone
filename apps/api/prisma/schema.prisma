@@ -1,11 +1,269 @@
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "cjs"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+  moduleFormat    = "cjs"
 }
 
 datasource db {
   provider = "postgresql"
 }
 
-// Domain models will be added in a dedicated database implementation task.
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bookings {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                String          @unique(map: "uq_bookings_code") @default(dbgenerated("('KZ-'::text || upper(substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 12)))"))
+  user_id             String          @db.Uuid
+  field_id            String          @db.Uuid
+  voucher_id          String?         @db.Uuid
+  start_time          DateTime        @db.Timestamptz(6)
+  end_time            DateTime        @db.Timestamptz(6)
+  status              booking_status  @default(PENDING)
+  original_price      Int
+  discount_amount     Int             @default(0)
+  final_price         Int
+  cancellation_reason String?
+  rejection_reason    String?
+  created_at          DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime        @default(now()) @db.Timestamptz(6)
+  fields              fields          @relation(fields: [field_id], references: [id], onUpdate: Restrict, map: "fk_bookings_field")
+  profiles            profiles        @relation(fields: [user_id], references: [id], onUpdate: Restrict, map: "fk_bookings_user")
+  vouchers            vouchers?       @relation(fields: [voucher_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_bookings_voucher")
+  reviews             reviews?
+  voucher_usages      voucher_usages?
+
+  @@unique([id, user_id, field_id], map: "uq_bookings_id_user_field")
+  @@unique([id, user_id, voucher_id], map: "uq_bookings_id_user_voucher")
+  @@index([field_id, start_time, end_time], map: "idx_bookings_blocking_interval", where: raw("(status = ANY (ARRAY['PENDING'::booking_status, 'CONFIRMED'::booking_status]))"))
+  @@index([field_id, end_time], map: "idx_bookings_field_end")
+  @@index([field_id, start_time], map: "idx_bookings_field_start")
+  @@index([field_id, status], map: "idx_bookings_field_status")
+  @@index([status, end_time], map: "idx_bookings_status_end")
+  @@index([user_id, created_at(sort: Desc)], map: "idx_bookings_user_created")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model favorites {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @db.Uuid
+  field_id   String   @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  fields     fields   @relation(fields: [field_id], references: [id], onDelete: Cascade, map: "fk_favorites_field")
+  profiles   profiles @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_favorites_user")
+
+  @@unique([user_id, field_id], map: "uq_favorites_user_field")
+  @@index([user_id, created_at(sort: Desc)], map: "idx_favorites_user_created")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model field_images {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  field_id     String   @unique(map: "ux_field_images_one_primary", where: raw("(is_primary = true)")) @db.Uuid
+  storage_path String
+  alt_text     String?
+  sort_order   Int      @default(0)
+  is_primary   Boolean  @default(false)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  fields       fields   @relation(fields: [field_id], references: [id], onDelete: Cascade, map: "fk_field_images_field")
+
+  @@index([field_id, sort_order, created_at], map: "idx_field_images_order")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model field_operating_hours {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  field_id    String    @db.Uuid
+  day_of_week Int       @db.SmallInt
+  open_time   DateTime? @db.Time(6)
+  close_time  DateTime? @db.Time(6)
+  is_closed   Boolean   @default(false)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @db.Timestamptz(6)
+  fields      fields    @relation(fields: [field_id], references: [id], onDelete: Cascade, map: "fk_field_operating_hours_field")
+
+  @@unique([field_id, day_of_week], map: "uq_field_operating_hours_day")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model field_types {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @unique(map: "uq_field_types_name")
+  description String?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+  fields      fields[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fields {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  field_type_id         String                  @db.Uuid
+  name                  String
+  slug                  String                  @unique(map: "uq_fields_slug")
+  description           String?
+  address               String
+  city                  String
+  district              String
+  latitude              Decimal?                @db.Decimal(9, 6)
+  longitude             Decimal?                @db.Decimal(9, 6)
+  base_price_per_hour   Int
+  status                field_status            @default(ACTIVE)
+  deleted_at            DateTime?               @db.Timestamptz(6)
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime                @default(now()) @db.Timestamptz(6)
+  bookings              bookings[]
+  favorites             favorites[]
+  field_images          field_images?
+  field_operating_hours field_operating_hours[]
+  field_types           field_types             @relation(fields: [field_type_id], references: [id], onUpdate: Restrict, map: "fk_fields_field_type")
+  price_rules           price_rules[]
+  reviews               reviews[]
+
+  @@index([base_price_per_hour], map: "idx_fields_base_price")
+  @@index([district], map: "idx_fields_district")
+  @@index([field_type_id], map: "idx_fields_field_type")
+  @@index([status, deleted_at], map: "idx_fields_status_deleted")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model price_rules {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  field_id       String    @db.Uuid
+  name           String
+  day_of_week    Int?      @db.SmallInt
+  start_time     DateTime  @db.Time(6)
+  end_time       DateTime  @db.Time(6)
+  price_per_hour Int
+  effective_from DateTime? @db.Date
+  effective_to   DateTime? @db.Date
+  priority       Int       @default(0)
+  is_active      Boolean   @default(true)
+  created_at     DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime  @default(now()) @db.Timestamptz(6)
+  fields         fields    @relation(fields: [field_id], references: [id], onDelete: Cascade, map: "fk_price_rules_field")
+
+  @@index([field_id, is_active, day_of_week, effective_from, effective_to, start_time, end_time], map: "idx_price_rules_lookup")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model profiles {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  auth_user_id   String           @unique(map: "uq_profiles_auth_user_id") @db.Uuid
+  email          String
+  full_name      String?
+  avatar_path    String?
+  phone          String?
+  role           user_role        @default(USER)
+  status         user_status      @default(ACTIVE)
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime         @default(now()) @db.Timestamptz(6)
+  bookings       bookings[]
+  favorites      favorites[]
+  reviews        reviews[]
+  voucher_usages voucher_usages[]
+
+  @@index([email], map: "idx_profiles_email")
+  @@index([status], map: "idx_profiles_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model reviews {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String   @db.Uuid
+  field_id   String   @db.Uuid
+  booking_id String   @db.Uuid
+  rating     Int      @db.SmallInt
+  content    String
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  bookings   bookings @relation(fields: [booking_id, user_id, field_id], references: [id, user_id, field_id], onUpdate: Restrict, map: "fk_reviews_eligible_booking")
+  fields     fields   @relation(fields: [field_id], references: [id], onUpdate: Restrict, map: "fk_reviews_field")
+  profiles   profiles @relation(fields: [user_id], references: [id], onUpdate: Restrict, map: "fk_reviews_user")
+
+  @@unique([booking_id, user_id, field_id], map: "uq_reviews_booking")
+  @@index([field_id, created_at(sort: Desc)], map: "idx_reviews_field_created")
+  @@index([user_id, created_at(sort: Desc)], map: "idx_reviews_user")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model voucher_usages {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  voucher_id String   @db.Uuid
+  user_id    String   @db.Uuid
+  booking_id String   @db.Uuid
+  used_at    DateTime @default(now()) @db.Timestamptz(6)
+  bookings   bookings @relation(fields: [booking_id, user_id, voucher_id], references: [id, user_id, voucher_id], onUpdate: Restrict, map: "fk_voucher_usages_booking")
+  profiles   profiles @relation(fields: [user_id], references: [id], onUpdate: Restrict, map: "fk_voucher_usages_user")
+  vouchers   vouchers @relation(fields: [voucher_id], references: [id], onUpdate: Restrict, map: "fk_voucher_usages_voucher")
+
+  @@unique([booking_id, user_id, voucher_id], map: "uq_voucher_usages_booking")
+  @@index([voucher_id, user_id, used_at], map: "idx_voucher_usages_user")
+  @@index([voucher_id, used_at], map: "idx_voucher_usages_voucher")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model vouchers {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code            String           @unique(map: "uq_vouchers_code")
+  discount_type   discount_type
+  value           Int
+  max_discount    Int?
+  min_order_value Int?
+  start_at        DateTime?        @db.Timestamptz(6)
+  end_at          DateTime?        @db.Timestamptz(6)
+  usage_limit     Int?
+  per_user_limit  Int?
+  is_active       Boolean          @default(true)
+  created_at      DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime         @default(now()) @db.Timestamptz(6)
+  bookings        bookings[]
+  voucher_usages  voucher_usages[]
+
+  @@index([is_active, start_at, end_at], map: "idx_vouchers_active_window")
+}
+
+enum booking_status {
+  PENDING
+  CONFIRMED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+enum discount_type {
+  PERCENT
+  FIXED
+}
+
+enum field_status {
+  ACTIVE
+  INACTIVE
+}
+
+enum user_role {
+  USER
+  ADMIN
+}
+
+enum user_status {
+  ACTIVE
+  INACTIVE
+}
