@@ -29,7 +29,7 @@ Browser
 - NestJS là nơi kiểm tra quyền, tính giá, chống trùng lịch và xử lý trạng thái booking.
 - PostgreSQL là nguồn dữ liệu chuẩn duy nhất cho nghiệp vụ.
 
-## Công nghệ
+## C ông nghệ
 
 ### Frontend
 
