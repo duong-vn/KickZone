@@ -1,12 +1,25 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { Inter, Manrope } from 'next/font/google';
 import { Toaster } from 'sonner';
 import { QueryProvider } from '@/providers/query-provider';
 import './globals.css';
 
+const inter = Inter({
+  subsets: ['latin', 'vietnamese'],
+  weight: ['400', '600'],
+  variable: '--font-inter',
+});
+
+const manrope = Manrope({
+  subsets: ['latin', 'vietnamese'],
+  weight: ['600', '700', '800'],
+  variable: '--font-manrope',
+});
+
 export const metadata: Metadata = {
   title: 'KickZone',
-  description: 'Soccer field booking and management',
+  description: 'Nền tảng đặt sân bóng đá',
 };
 
 type RootLayoutProps = Readonly<{
@@ -15,7 +28,7 @@ type RootLayoutProps = Readonly<{
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en">
+    <html lang="vi" className={`${inter.variable} ${manrope.variable}`}>
       <body>
         <QueryProvider>{children}</QueryProvider>
         <Toaster richColors />
