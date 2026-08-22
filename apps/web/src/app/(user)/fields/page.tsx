@@ -1,6 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useState, useMemo, useEffect, Suspense } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { 
@@ -13,6 +14,7 @@ import {
   Calendar
 } from 'lucide-react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 
 import { Button } from '@/components/ui/button';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -120,6 +122,9 @@ const TIME_SLOTS = [
 ];
 const FIELD_TYPES = ['Sân 5', 'Sân 7', 'Sân 11'];
 
+// ==========================================
+// THÀNH PHẦN CHÍNH (ĐƯỢC ẨN KHỎI TRÌNH BUILD SSR)
+// ==========================================
 function FieldsContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -139,7 +144,6 @@ function FieldsContent() {
 
   const debouncedSearch = useDebounce(search, 350);
 
-  // FIX: Thêm `string[]` vào Record overrides để TypeScript không báo lỗi khi truyền array `selectedTypes`
   const pushParams = (overrides: Record<string, string | number | string[] | undefined>) => {
     const params = new URLSearchParams();
     
@@ -205,7 +209,6 @@ function FieldsContent() {
       });
     }
 
-    // FIX: Thêm fallback `?? false` để tránh typescript báo lỗi boolean | undefined
     if (selectedTypes.length > 0) {
       result = result.filter(f => 
         selectedTypes.every(t => f.types?.includes(t) ?? false)
@@ -450,7 +453,6 @@ function FieldsContent() {
                       className="bg-white border border-[#bccbb9]/40 rounded-xl overflow-hidden shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] hover:shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1)] transition-shadow duration-300 flex flex-col group"
                     >
                       <div className="h-48 relative overflow-hidden bg-slate-100">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={field.image}
                           alt={field.name}
@@ -571,14 +573,19 @@ function FieldsContent() {
   );
 }
 
-export default function FieldsSearchPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center text-[#006e2f]">
-        Đang tải dữ liệu...
-      </div>
-    }>
-      <FieldsContent />
-    </Suspense>
-  );
+// ==========================================
+// TẮT CHẾ ĐỘ RENDER SERVER (SSR) CHO TRANG NÀY
+// Để tránh lỗi "Missing Suspense with CSR Bailout" của Next.js
+// ==========================================
+const DynamicFieldsSearchPage = dynamic(() => Promise.resolve(FieldsContent), {
+  ssr: false,
+  loading: () => (
+    <div className="min-h-screen flex items-center justify-center text-[#006e2f]">
+      Đang tải dữ liệu bộ lọc...
+    </div>
+  ),
+});
+
+export default function FieldsSearchPageWrapper() {
+  return <DynamicFieldsSearchPage />;
 }
