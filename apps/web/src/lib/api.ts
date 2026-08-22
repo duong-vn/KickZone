@@ -7,18 +7,25 @@ export const api = axios.create({
   },
 });
 
-export const fetchFields = async (params: Record<string, any>) => {
-  // Loại bỏ các param rỗng
-  const cleanParams = Object.fromEntries(
-    Object.entries(params).filter(([_, v]) => v != null && v !== ''),
-  );
+export const fetchFields = async (
+  params: Record<string, string | number | boolean | undefined | null>,
+) => {
+  const cleanParams: Record<string, string> = {};
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      cleanParams[key] = String(value);
+    }
+  });
+
   const query = new URLSearchParams(cleanParams).toString();
-
-  // URL tùy thuộc vào cấu hình API của bạn (thường là http://localhost:3000 hoặc /api)
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333'}/fields?${query}`,
+    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333'}/fields${query ? `?${query}` : ''}`,
   );
 
-  if (!res.ok) throw new Error('Failed to fetch fields');
+  if (!res.ok) {
+    throw new Error('Failed to fetch fields');
+  }
+
   return res.json();
 };
