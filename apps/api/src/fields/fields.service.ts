@@ -48,8 +48,10 @@ export class FieldsService {
 
     if (query.minPrice || query.maxPrice) {
       where.base_price_per_hour = {};
-      if (query.minPrice) where.base_price_per_hour.gte = Number(query.minPrice);
-      if (query.maxPrice) where.base_price_per_hour.lte = Number(query.maxPrice);
+      if (query.minPrice)
+        where.base_price_per_hour.gte = Number(query.minPrice);
+      if (query.maxPrice)
+        where.base_price_per_hour.lte = Number(query.maxPrice);
     }
 
     const [data, total] = await Promise.all([
