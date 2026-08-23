@@ -21,3 +21,10 @@ apps/api/src/generated/prisma/
 .DS_Store
 Thumbs.db
 *.log
+
+# Certificates
+apps/api/certs/*
+!apps/api/certs/.gitkeep
+*.crt
+*.pem
+*.key
