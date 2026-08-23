@@ -8,16 +8,10 @@ import {
   Ban,
   CheckCircle2,
   Mail,
-  Phone,
-  Calendar,
   Eye,
   Star,
   X,
   Check,
-  Globe,
-  Shield,
-  Clock,
-  ArrowLeft,
   UserCheck,
 } from 'lucide-react';
 
@@ -133,7 +127,10 @@ export default function AdminUserDetailPage({
   const resolvedParams = use(params);
   const userId = resolvedParams.id;
 
-  const [user, setUser] = useState<UserDetailData>(MOCK_USER_DETAIL);
+  const [user, setUser] = useState<UserDetailData>({
+    ...MOCK_USER_DETAIL,
+    id: userId,
+  });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 

@@ -12,16 +12,8 @@ import {
   Ban,
   CheckCircle2,
   X,
-  MapPin,
   DollarSign,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
-  Info,
   Check,
-  Building2,
-  Clock,
-  Layers,
 } from 'lucide-react';
 
 // Types aligned directly with database/init.sql
@@ -116,9 +108,6 @@ export default function AdminFieldsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-
   // Modals state
   const [viewingField, setViewingField] = useState<AdminFieldItem | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -190,22 +179,6 @@ export default function AdminFieldsPage() {
         return f;
       })
     );
-  };
-
-  // Open Create Modal
-  const handleOpenCreateModal = () => {
-    setFormData({
-      name: '',
-      fieldType: '5-a-side',
-      address: '',
-      district: 'Tân Bình',
-      city: 'Hồ Chí Minh',
-      basePricePerHour: 300000,
-      description: '',
-      status: 'ACTIVE',
-    });
-    setEditingField(null);
-    setIsCreateModalOpen(true);
   };
 
   // Open Edit Modal

@@ -16,8 +16,6 @@ import {
   RotateCcw,
   X,
   Check,
-  Phone,
-  Mail,
   AlertCircle,
   CheckCircle,
 } from 'lucide-react';

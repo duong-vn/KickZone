@@ -8,15 +8,10 @@ import {
   ChevronRight,
   ChevronDown,
   Clock,
-  User,
-  Phone,
   CheckCircle2,
-  AlertCircle,
   X,
-  Check,
   ShieldCheck,
   Eye,
-  Plus,
 } from 'lucide-react';
 
 // Types aligned with database/init.sql
@@ -97,16 +92,19 @@ const HOUR_ROW_HEIGHT = 64; // px per hour
 
 export default function AdminSchedulePage() {
   const [selectedCourtFilter, setSelectedCourtFilter] = useState('all');
-  const [selectedDate, setSelectedDate] = useState('2023-10-15');
+  const [selectedDate, setSelectedDate] = useState(new Date(2023, 9, 15));
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
-  const [bookings, setBookings] = useState<ScheduleBookingItem[]>(INITIAL_SCHEDULE_BOOKINGS);
+  const bookings = INITIAL_SCHEDULE_BOOKINGS;
 
   // Selected booking for quick inspection modal
   const [selectedBooking, setSelectedBooking] = useState<ScheduleBookingItem | null>(null);
 
   // Format date display
   const dateFormatted = useMemo(() => {
-    return '15 Tháng 10, 2023';
+    const day = selectedDate.getDate();
+    const month = selectedDate.getMonth() + 1;
+    const year = selectedDate.getFullYear();
+    return `${day} Tháng ${month}, ${year}`;
   }, [selectedDate]);
 
   // Filtered courts
@@ -116,11 +114,11 @@ export default function AdminSchedulePage() {
   }, [selectedCourtFilter]);
 
   const handlePrevDay = () => {
-    // Simulating date change
+    setSelectedDate((prev) => new Date(prev.getTime() - 86400000));
   };
 
   const handleNextDay = () => {
-    // Simulating date change
+    setSelectedDate((prev) => new Date(prev.getTime() + 86400000));
   };
 
   return (

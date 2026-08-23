@@ -15,9 +15,6 @@ import {
   X,
   Save,
   ChevronDown,
-  Navigation,
-  Sparkles,
-  ArrowLeft,
   Pin,
 } from 'lucide-react';
 

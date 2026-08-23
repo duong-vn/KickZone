@@ -2,9 +2,7 @@
 
 import React, { useState, use } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
-  PersonStanding,
   User,
   Mail,
   Phone,
@@ -17,7 +15,6 @@ import {
   XCircle,
   ArrowLeft,
   X,
-  Check,
   AlertCircle,
   ShieldCheck,
   Sparkles,
@@ -102,7 +99,6 @@ export default function AdminBookingDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const router = useRouter();
   const resolvedParams = use(params);
   const bookingId = resolvedParams.id;
 

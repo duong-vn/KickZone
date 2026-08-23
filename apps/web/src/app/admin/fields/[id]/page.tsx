@@ -2,7 +2,6 @@
 
 import React, { useState, use } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Edit,
@@ -17,11 +16,6 @@ import {
   Receipt,
   Plus,
   Ban,
-  UserCheck,
-  Building2,
-  DollarSign,
-  Layers,
-  Sparkles,
 } from 'lucide-react';
 
 // Types aligned with database/init.sql
@@ -118,7 +112,6 @@ export default function AdminFieldDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const router = useRouter();
   const resolvedParams = use(params);
   const fieldId = resolvedParams.id;
 
@@ -590,7 +583,7 @@ export default function AdminFieldDetailPage({
             </h3>
 
             <p className="text-xs sm:text-sm text-[#575e70] mb-6 leading-relaxed">
-              Sân bóng <strong>"{field.name}"</strong> hiện đang có{' '}
+              Sân bóng <strong>&ldquo;{field.name}&rdquo;</strong> hiện đang có{' '}
               <strong className="text-[#ba1a1a]">{field.upcomingBookingsCount} đơn đặt sân</strong>{' '}
               đang chờ xử lý hoặc sắp diễn ra. Vui lòng hoàn tất hoặc hủy các đơn này trước khi thực hiện xóa.
             </p>

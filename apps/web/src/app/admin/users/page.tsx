@@ -13,13 +13,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  UserCheck,
-  Mail,
-  Phone,
-  Calendar,
-  Shield,
-  MoreVertical,
-  AlertCircle,
 } from 'lucide-react';
 
 // Types aligned with database/init.sql
@@ -101,9 +94,6 @@ export default function AdminUsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
-
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
 
   // Modal states
   const [viewingUser, setViewingUser] = useState<AdminUserItem | null>(null);

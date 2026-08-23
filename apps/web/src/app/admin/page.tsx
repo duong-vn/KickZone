@@ -14,11 +14,8 @@ import {
   XCircle,
   UserPlus,
   ArrowRight,
-  Filter,
   Check,
   X,
-  Calendar,
-  AlertTriangle,
 } from 'lucide-react';
 
 // Types mapping directly to KickZone database schema

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, use } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   ChevronRight,
@@ -11,11 +11,6 @@ import {
   MapPin,
   CheckCircle2,
   X,
-  Check,
-  Calendar,
-  AlertCircle,
-  DollarSign,
-  Layers,
 } from 'lucide-react';
 
 // Types aligned with database/init.sql
@@ -96,14 +91,7 @@ const DAY_OPTIONS = [
   { label: 'Chủ Nhật', value: 0 },
 ];
 
-export default function AdminFieldPricingPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const resolvedParams = use(params);
-  const fieldId = resolvedParams.id;
-
+export default function AdminFieldPricingPage() {
   const [fieldData, setFieldData] = useState<FieldPricingData>(MOCK_FIELD_PRICING);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<PriceRuleItem | null>(null);
@@ -327,13 +315,13 @@ export default function AdminFieldPricingPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#bccbb9]/40 text-[#191c1d]">
-              {fieldData.priceRules.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-[#575e70]">
-                    Chưa có mức giá nào được thiết lập. Hãy bấm "+ Thêm mức giá mới".
-                  </td>
-                </tr>
-              ) : (
+                {fieldData.priceRules.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-[#575e70]">
+                      Chưa có mức giá nào được thiết lập. Hãy bấm &ldquo;+ Thêm mức giá mới&rdquo;.
+                    </td>
+                  </tr>
+                ) : (
                 fieldData.priceRules.map((rule) => (
                   <tr
                     key={rule.id}

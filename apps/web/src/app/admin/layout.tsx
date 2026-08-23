@@ -5,14 +5,6 @@ import { usePathname } from 'next/navigation';
 import { AdminSidebar } from '@/components/layout/admin-sidebar';
 import { Menu, X, Search, Bell, HelpCircle } from 'lucide-react';
 
-const PAGE_TITLES: Record<string, string> = {
-  '/admin': 'Tổng quan',
-  '/admin/bookings': 'Quản lý đơn đặt sân',
-  '/admin/fields': 'Quản lý sân bóng',
-  '/admin/users': 'Quản lý người dùng',
-  '/admin/schedule': 'Lịch sân',
-};
-
 export default function AdminLayout({
   children,
 }: {
