@@ -1,27 +1,48 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GetFieldsQueryDto } from './fields.controller';
+
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 9;
+const MAX_LIMIT = 100;
+
+function parsePositiveInteger(
+  value: string | undefined,
+  fallback: number,
+  max?: number,
+) {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return max ? Math.min(parsed, max) : parsed;
+}
+
+function parsePrice(value: string | undefined) {
+  const parsed = Number(value);
+
+  return value && Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
 
 @Injectable()
 export class FieldsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query: GetFieldsQueryDto) {
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 9;
+    const page = parsePositiveInteger(query.page, DEFAULT_PAGE);
+    const limit = parsePositiveInteger(query.limit, DEFAULT_LIMIT, MAX_LIMIT);
     const skip = (page - 1) * limit;
-
-    // Sử dụng any để bypass ESLint strict mode
-    const where: any = {};
+    const minPrice = parsePrice(query.minPrice);
+    const maxPrice = parsePrice(query.maxPrice);
+    const where: Prisma.fieldsWhereInput = {};
 
     if (query.search) {
       where.OR = [
         { name: { contains: query.search, mode: 'insensitive' } },
-        { location: { contains: query.search, mode: 'insensitive' } },
+        { address: { contains: query.search, mode: 'insensitive' } },
       ];
     }
 
@@ -32,25 +53,21 @@ export class FieldsService {
       };
     }
 
-    if (query.minPrice || query.maxPrice) {
-      where.pricePerHour = {};
-      if (query.minPrice) {
-        where.pricePerHour.gte = Number(query.minPrice);
-      }
-      if (query.maxPrice) {
-        where.pricePerHour.lte = Number(query.maxPrice);
-      }
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      where.base_price_per_hour = {
+        ...(minPrice !== undefined && { gte: minPrice }),
+        ...(maxPrice !== undefined && { lte: maxPrice }),
+      };
     }
 
-    // Bypass Prisma strict checking bằng (this.prisma as any)
     const [data, total] = await Promise.all([
-      (this.prisma as any).field.findMany({
+      this.prisma.fields.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { created_at: 'desc' },
       }),
-      (this.prisma as any).field.count({ where }),
+      this.prisma.fields.count({ where }),
     ]);
 
     return {

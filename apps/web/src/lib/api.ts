@@ -29,3 +29,15 @@ export const fetchFields = async (
 
   return res.json();
 };
+
+export const fetchFieldById = async (id: string) => {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/fields/${id}`,
+  );
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch field ${id}`);
+  }
+
+  return res.json();
+};

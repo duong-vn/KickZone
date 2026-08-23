@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Pool } from 'pg'; // <-- Phải import Pool từ thư viện pg
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../src/generated/prisma/client.js'; // <-- Bỏ đuôi /client.js
+import { Pool, type PoolConfig } from 'pg';
+import { PrismaClient } from '../src/generated/prisma/client.js';
 
 @Injectable()
 export class PrismaService
@@ -15,15 +17,24 @@ export class PrismaService
       throw new Error('DATABASE_URL is not configured');
     }
 
-    // 1. Khởi tạo connection pool thông qua thư viện 'pg'
-    const pool = new Pool({ connectionString });
+    const caCertPath = process.env.DATABASE_CA_CERT_PATH;
+    const databaseUrl = new URL(connectionString);
+    const poolConfig: PoolConfig = caCertPath
+      ? {
+          database: databaseUrl.pathname.slice(1),
+          host: databaseUrl.hostname,
+          password: decodeURIComponent(databaseUrl.password),
+          port: Number(databaseUrl.port) || 5432,
+          user: decodeURIComponent(databaseUrl.username),
+          // ponytail: certificate reload requires an API restart; add a cert manager only for live rotation.
+          ssl: {
+            ca: readFileSync(resolve(caCertPath), 'utf8'),
+            rejectUnauthorized: true,
+          },
+        }
+      : { connectionString };
 
-    // 2. Truyền pool vào PrismaPg adapter
-    const adapter = new PrismaPg(pool);
-
-    super({
-      adapter,
-    });
+    super({ adapter: new PrismaPg(new Pool(poolConfig)) });
   }
 
   async onModuleInit() {

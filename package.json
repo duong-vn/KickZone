@@ -17,6 +17,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspace @kickzone/api -- --runInBand",
+    "postinstall": "npm run prisma:generate --workspace @kickzone/api",
     "format": "prettier --write \"apps/**/*.{ts,tsx,js,mjs,json,css}\" \".github/**/*.yml\" \"*.json\"",
     "format:check": "prettier --check \"apps/**/*.{ts,tsx,js,mjs,json,css}\" \".github/**/*.yml\" \"*.json\""
   },
