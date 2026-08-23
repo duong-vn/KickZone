@@ -49,7 +49,7 @@ export function LoginForm() {
 
     try {
       const supabase = getSupabaseBrowserClient();
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -60,7 +60,17 @@ export function LoginForm() {
       }
 
       toast.success('Đăng nhập thành công');
-      router.replace('/');
+
+      const isAdmin =
+        data.user?.user_metadata?.role === 'ADMIN' ||
+        data.user?.app_metadata?.role === 'ADMIN' ||
+        data.user?.email?.toLowerCase().startsWith('admin');
+
+      if (isAdmin) {
+        router.replace('/admin');
+      } else {
+        router.replace('/');
+      }
       router.refresh();
     } catch {
       setErrorMessage('Thiếu cấu hình Supabase hoặc kết nối đang gián đoạn.');
