@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   CalendarDays,
@@ -9,8 +10,10 @@ import {
   Users,
   CalendarCheck,
   LogOut,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getSupabaseBrowserClient } from '@/lib/supabase';
 
 const ADMIN_NAV_ITEMS = [
   {
@@ -46,6 +49,22 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ onClose }: AdminSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      const supabase = getSupabaseBrowserClient();
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      onClose?.();
+      router.push('/login');
+      router.refresh();
+    }
+  };
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-[#bccbb9] bg-white p-4">
@@ -91,12 +110,19 @@ export function AdminSidebar({ onClose }: AdminSidebarProps) {
       <div className="mt-auto border-t border-[#bccbb9]/40 pt-3">
         <button
           type="button"
-          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-[#575e70] transition-colors hover:bg-[#ffdad6]/50 hover:text-[#ba1a1a]"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-[#575e70] transition-colors hover:bg-[#ffdad6]/50 hover:text-[#ba1a1a] disabled:opacity-50"
         >
-          <LogOut className="h-5 w-5 shrink-0" />
-          <span>Đăng xuất</span>
+          {isLoggingOut ? (
+            <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[#ba1a1a]" />
+          ) : (
+            <LogOut className="h-5 w-5 shrink-0" />
+          )}
+          <span>{isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}</span>
         </button>
       </div>
     </aside>
   );
 }
+
