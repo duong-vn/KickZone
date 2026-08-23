@@ -8,6 +8,14 @@ coverage/
 .env.*
 !.env.example
 
+# Local database certificates and keys
+*.ca-bundle
+*.cer
+*.cert
+*.crt
+*.pem
+certs/
+
 apps/api/src/generated/prisma/
 
 .DS_Store
