@@ -107,6 +107,7 @@ export default function AdminFieldsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Modals state
   const [viewingField, setViewingField] = useState<AdminFieldItem | null>(null);
@@ -509,30 +510,47 @@ export default function AdminFieldsPage() {
             <button
               type="button"
               disabled={currentPage === 1}
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               className="rounded border border-[#bccbb9] px-3 py-1 text-xs font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9] disabled:opacity-50"
             >
               Trước
             </button>
             <button
               type="button"
-              className="rounded bg-[#006e2f] px-3 py-1 text-xs font-bold text-white"
+              onClick={() => setCurrentPage(1)}
+              className={`rounded px-3 py-1 text-xs font-bold ${
+                currentPage === 1
+                  ? 'bg-[#006e2f] text-white'
+                  : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
+              }`}
             >
               1
             </button>
             <button
               type="button"
-              className="rounded border border-[#bccbb9] px-3 py-1 text-xs font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9]"
+              onClick={() => setCurrentPage(2)}
+              className={`rounded px-3 py-1 text-xs font-semibold ${
+                currentPage === 2
+                  ? 'bg-[#006e2f] text-white'
+                  : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
+              }`}
             >
               2
             </button>
             <button
               type="button"
-              className="rounded border border-[#bccbb9] px-3 py-1 text-xs font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9]"
+              onClick={() => setCurrentPage(3)}
+              className={`rounded px-3 py-1 text-xs font-semibold ${
+                currentPage === 3
+                  ? 'bg-[#006e2f] text-white'
+                  : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
+              }`}
             >
               3
             </button>
             <button
               type="button"
+              onClick={() => setCurrentPage((prev) => prev + 1)}
               className="rounded border border-[#bccbb9] px-3 py-1 text-xs font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9]"
             >
               Sau

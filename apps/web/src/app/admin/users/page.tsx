@@ -94,6 +94,7 @@ export default function AdminUsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Modal states
   const [viewingUser, setViewingUser] = useState<AdminUserItem | null>(null);
@@ -507,6 +508,7 @@ export default function AdminUsersPage() {
             <button
               type="button"
               disabled={currentPage === 1}
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               className="flex h-9 items-center gap-1 rounded-lg border border-[#bccbb9] px-3 text-xs font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9] disabled:opacity-50"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -516,19 +518,34 @@ export default function AdminUsersPage() {
             <div className="hidden sm:flex items-center gap-1">
               <button
                 type="button"
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#006e2f] text-xs font-bold text-white shadow-sm"
+                onClick={() => setCurrentPage(1)}
+                className={`flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold shadow-sm ${
+                  currentPage === 1
+                    ? 'bg-[#006e2f] text-white'
+                    : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
+                }`}
               >
                 1
               </button>
               <button
                 type="button"
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#bccbb9] text-xs font-semibold text-[#575e70] hover:bg-[#e7e8e9]"
+                onClick={() => setCurrentPage(2)}
+                className={`flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold ${
+                  currentPage === 2
+                    ? 'bg-[#006e2f] text-white'
+                    : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
+                }`}
               >
                 2
               </button>
               <button
                 type="button"
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#bccbb9] text-xs font-semibold text-[#575e70] hover:bg-[#e7e8e9]"
+                onClick={() => setCurrentPage(3)}
+                className={`flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold ${
+                  currentPage === 3
+                    ? 'bg-[#006e2f] text-white'
+                    : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
+                }`}
               >
                 3
               </button>
@@ -537,7 +554,12 @@ export default function AdminUsersPage() {
               </span>
               <button
                 type="button"
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#bccbb9] text-xs font-semibold text-[#575e70] hover:bg-[#e7e8e9]"
+                onClick={() => setCurrentPage(12)}
+                className={`flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold ${
+                  currentPage === 12
+                    ? 'bg-[#006e2f] text-white'
+                    : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
+                }`}
               >
                 12
               </button>
@@ -545,6 +567,7 @@ export default function AdminUsersPage() {
 
             <button
               type="button"
+              onClick={() => setCurrentPage((prev) => prev + 1)}
               className="flex h-9 items-center gap-1 rounded-lg border border-[#bccbb9] px-3 text-xs font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9]"
             >
               <span>Sau</span>
