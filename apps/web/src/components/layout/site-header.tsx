@@ -23,6 +23,7 @@ const NAV_LINKS = [
   { href: '/', label: 'Trang chủ' },
   { href: '/fields', label: 'Tìm sân' },
   { href: '/bookings', label: 'Đơn đặt sân' },
+  { href: '/favorites', label: 'Yêu thích' },
   { href: '/how-it-works', label: 'Cách hoạt động' },
 ];
 

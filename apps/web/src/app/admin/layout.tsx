@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { AdminSidebar } from '@/components/layout/admin-sidebar';
 import { Menu, X, Search, Bell, HelpCircle } from 'lucide-react';
 
@@ -10,6 +11,29 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const rawPathname = usePathname() || '';
+  const pathname = rawPathname.replace(/\/$/, '') || '/admin';
+
+  let currentTitle = 'Tổng quan';
+  if (pathname === '/admin/bookings') {
+    currentTitle = 'Quản lý đơn đặt sân';
+  } else if (pathname.startsWith('/admin/bookings/')) {
+    currentTitle = 'Chi tiết đơn đặt sân';
+  } else if (pathname === '/admin/fields/new' || pathname.startsWith('/admin/fields/new')) {
+    currentTitle = 'Thêm sân bóng mới';
+  } else if (pathname === '/admin/fields') {
+    currentTitle = 'Quản lý sân bóng';
+  } else if (pathname.startsWith('/admin/fields/')) {
+    currentTitle = 'Chi tiết sân bóng';
+  } else if (pathname === '/admin/users') {
+    currentTitle = 'Người dùng';
+  } else if (pathname.startsWith('/admin/users/')) {
+    currentTitle = 'Chi tiết người dùng';
+  } else if (pathname.startsWith('/admin/schedule')) {
+    currentTitle = 'Lịch sân';
+  } else if (pathname === '/admin') {
+    currentTitle = 'Tổng quan';
+  }
 
   return (
     <div className="flex min-h-screen bg-[#f8f9fa] text-[#191c1d]">
@@ -48,7 +72,7 @@ export default function AdminLayout({
               <Menu className="h-6 w-6" />
             </button>
             <h2 className="font-(family-name:--font-manrope) text-lg font-bold text-[#191c1d]">
-              Tổng quan
+              {currentTitle}
             </h2>
           </div>
 
