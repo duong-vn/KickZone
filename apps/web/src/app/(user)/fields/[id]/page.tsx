@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useState, useMemo, use } from 'react';
+import { useMemo, use, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -23,7 +23,6 @@ import {
   Sparkles,
   Award,
   X,
-  Check,
   Flame,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -415,6 +414,20 @@ const BOOKED_SLOTS_MAP: Record<string, string[]> = {
   default: ['09:00', '09:30', '17:00', '17:30', '18:30', '19:00', '20:00'],
 };
 
+const ALL_TIME_SLOTS = [
+  ...TIME_INTERVALS.morning,
+  ...TIME_INTERVALS.afternoon,
+  ...TIME_INTERVALS.evening,
+];
+
+function getSlotEndTime(slot: string): string {
+  const [hours, minutes] = slot.split(':').map(Number);
+  const totalMinutes = hours * 60 + minutes + 30;
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(
+    totalMinutes % 60,
+  ).padStart(2, '0')}`;
+}
+
 export default function FieldDetailPage({
   params,
 }: {
@@ -462,11 +475,7 @@ export default function FieldDetailPage({
   const [selectedDate, setSelectedDate] = useState(
     availableDates[0]?.iso || '',
   );
-  const [selectedSlots, setSelectedSlots] = useState<string[]>([
-    '18:00',
-    '18:30',
-    '19:00',
-  ]);
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
 
   // Voucher state
   const [voucherCode, setVoucherCode] = useState('');
@@ -474,10 +483,6 @@ export default function FieldDetailPage({
     code: string;
     discount: number;
   } | null>(null);
-
-  // Booking Modal State
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-  const [isBookingSuccess, setIsBookingSuccess] = useState(false);
 
   // Current Sub Pitch
   const currentSubPitch = useMemo(
@@ -487,27 +492,57 @@ export default function FieldDetailPage({
     [field.subPitches, selectedSubPitch],
   );
 
-  // Slot handler
+  const handleChangeSubPitch = (subPitchId: string) => {
+    setSelectedSubPitch(subPitchId);
+    setSelectedSlots([]);
+  };
+
+  const handleChangeDate = (date: string) => {
+    setSelectedDate(date);
+    setSelectedSlots([]);
+  };
+
+  // One booking maps to one contiguous start_time/end_time interval.
   const handleToggleSlot = (time: string) => {
-    const isBooked = BOOKED_SLOTS_MAP.default.includes(time);
-    if (isBooked) return;
+    if (BOOKED_SLOTS_MAP.default.includes(time)) return;
+
+    const slotIndex = ALL_TIME_SLOTS.indexOf(time);
+    const selectedIndexes = selectedSlots.map((slot) => ALL_TIME_SLOTS.indexOf(slot));
+    const minimumIndex = Math.min(...selectedIndexes);
+    const maximumIndex = Math.max(...selectedIndexes);
 
     if (selectedSlots.includes(time)) {
-      if (selectedSlots.length === 1) {
-        setSelectedSlots([]);
-      } else {
-        setSelectedSlots((prev) => prev.filter((s) => s !== time));
+      if (
+        selectedSlots.length > 1 &&
+        slotIndex !== minimumIndex &&
+        slotIndex !== maximumIndex
+      ) {
+        toast.error('Chỉ có thể bỏ chọn khung giờ ở đầu hoặc cuối dải.');
+        return;
       }
-    } else {
-      setSelectedSlots((prev) => [...prev, time].sort());
+
+      setSelectedSlots((slots) => slots.filter((slot) => slot !== time));
+      return;
     }
+
+
+    if (
+      selectedSlots.length > 0 &&
+      slotIndex !== minimumIndex - 1 &&
+      slotIndex !== maximumIndex + 1
+    ) {
+      toast.error('Vui lòng chọn các khung giờ liền nhau.');
+      return;
+    }
+
+    setSelectedSlots((slots) => [...slots, time].sort());
   };
 
   // Tính toán thời lượng và giá tiền
   const durationHours = (selectedSlots.length * 30) / 60;
   const currentRate = currentSubPitch?.pricePerHour || field.basePricePerHour;
   const originalPrice = Math.round(durationHours * currentRate);
-  const discountAmount = appliedVoucher ? appliedVoucher.discount : 0;
+  const discountAmount = Math.min(appliedVoucher?.discount ?? 0, originalPrice);
   const finalPrice = Math.max(0, originalPrice - discountAmount);
 
   // Xử lý áp dụng voucher
@@ -521,9 +556,9 @@ export default function FieldDetailPage({
     if (clean === 'KICKZONE50' || clean === 'KZ50') {
       setAppliedVoucher({ code: clean, discount: 50000 });
       toast.success('Đã áp dụng mã giảm giá 50.000đ!');
-    } else if (clean === 'KZ10' || clean === 'VIP10') {
+    } else if (clean === 'KZ10' || clean === 'KZPRO10') {
       const discount = Math.round(originalPrice * 0.1);
-      setAppliedVoucher({ code: clean, discount });
+      setAppliedVoucher({ code: clean, discount: Math.min(discount, originalPrice) });
       toast.success(
         `Đã áp dụng giảm 10% (-${discount.toLocaleString('vi-VN')}đ)!`,
       );
@@ -553,20 +588,31 @@ export default function FieldDetailPage({
       toast.error('Vui lòng chọn ít nhất 1 khung giờ thi đấu.');
       return;
     }
-    setIsBookingModalOpen(true);
-  };
 
-  const handleConfirmOrder = () => {
-    setIsBookingSuccess(true);
-    toast.success(
-      'Gửi yêu cầu đặt sân thành công! Mã đơn KZ-' +
-        Math.floor(100000 + Math.random() * 900000),
-    );
-    setTimeout(() => {
-      setIsBookingModalOpen(false);
-      setIsBookingSuccess(false);
-      router.push('/fields');
-    }, 2200);
+    const start = selectedSlots[0];
+    const end = getSlotEndTime(selectedSlots[selectedSlots.length - 1]);
+    // ponytail: sub-pitch is display-only until it has its own database entity.
+
+    const dateObj = availableDates.find((d) => d.iso === selectedDate);
+    const dateDisplay = dateObj?.dayFormatted || selectedDate;
+
+    const params = new URLSearchParams({
+      fieldId: field.id,
+      fieldName: field.name,
+      fieldAddress: field.address,
+      fieldType: currentSubPitch?.type || 'Sân 7 người',
+      courtName: currentSubPitch?.name || 'Sân tiêu chuẩn',
+      date: selectedDate,
+      dateDisplay,
+      startTime: start,
+      endTime: end,
+      durationHours: durationHours.toString(),
+      pricePerHour: currentRate.toString(),
+      fieldImage: field.images[0] || '',
+      voucher: appliedVoucher?.code || '',
+    });
+
+    router.push(`/checkout?${params.toString()}`);
   };
 
   return (
@@ -1028,12 +1074,16 @@ export default function FieldDetailPage({
 
               {/* 1. Chọn Cụm sân / Sub Pitch */}
               <div>
-                <label className="block text-xs font-bold text-[#191c1d] uppercase tracking-wider mb-2">
+                <label
+                  htmlFor="sub-pitch"
+                  className="block text-xs font-bold text-[#191c1d] uppercase tracking-wider mb-2"
+                >
                   1. Chọn sân thi đấu
                 </label>
                 <select
+                  id="sub-pitch"
                   value={selectedSubPitch}
-                  onChange={(e) => setSelectedSubPitch(e.target.value)}
+                  onChange={(e) => handleChangeSubPitch(e.target.value)}
                   className="w-full bg-[#f8f9fa] border border-[#bccbb9]/60 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-[#191c1d] outline-none focus:border-[#006e2f] focus:ring-2 focus:ring-[#006e2f]/20 cursor-pointer"
                 >
                   {field.subPitches.map((p) => (
@@ -1062,7 +1112,8 @@ export default function FieldDetailPage({
                       <button
                         key={item.iso}
                         type="button"
-                        onClick={() => setSelectedDate(item.iso)}
+                        onClick={() => handleChangeDate(item.iso)}
+                        aria-pressed={isSelected}
                         className={`flex flex-col items-center py-2 px-1 rounded-xl border text-center transition-all ${
                           isSelected
                             ? 'bg-[#006e2f] text-white border-[#006e2f] shadow-sm font-bold scale-[1.03]'
@@ -1121,6 +1172,7 @@ export default function FieldDetailPage({
                             key={slot}
                             type="button"
                             disabled={isBooked}
+                            aria-pressed={isSelected}
                             onClick={() => handleToggleSlot(slot)}
                             className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all ${
                               isBooked
@@ -1152,6 +1204,7 @@ export default function FieldDetailPage({
                             key={slot}
                             type="button"
                             disabled={isBooked}
+                            aria-pressed={isSelected}
                             onClick={() => handleToggleSlot(slot)}
                             className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all ${
                               isBooked
@@ -1183,6 +1236,7 @@ export default function FieldDetailPage({
                             key={slot}
                             type="button"
                             disabled={isBooked}
+                            aria-pressed={isSelected}
                             onClick={() => handleToggleSlot(slot)}
                             className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all ${
                               isBooked
@@ -1203,11 +1257,15 @@ export default function FieldDetailPage({
 
               {/* 4. Voucher / Mã giảm giá */}
               <div>
-                <label className="block text-xs font-bold text-[#191c1d] uppercase tracking-wider mb-2">
+                <label
+                  htmlFor="voucher-code"
+                  className="block text-xs font-bold text-[#191c1d] uppercase tracking-wider mb-2"
+                >
                   4. Mã giảm giá
                 </label>
                 <div className="flex gap-2">
                   <input
+                    id="voucher-code"
                     type="text"
                     value={voucherCode}
                     onChange={(e) => setVoucherCode(e.target.value)}
@@ -1421,122 +1479,6 @@ export default function FieldDetailPage({
           ))}
         </div>
       </div>
-
-      {/* ==========================================
-          MODAL: BOOKING CONFIRMATION MODAL
-      ========================================== */}
-      {isBookingModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#bccbb9]/40 animate-in fade-in zoom-in-95 duration-200">
-            {isBookingSuccess ? (
-              <div className="text-center py-8 space-y-4">
-                <div className="w-16 h-16 rounded-full bg-[#22c55e]/20 text-[#006e2f] flex items-center justify-center mx-auto animate-bounce">
-                  <Check className="w-8 h-8" />
-                </div>
-                <h3 className="text-xl font-bold text-[#191c1d] font-['Manrope']">
-                  Yêu cầu đặt sân thành công!
-                </h3>
-                <p className="text-xs text-[#575e70] max-w-sm mx-auto">
-                  Hệ thống đã ghi nhận đơn đặt sân của bạn với trạng thái{' '}
-                  <b>PENDING</b>. Quản trị viên sẽ liên hệ và xác nhận trong ít
-                  phút.
-                </p>
-                <div className="text-[11px] text-[#006e2f] font-semibold">
-                  Đang chuyển hướng về trang chủ...
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex justify-between items-center pb-4 border-b border-[#bccbb9]/30">
-                  <h3 className="text-lg font-bold text-[#191c1d] font-['Manrope']">
-                    Xác nhận thông tin đặt sân
-                  </h3>
-                  <button
-                    onClick={() => setIsBookingModalOpen(false)}
-                    className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-[#575e70]"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="py-4 space-y-3 text-xs">
-                  <div className="p-3.5 bg-[#f8f9fa] rounded-xl space-y-1.5">
-                    <div className="font-bold text-sm text-[#006e2f]">
-                      {field.name}
-                    </div>
-                    <div className="text-[#575e70]">
-                      {currentSubPitch?.name}
-                    </div>
-                    <div className="text-[#575e70]">{field.address}</div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="p-3 bg-[#f8f9fa] rounded-xl">
-                      <span className="text-[#575e70] block text-[11px]">
-                        Ngày thi đấu
-                      </span>
-                      <span className="font-bold text-[#191c1d]">
-                        {selectedDate}
-                      </span>
-                    </div>
-                    <div className="p-3 bg-[#f8f9fa] rounded-xl">
-                      <span className="text-[#575e70] block text-[11px]">
-                        Khung giờ ({durationHours}h)
-                      </span>
-                      <span className="font-bold text-[#191c1d]">
-                        {selectedSlots[0]} -{' '}
-                        {selectedSlots[selectedSlots.length - 1]}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 border border-[#bccbb9]/40 rounded-xl space-y-1.5">
-                    <div className="flex justify-between text-[#575e70]">
-                      <span>Tiền sân:</span>
-                      <span>{originalPrice.toLocaleString('vi-VN')}đ</span>
-                    </div>
-                    {appliedVoucher && (
-                      <div className="flex justify-between text-[#006e2f] font-semibold">
-                        <span>Giảm giá ({appliedVoucher.code}):</span>
-                        <span>
-                          -{appliedVoucher.discount.toLocaleString('vi-VN')}đ
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between font-bold text-sm text-[#191c1d] pt-1.5 border-t border-[#bccbb9]/30">
-                      <span>Tổng tiền cần thanh toán:</span>
-                      <span className="text-[#006e2f] font-['Manrope']">
-                        {finalPrice.toLocaleString('vi-VN')}đ
-                      </span>
-                    </div>
-                  </div>
-
-                  <p className="text-[11px] text-[#575e70] italic">
-                    * Đơn đặt sẽ được chuyển sang trạng thái <b>PENDING</b> để
-                    ban quản lý kiểm tra và duyệt lịch.
-                  </p>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsBookingModalOpen(false)}
-                    className="flex-1 text-xs border-[#bccbb9]/60"
-                  >
-                    Quay lại
-                  </Button>
-                  <Button
-                    onClick={handleConfirmOrder}
-                    className="flex-1 text-xs font-bold bg-[#006e2f] hover:bg-[#005321] text-white"
-                  >
-                    Xác nhận đặt sân
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* ==========================================
           MODAL: FULLSCREEN LIGHTBOX IMAGE VIEWER
