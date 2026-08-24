@@ -7,7 +7,7 @@ import { Heart, MapPin, Star, Users } from 'lucide-react';
 import { Field } from '@/types/field';
 
 export const DEFAULT_FIELD_IMAGE =
-  'https://images.unsplash.com/photo-1529900240051-5120302b7405?auto=format&fit=crop&w=800&q=80';
+  'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80';
 
 // Format currency VND
 export function formatVND(amount: number): string {
@@ -72,7 +72,8 @@ export function FieldCard({
   const rating = field.rating_avg ?? field.rating ?? 5.0;
   const reviewsCount = field.reviews_count ?? 0;
   const isAvailable = field.is_available_today ?? field.available ?? true;
-  const location = field.location || field.address || `${field.district}, TP.HCM`;
+  const location =
+    field.location || field.address || `${field.district}, TP.HCM`;
   const typeDisplay = formatFieldTypes(field);
 
   const handleFavoriteClick = (e: React.MouseEvent) => {

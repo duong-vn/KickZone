@@ -4,7 +4,7 @@ import type {
   FavoritesResponse,
   ToggleFavoriteResponse,
 } from '@/types/favorite';
-import { Field, FieldsResponse } from '@/types/field';
+import { Field, FieldsResponse, FieldReviewsResponse } from '@/types/field';
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -15,6 +15,15 @@ export const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
 
 export async function getAuthToken(): Promise<string | null> {
   try {
@@ -43,7 +52,10 @@ export const fetchFields = async (
   });
 
   if (!res.ok) {
-    throw new Error('Failed to fetch fields');
+    throw new ApiError(
+      `Lỗi tải danh sách sân bóng (${res.status})`,
+      res.status,
+    );
   }
 
   return res.json();
@@ -55,7 +67,10 @@ export const fetchFieldById = async (id: string): Promise<Field> => {
   });
 
   if (!res.ok) {
-    throw new Error(`Failed to fetch field ${id}`);
+    if (res.status === 404) {
+      throw new ApiError('Không tìm thấy thông tin sân bóng này', 404);
+    }
+    throw new ApiError(`Lỗi tải chi tiết sân bóng (${res.status})`, res.status);
   }
 
   return res.json();
@@ -123,3 +138,77 @@ export async function fetchFavorites(params?: {
 
   return res.data;
 }
+
+export const fetchFieldReviews = async (
+  id: string,
+  params?: Record<string, string | number | boolean | undefined | null>,
+): Promise<FieldReviewsResponse> => {
+  const cleanParams: Record<string, string> = {};
+
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        cleanParams[key] = String(value);
+      }
+    });
+  }
+
+  const query = new URLSearchParams(cleanParams).toString();
+  const res = await fetch(
+    `${API_BASE_URL}/fields/${id}/reviews${query ? `?${query}` : ''}`,
+    {
+      cache: 'no-store',
+    },
+  );
+
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new ApiError('Không tìm thấy đánh giá cho sân bóng này', 404);
+    }
+    throw new ApiError(`Lỗi tải đánh giá sân bóng (${res.status})`, res.status);
+  }
+
+  return res.json();
+};
+
+export interface VoucherValidateResult {
+  valid: boolean;
+  message: string;
+  code?: string;
+  discountType?: 'PERCENT' | 'FIXED';
+  discountValue?: number;
+  discountAmount?: number;
+  finalPrice?: number;
+}
+
+export const validateVoucherApi = async (
+  code: string,
+  originalPrice: number,
+  fieldId?: string,
+): Promise<VoucherValidateResult> => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/vouchers/validate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ code, originalPrice, fieldId }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      return {
+        valid: false,
+        message:
+          errorData.message || 'Mã giảm giá không hợp lệ hoặc đã hết hạn.',
+      };
+    }
+
+    return await res.json();
+  } catch {
+    return {
+      valid: false,
+      message: 'Không thể kết nối máy chủ để kiểm tra mã giảm giá.',
+    };
+  }
+};
