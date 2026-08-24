@@ -30,9 +30,11 @@ export function formatFieldTypes(field: Field): string {
       ? field.types
       : field.field_type?.name
         ? [field.field_type.name]
-        : field.type
+        : typeof field.type === 'string'
           ? [field.type]
-          : [];
+          : field.type?.name
+            ? [field.type.name]
+            : [];
 
   if (rawTypes.length > 0) {
     return rawTypes

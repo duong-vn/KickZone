@@ -5,7 +5,8 @@ import { Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface StarRatingProps {
-  value: number; // 0 to 5 (e.g. 4.8 or integer)
+  value?: number; // 0 to 5 (e.g. 4.8 or integer)
+  rating?: number;
   onChange?: (value: number) => void;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   readonly?: boolean;
@@ -25,6 +26,7 @@ const RATING_LABELS = [
 
 export function StarRating({
   value,
+  rating,
   onChange,
   size = 'sm',
   readonly = true,
@@ -32,9 +34,10 @@ export function StarRating({
   showTextLabel = false,
   className,
 }: StarRatingProps) {
+  const numericValue = value ?? rating ?? 0;
   const [hoverValue, setHoverValue] = useState<number | null>(null);
 
-  const activeValue = hoverValue !== null ? hoverValue : value;
+  const activeValue = hoverValue !== null ? hoverValue : numericValue;
 
   const sizeClasses = {
     xs: 'w-3 h-3',
@@ -105,7 +108,7 @@ export function StarRating({
     <div className={cn('inline-flex items-center gap-1', className)}>
       <div className="flex items-center gap-0.5">
         {[1, 2, 3, 4, 5].map((star) => {
-          const fillDifference = value - (star - 1);
+          const fillDifference = numericValue - (star - 1);
           const isFull = fillDifference >= 0.75;
           const isHalf = fillDifference >= 0.25 && fillDifference < 0.75;
 
@@ -139,7 +142,7 @@ export function StarRating({
       </div>
       {showTextLabel && (
         <span className="text-xs font-bold text-[#191c1d] ml-1">
-          {value.toFixed(1)}
+          {numericValue.toFixed(1)}
         </span>
       )}
     </div>

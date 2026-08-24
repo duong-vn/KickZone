@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 export interface ToggleFavoriteResult {
   is_favorite: boolean;
@@ -152,7 +152,10 @@ export class FavoritesService {
           status: fav.fields.status,
           field_type: fav.fields.field_types?.name,
           field_type_id: fav.fields.field_type_id,
-          image_url: fav.fields.field_images?.storage_path,
+          image_url: Array.isArray(fav.fields.field_images)
+            ? fav.fields.field_images[0]?.storage_path
+            : (fav.fields.field_images as { storage_path?: string } | null)
+                ?.storage_path,
         },
       })),
       meta: {

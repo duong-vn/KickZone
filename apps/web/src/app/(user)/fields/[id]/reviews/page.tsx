@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import type {
   Review,
+  ReviewComment,
   ReviewFilterState,
   ReviewStarFilter,
   ReviewSortOption,
@@ -49,7 +50,7 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
 
   // Fetch field info
   const {
-    data: field,
+    data: fieldResponse,
     isLoading: isFieldLoading,
     isError: isFieldError,
     refetch: refetchField,
@@ -62,6 +63,8 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
       return failureCount < 2;
     },
   });
+
+  const field = fieldResponse?.data;
 
   // Fetch reviews from API
   const { data: reviewsResponse, isLoading: isReviewsLoading } = useQuery({
@@ -144,7 +147,7 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
   // Star counts mapping for filter pills
   const starCounts = useMemo(() => {
     const counts: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-    reviewsList.forEach((r) => {
+    reviewsList.forEach((r: Review) => {
       const star = Math.min(5, Math.max(1, Math.round(r.rating)));
       counts[star] = (counts[star] || 0) + 1;
     });
@@ -199,7 +202,7 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
     if (data.reviewId) {
       setLocalReviews((prev) => {
         const base = prev ?? reviewsList;
-        return base.map((r) =>
+        return base.map((r: Review) =>
           r.id === data.reviewId
             ? {
                 ...r,
@@ -249,7 +252,7 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
     if (!deletingReview) return;
     setLocalReviews((prev) => {
       const base = prev ?? reviewsList;
-      return base.filter((r) => r.id !== deletingReview.id);
+      return base.filter((r: Review) => r.id !== deletingReview.id);
     });
     toast.success('Đã xóa bài đánh giá thành công.');
     setDeletingReview(null);
@@ -274,11 +277,11 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
 
     setLocalReviews((prev) => {
       const base = prev ?? reviewsList;
-      return base.map((rev) => {
+      return base.map((rev: Review) => {
         if (rev.id !== reviewId) return rev;
 
         if (parentId) {
-          const updatedComments = rev.comments.map((c) => {
+          const updatedComments = rev.comments.map((c: ReviewComment) => {
             if (c.id === parentId) {
               return { ...c, replies: [...(c.replies || []), newComment] };
             }

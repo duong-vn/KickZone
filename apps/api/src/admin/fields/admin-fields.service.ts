@@ -1,11 +1,11 @@
 import {
-  BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
+  BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { Prisma } from '../../generated/prisma/client.js';
+import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { CreateFieldDto } from './dto/create-field.dto';
 
@@ -104,7 +104,7 @@ export class AdminFieldsService {
           status: f.status,
           imageUrl:
             firstImg?.storage_path ||
-            f.field_images?.storage_path ||
+            f.field_images?.[0]?.storage_path ||
             'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=500&auto=format&fit=crop&q=60',
           description: f.description || '',
           createdAt: f.created_at.toISOString().split('T')[0],
@@ -159,7 +159,7 @@ export class AdminFieldsService {
     const imageUrl =
       fieldImages.length > 0
         ? fieldImages[0].storage_path
-        : field.field_images?.storage_path ||
+        : field.field_images?.[0]?.storage_path ||
           'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=800&auto=format&fit=crop&q=80';
 
     const images =

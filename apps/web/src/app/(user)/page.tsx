@@ -255,6 +255,7 @@ export default function HomePage() {
                 city: 'TP.HCM',
                 district: field.location.split(',')[0].trim(),
                 base_price_per_hour: field.pricePerHour,
+                basePricePerHour: field.pricePerHour,
                 pricePerHour: field.pricePerHour,
                 status: 'ACTIVE',
                 created_at: new Date().toISOString(),

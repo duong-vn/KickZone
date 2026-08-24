@@ -7,8 +7,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Prisma } from '../../generated/prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { Prisma } from '../../generated/prisma/client.js';
+import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { CreateUserDto } from './dto/create-user.dto';
 
