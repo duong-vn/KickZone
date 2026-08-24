@@ -41,6 +41,16 @@ export class EmailService {
     );
   }
 
+  enqueueBookingCreated(recipient: string, booking: BookingResponse): void {
+    setImmediate(() => {
+      this.sendBookingCreated(recipient, booking).catch((err: unknown) => {
+        this.logger.error(
+          `Background email failed for booking ${booking.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+    });
+  }
+
   async sendBookingCancelled(
     recipient: string,
     booking: BookingResponse,
@@ -62,6 +72,16 @@ export class EmailService {
       `Đã hủy đặt sân ${booking.code}`,
       lines,
     );
+  }
+
+  enqueueBookingCancelled(recipient: string, booking: BookingResponse): void {
+    setImmediate(() => {
+      this.sendBookingCancelled(recipient, booking).catch((err: unknown) => {
+        this.logger.error(
+          `Background cancellation email failed for booking ${booking.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+    });
   }
 
   private async sendBookingEmail(

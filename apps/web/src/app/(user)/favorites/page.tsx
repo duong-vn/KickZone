@@ -14,11 +14,18 @@ import {
   RotateCcw,
   ChevronDown,
   Check,
+  LogIn,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 import type { Favorite } from '@/types/favorite';
-import { MOCK_FAVORITES } from '@/data/mock-favorites';
+import {
+  useFavoritesQuery,
+  FAVORITES_QUERY_KEY,
+  FAVORITE_STATUS_QUERY_KEY,
+} from '@/hooks/use-favorites';
+import { toggleFavoriteField } from '@/lib/api';
 
 // Helper format VND currency
 function formatVND(amount: number): string {
@@ -39,7 +46,16 @@ const SORT_OPTIONS = [
 type SortValue = (typeof SORT_OPTIONS)[number]['value'];
 
 export default function FavoritesPage() {
-  const [favorites, setFavorites] = useState<Favorite[]>(MOCK_FAVORITES);
+  const queryClient = useQueryClient();
+  const { data: favoritesData, isLoading, error } = useFavoritesQuery();
+
+  const isUnauthorized =
+    error instanceof Error && error.message === 'UNAUTHORIZED';
+
+  const favorites = useMemo(() => {
+    return favoritesData?.data || [];
+  }, [favoritesData]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortValue>('recent');
@@ -61,33 +77,61 @@ export default function FavoritesPage() {
   // Extract unique districts from active favorites
   const districts = useMemo(() => {
     const set = new Set<string>();
-    MOCK_FAVORITES.forEach((fav) => {
+    favorites.forEach((fav) => {
       if (fav.field.district) set.add(fav.field.district);
     });
     return Array.from(set);
-  }, []);
+  }, [favorites]);
 
-  // Handle Remove Favorite with Toast + Undo
-  const handleRemoveFavorite = (favorite: Favorite) => {
-    const removedId = favorite.id;
-    const removedItem = favorite;
+  // Handle Remove Favorite with Optimistic UI & API Call
+  const handleRemoveFavorite = async (favorite: Favorite) => {
+    const fieldId = favorite.field_id || favorite.field.id;
+    const fieldName = favorite.field.name;
 
-    // Optimistic removal
-    setFavorites((prev) => prev.filter((item) => item.id !== removedId));
+    // Snapshot previous data for rollback
+    const previousFavorites =
+      queryClient.getQueryData<typeof favoritesData>(FAVORITES_QUERY_KEY);
 
-    toast.success(`Đã xóa "${favorite.field.name}" khỏi danh sách yêu thích`, {
-      description: 'Bạn có thể hoàn tác nếu bấm nhầm.',
-      action: {
-        label: 'Hoàn tác',
-        onClick: () => {
-          setFavorites((prev) => {
-            if (prev.some((item) => item.id === removedId)) return prev;
-            return [removedItem, ...prev];
-          });
-          toast.info(`Đã khôi phục "${favorite.field.name}" vào yêu thích.`);
-        },
+    // Optimistically remove from query cache
+    queryClient.setQueryData(
+      FAVORITES_QUERY_KEY,
+      (old: typeof favoritesData) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.filter((item) => item.id !== favorite.id),
+          meta: old.meta
+            ? { ...old.meta, total: Math.max(0, old.meta.total - 1) }
+            : undefined,
+        };
       },
+    );
+
+    // Optimistically update field favorite status
+    queryClient.setQueryData(FAVORITE_STATUS_QUERY_KEY(fieldId), {
+      is_favorite: false,
     });
+
+    try {
+      await toggleFavoriteField(fieldId);
+      toast.success(`Đã xóa "${fieldName}" khỏi danh sách yêu thích`, {
+        description: 'Bạn có thể thêm lại bất cứ lúc nào.',
+      });
+    } catch {
+      // Rollback on error
+      if (previousFavorites) {
+        queryClient.setQueryData(FAVORITES_QUERY_KEY, previousFavorites);
+      }
+      queryClient.setQueryData(FAVORITE_STATUS_QUERY_KEY(fieldId), {
+        is_favorite: true,
+      });
+      toast.error('Không thể xóa sân yêu thích. Vui lòng thử lại!');
+    } finally {
+      void queryClient.invalidateQueries({ queryKey: FAVORITES_QUERY_KEY });
+      void queryClient.invalidateQueries({
+        queryKey: FAVORITE_STATUS_QUERY_KEY(fieldId),
+      });
+    }
   };
 
   // Filter and sort favorites
@@ -108,7 +152,7 @@ export default function FavoritesPage() {
       })
       .sort((a, b) => {
         if (sortBy === 'rating') {
-          return (b.field.rating_avg ?? 0) - (a.field.rating_avg ?? 0);
+          return (b.field.rating_avg ?? 4.8) - (a.field.rating_avg ?? 4.8);
         }
         if (sortBy === 'price-asc') {
           return (
@@ -135,9 +179,11 @@ export default function FavoritesPage() {
               <h1 className="font-['Manrope',sans-serif] text-2xl sm:text-3xl font-extrabold text-[#191c1d] tracking-tight">
                 Sân yêu thích
               </h1>
-              <span className="inline-flex items-center rounded-full bg-[#dcfce7] px-2.5 py-0.5 text-xs font-bold text-[#006e2f]">
-                {favorites.length} sân đã lưu
-              </span>
+              {!isLoading && !isUnauthorized && (
+                <span className="inline-flex items-center rounded-full bg-[#dcfce7] px-2.5 py-0.5 text-xs font-bold text-[#006e2f]">
+                  {favorites.length} sân đã lưu
+                </span>
+              )}
             </div>
             <p className="mt-1.5 font-['Inter',sans-serif] text-sm text-[#575e70]">
               Danh sách các sân bóng bạn đã lưu lại để đặt nhanh.
@@ -155,8 +201,50 @@ export default function FavoritesPage() {
           </Link>
         </div>
 
-        {/* Minimalist Filter & Search Bar */}
-        {favorites.length > 0 && (
+        {/* Loading State */}
+        {isLoading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="bg-white border border-[#bccbb9]/40 rounded-2xl p-4 h-72 animate-pulse flex flex-col justify-between"
+              >
+                <div className="aspect-16/10 bg-[#edeeef] rounded-xl mb-3" />
+                <div className="h-4 bg-[#edeeef] rounded w-3/4 mb-2" />
+                <div className="h-3 bg-[#edeeef] rounded w-1/2 mb-4" />
+                <div className="h-6 bg-[#edeeef] rounded w-full mt-auto" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Unauthorized State */}
+        {!isLoading && isUnauthorized && (
+          <div className="flex flex-col items-center justify-center py-20 text-center rounded-3xl border border-dashed border-[#bccbb9] bg-white p-6">
+            <div className="w-16 h-16 bg-[#f3f4f5] rounded-full flex items-center justify-center mb-4 text-[#006e2f]">
+              <LogIn className="w-8 h-8" />
+            </div>
+            <h2 className="font-['Manrope',sans-serif] text-xl font-bold text-[#191c1d] mb-2">
+              Vui lòng đăng nhập
+            </h2>
+            <p className="font-['Inter',sans-serif] text-sm text-[#575e70] max-w-md mb-6">
+              Bạn cần đăng nhập tài khoản để xem và quản lý danh sách các sân
+              bóng yêu thích.
+            </p>
+            <Link href="/login?redirect=/favorites">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#006e2f] text-white font-['Inter',sans-serif] text-xs font-semibold rounded-xl hover:bg-[#006e2f]/90 transition-colors shadow-md active:scale-95 cursor-pointer"
+              >
+                <LogIn className="w-4 h-4" />
+                Đăng nhập ngay
+              </button>
+            </Link>
+          </div>
+        )}
+
+        {/* Filter & Search Bar */}
+        {!isLoading && !isUnauthorized && favorites.length > 0 && (
           <div className="mb-6 rounded-2xl border border-[#bccbb9]/50 bg-white p-3 sm:p-4 shadow-2xs">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               {/* Search input */}
@@ -202,7 +290,7 @@ export default function FavoritesPage() {
                   ))}
                 </div>
 
-                {/* Custom Sort Dropdown (No native select) */}
+                {/* Custom Sort Dropdown */}
                 <div ref={sortRef} className="relative">
                   <button
                     type="button"
@@ -252,8 +340,8 @@ export default function FavoritesPage() {
           </div>
         )}
 
-        {/* 4-Column Favorites Grid (Sleek, Compact & Clean) */}
-        {filteredFavorites.length > 0 ? (
+        {/* 4-Column Favorites Grid */}
+        {!isLoading && !isUnauthorized && filteredFavorites.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {filteredFavorites.map((item) => {
               const field = item.field;
@@ -265,7 +353,12 @@ export default function FavoritesPage() {
                   {/* Image Container */}
                   <div className="relative aspect-16/10 w-full overflow-hidden bg-[#e1e3e4]">
                     <img
-                      src={field.primary_image_url || '/placeholder-pitch.jpg'}
+                      src={
+                        field.primary_image_url ||
+                        (field as unknown as { image_url?: string })
+                          .image_url ||
+                        'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&auto=format&fit=crop&q=80'
+                      }
                       alt={field.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       loading="lazy"
@@ -286,16 +379,10 @@ export default function FavoritesPage() {
                     </button>
 
                     {/* Status Pill Bottom-Left */}
-                    {field.is_available_today ? (
-                      <div className="absolute bottom-2.5 left-2.5 bg-[#22c55e] text-[#004b1e] px-2 py-0.5 rounded-md font-['Inter',sans-serif] text-[11px] font-bold shadow-xs flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#004b1e] animate-pulse" />
-                        Còn sân hôm nay
-                      </div>
-                    ) : (
-                      <div className="absolute bottom-2.5 left-2.5 bg-[#e1e3e4]/95 text-[#575e70] px-2 py-0.5 rounded-md font-['Inter',sans-serif] text-[11px] font-semibold shadow-xs">
-                        Kín lịch hôm nay
-                      </div>
-                    )}
+                    <div className="absolute bottom-2.5 left-2.5 bg-[#22c55e] text-[#004b1e] px-2 py-0.5 rounded-md font-['Inter',sans-serif] text-[11px] font-bold shadow-xs flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#004b1e] animate-pulse" />
+                      Sẵn sàng đặt sân
+                    </div>
                   </div>
 
                   {/* Card Content */}
@@ -317,9 +404,6 @@ export default function FavoritesPage() {
                         <span className="font-['Inter',sans-serif] text-[11px] font-bold text-[#191c1d]">
                           {field.rating_avg?.toFixed(1) || '4.8'}
                         </span>
-                        <span className="font-['Inter',sans-serif] text-[10px] text-[#575e70]">
-                          ({field.reviews_count || 0})
-                        </span>
                       </div>
                     </div>
 
@@ -333,10 +417,10 @@ export default function FavoritesPage() {
                       <div className="flex items-center gap-1.5">
                         <Users className="w-3.5 h-3.5 shrink-0 text-[#575e70]" />
                         <span className="line-clamp-1">
-                          {field.supported_types &&
-                          field.supported_types.length > 0
-                            ? field.supported_types.join(' • ')
-                            : 'Sân 5 người • Sân 7 người'}
+                          {field.field_type?.name ||
+                            (field as unknown as { field_type?: string })
+                              .field_type ||
+                            'Sân bóng đá'}
                         </span>
                       </div>
                     </div>
@@ -370,26 +454,14 @@ export default function FavoritesPage() {
                           <Heart className="w-3.5 h-3.5" />
                         </button>
 
-                        {/* CTA button: Đặt ngay (green) hoặc Xem chi tiết (outline) */}
-                        {field.is_available_today ? (
-                          <Link href={`/fields/${field.id}`}>
-                            <button
-                              type="button"
-                              className="px-3 py-1.5 bg-[#006e2f] text-white font-['Inter',sans-serif] text-xs font-semibold rounded-lg hover:bg-[#006e2f]/90 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                            >
-                              Đặt ngay
-                            </button>
-                          </Link>
-                        ) : (
-                          <Link href={`/fields/${field.id}`}>
-                            <button
-                              type="button"
-                              className="px-3 py-1.5 border border-[#006e2f] text-[#006e2f] font-['Inter',sans-serif] text-xs font-semibold rounded-lg hover:bg-[#006e2f]/10 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                            >
-                              Xem chi tiết
-                            </button>
-                          </Link>
-                        )}
+                        <Link href={`/fields/${field.id}`}>
+                          <button
+                            type="button"
+                            className="px-3 py-1.5 bg-[#006e2f] text-white font-['Inter',sans-serif] text-xs font-semibold rounded-lg hover:bg-[#006e2f]/90 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                          >
+                            Đặt ngay
+                          </button>
+                        </Link>
                       </div>
                     </div>
                   </div>
@@ -397,9 +469,11 @@ export default function FavoritesPage() {
               );
             })}
           </div>
-        ) : (
-          /* Empty State */
-          <div className="flex flex-col items-center justify-center py-20 text-center rounded-3xl border border-dashed border-[#bccbb9] bg-white">
+        )}
+
+        {/* Empty State */}
+        {!isLoading && !isUnauthorized && filteredFavorites.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-center rounded-3xl border border-dashed border-[#bccbb9] bg-white p-6">
             <div className="w-16 h-16 bg-[#edeeef] rounded-full flex items-center justify-center mb-5 text-[#575e70]">
               <Heart className="w-8 h-8 text-[#575e70] stroke-[1.5]" />
             </div>

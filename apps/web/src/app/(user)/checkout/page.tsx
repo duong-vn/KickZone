@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 
 import { Suspense, useState } from 'react';
@@ -36,6 +37,7 @@ function CheckoutContent() {
   const params = useSearchParams();
   const queryClient = useQueryClient();
   const authReady = useRequireAuth();
+
   const fieldId = params.get('fieldId') ?? '';
   const startTime = params.get('startTime') ?? '';
   const endTime = params.get('endTime') ?? '';
@@ -46,12 +48,14 @@ function CheckoutContent() {
     !Number.isNaN(new Date(startTime).getTime()) &&
     !Number.isNaN(new Date(endTime).getTime()),
   );
+
   const fieldQuery = useQuery({
     queryKey: ['field', fieldId],
     queryFn: () => fetchFieldById(fieldId),
     enabled: authReady && validDraft,
     retry: false,
   });
+
   const date = startTime
     ? new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Ho_Chi_Minh',
@@ -60,12 +64,14 @@ function CheckoutContent() {
         day: '2-digit',
       }).format(new Date(startTime))
     : '';
+
   const availabilityQuery = useQuery({
     queryKey: ['availability', fieldId, date],
     queryFn: () => fetchAvailability(fieldId, date),
     enabled: authReady && validDraft && Boolean(date),
     retry: false,
   });
+
   const field = fieldQuery.data?.data;
   const availableSlots = availabilityQuery.data?.data.slots ?? [];
   const selectedSlots = availableSlots.filter(
@@ -77,6 +83,7 @@ function CheckoutContent() {
     (sum, slot) => sum + slot.price,
     0,
   );
+
   const [voucherCode, setVoucherCode] = useState('');
   const [voucher, setVoucher] = useState<{
     code: string;
@@ -123,6 +130,7 @@ function CheckoutContent() {
         startTime,
         endTime,
         code,
+        originalPrice: originalPrice || field?.basePricePerHour || 0,
       });
       setVoucher({
         code: response.data.code,
@@ -153,22 +161,31 @@ function CheckoutContent() {
   if (fieldQuery.isError || availabilityQuery.isError || !field)
     return <State message="Không thể tải thông tin đặt sân." error />;
 
-  const image = field.images.find((item) => item.isPrimary)?.storagePath;
+  const firstImage = Array.isArray(field.images) ? field.images[0] : null;
+  const image =
+    typeof firstImage === 'string'
+      ? firstImage
+      : typeof firstImage === 'object' && firstImage !== null
+        ? (firstImage.storagePath ?? firstImage.storage_path ?? null)
+        : (field.image ?? field.primary_image_url ?? null);
+
   const duration = durationMinutes(startTime, endTime);
   const total = voucher?.finalPrice ?? originalPrice;
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] pb-16 text-[#191c1d]">
+    <div className="min-h-screen bg-[#f8f9fa] pb-16 text-[#191c1d] font-sans">
       <div className="border-b border-[#bccbb9]/40 bg-white py-5 shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <nav className="flex items-center gap-2 text-xs text-[#575e70]">
-            <Link href="/fields">Tìm sân</Link>
+            <Link href="/fields" className="hover:text-[#006e2f]">
+              Tìm sân
+            </Link>
             <ChevronRight className="h-3.5 w-3.5" />
             <span className="font-semibold text-[#191c1d]">
               Xác nhận đặt sân
             </span>
           </nav>
-          <h1 className="mt-2 text-2xl font-extrabold">
+          <h1 className="mt-2 text-2xl font-extrabold font-['Manrope']">
             Xác nhận thông tin đặt sân
           </h1>
         </div>
@@ -188,39 +205,41 @@ function CheckoutContent() {
             <div>
               <h2 className="text-lg font-bold">{field.name}</h2>
               <p className="mt-1 flex items-center gap-1 text-xs text-[#575e70]">
-                <MapPin className="h-3.5 w-3.5 text-[#006e2f]" />
+                <MapPin className="h-3.5 w-3.5 text-[#006e2f] shrink-0" />
                 {field.address}
               </p>
               <span className="mt-2 inline-block rounded-full bg-[#006e2f]/10 px-2.5 py-1 text-xs font-bold text-[#006e2f]">
-                {field.type?.name ?? 'Sân bóng'}
+                {typeof field.type === 'string'
+                  ? field.type
+                  : (field.type?.name ?? 'Sân bóng')}
               </span>
             </div>
           </div>
           <div className="rounded-2xl border border-[#bccbb9]/40 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 flex items-center gap-2 border-b border-[#bccbb9]/30 pb-3 font-bold">
+            <h3 className="mb-4 flex items-center gap-2 border-b border-[#bccbb9]/30 pb-3 font-bold text-sm">
               <Clock className="h-4 w-4 text-[#006e2f]" />
               Thời gian thi đấu
             </h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Info
-                icon={<Calendar />}
+                icon={<Calendar className="w-4 h-4" />}
                 label="Ngày"
                 value={formatBusinessDate(startTime)}
               />
               <Info
-                icon={<Clock />}
+                icon={<Clock className="w-4 h-4" />}
                 label="Khung giờ"
                 value={`${formatBusinessTime(startTime)} - ${formatBusinessTime(endTime)}`}
               />
               <Info
-                icon={<Clock />}
+                icon={<Clock className="w-4 h-4" />}
                 label="Thời lượng"
                 value={`${duration} phút`}
               />
             </div>
           </div>
           <div className="rounded-2xl border border-[#bccbb9]/40 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 flex items-center gap-2 border-b border-[#bccbb9]/30 pb-3 font-bold">
+            <h3 className="mb-4 flex items-center gap-2 border-b border-[#bccbb9]/30 pb-3 font-bold text-sm">
               <Tag className="h-4 w-4 text-[#006e2f]" />
               Mã ưu đãi / Voucher
             </h3>
@@ -231,13 +250,13 @@ function CheckoutContent() {
                   setVoucherCode(event.target.value);
                   setVoucher(null);
                 }}
-                placeholder="Nhập mã voucher"
-                className="flex-1 rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] px-3 py-2 text-xs uppercase outline-none"
+                placeholder="Nhập mã voucher (vd: KICKZONE50, KZ10)"
+                className="flex-1 rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] px-3 py-2 text-xs uppercase outline-none focus:border-[#006e2f]"
               />
               <Button
                 onClick={applyVoucher}
                 disabled={isVoucherLoading}
-                className="rounded-xl bg-[#006e2f] text-xs"
+                className="rounded-xl bg-[#006e2f] text-xs font-bold"
               >
                 {isVoucherLoading ? 'Đang kiểm tra...' : 'Áp dụng'}
               </Button>
@@ -278,7 +297,7 @@ function CheckoutContent() {
             <Button
               onClick={() => createMutation.mutate()}
               disabled={createMutation.isPending || !selectedSlots.length}
-              className="mt-6 w-full rounded-xl bg-[#006e2f] py-6 text-base font-bold hover:bg-[#005321]"
+              className="mt-6 w-full rounded-xl bg-[#006e2f] py-6 text-base font-bold hover:bg-[#005321] cursor-pointer"
             >
               {createMutation.isPending
                 ? 'Đang gửi yêu cầu...'
@@ -287,13 +306,13 @@ function CheckoutContent() {
             <Button
               variant="outline"
               onClick={() => router.back()}
-              className="mt-2 w-full rounded-xl"
+              className="mt-2 w-full rounded-xl text-xs font-semibold"
             >
               <ArrowLeft className="mr-1.5 h-4 w-4" />
               Quay lại
             </Button>
             <p className="mt-4 flex items-center gap-1 text-[11px] text-[#575e70]">
-              <Shield className="h-3.5 w-3.5 text-[#006e2f]" />
+              <Shield className="h-3.5 w-3.5 text-[#006e2f] shrink-0" />
               Giá sẽ được xác nhận lại khi tạo booking.
             </p>
           </div>
@@ -322,6 +341,7 @@ function Info({
     </div>
   );
 }
+
 function State({
   message,
   error = false,
@@ -337,6 +357,7 @@ function State({
     </div>
   );
 }
+
 export default function CheckoutPage() {
   return (
     <Suspense fallback={<State message="Đang tải thông tin đặt sân..." />}>

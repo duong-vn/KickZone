@@ -8,15 +8,20 @@ import type {
   VoucherPreview,
 } from '@/types/booking';
 import type {
+  FavoritesResponse,
+  ToggleFavoriteResponse,
+} from '@/types/favorite';
+import type {
   AvailabilityResponse,
   FieldDetail,
   FieldsResponse,
+  FieldReviewsResponse,
   Paginated,
 } from '@/types/field';
 
 export interface ApiErrorShape {
   status: number;
-  code: string;
+  code?: string;
   message: string;
 }
 
@@ -28,7 +33,7 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
     this.status = status;
-    this.code = code;
+    this.code = code || 'API_ERROR';
   }
 }
 
@@ -40,6 +45,16 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+export async function getAuthToken(): Promise<string | null> {
+  try {
+    const supabase = getSupabaseBrowserClient();
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || null;
+  } catch {
+    return null;
+  }
+}
+
 async function request<T>(
   method: 'get' | 'post' | 'patch',
   url: string,
@@ -50,9 +65,7 @@ async function request<T>(
   try {
     const headers: Record<string, string> = {};
     if (protectedRequest) {
-      const { data: sessionData } =
-        await getSupabaseBrowserClient().auth.getSession();
-      const token = sessionData.session?.access_token;
+      const token = await getAuthToken();
       if (!token)
         throw new ApiError({
           status: 401,
@@ -95,8 +108,17 @@ export function fetchFields(
   return request<FieldsResponse>('get', '/fields', undefined, params);
 }
 
-export function fetchFieldById(id: string) {
-  return request<{ data: FieldDetail }>('get', `/fields/${id}`);
+export async function fetchFieldById(
+  id: string,
+): Promise<{ data: FieldDetail }> {
+  const res = await request<FieldDetail | { data: FieldDetail }>(
+    'get',
+    `/fields/${id}`,
+  );
+  if (res && typeof res === 'object' && 'data' in res && res.data) {
+    return res as { data: FieldDetail };
+  }
+  return { data: res as FieldDetail };
 }
 
 export function fetchAvailability(fieldId: string, date: string) {
@@ -109,17 +131,18 @@ export function fetchAvailability(fieldId: string, date: string) {
 }
 
 export function validateVoucher(input: {
-  fieldId: string;
-  startTime: string;
-  endTime: string;
+  fieldId?: string;
+  startTime?: string;
+  endTime?: string;
   code: string;
+  originalPrice?: number;
 }) {
   return request<{ data: VoucherPreview }>(
     'post',
     '/vouchers/validate',
     input,
     undefined,
-    true,
+    false,
   );
 }
 
@@ -167,3 +190,108 @@ export function cancelBooking(id: string, input: CancelBookingRequest) {
     true,
   );
 }
+
+export async function toggleFavoriteField(
+  fieldId: string,
+): Promise<ToggleFavoriteResponse> {
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error('UNAUTHORIZED');
+  }
+
+  const res = await api.post<ToggleFavoriteResponse>(
+    `/fields/${fieldId}/favorite`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  return res.data;
+}
+
+export async function fetchFavoriteStatus(
+  fieldId: string,
+): Promise<{ is_favorite: boolean }> {
+  const token = await getAuthToken();
+  if (!token) {
+    return { is_favorite: false };
+  }
+
+  try {
+    const res = await api.get<{ is_favorite: boolean }>(
+      `/fields/${fieldId}/favorite`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    return res.data;
+  } catch {
+    return { is_favorite: false };
+  }
+}
+
+export async function fetchFavorites(params?: {
+  page?: number;
+  limit?: number;
+}): Promise<FavoritesResponse> {
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error('UNAUTHORIZED');
+  }
+
+  const res = await api.get<FavoritesResponse>('/favorites', {
+    params,
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.data;
+}
+
+export const fetchFieldReviews = async (
+  id: string,
+  params?: Record<string, string | number | boolean | undefined | null>,
+): Promise<FieldReviewsResponse> => {
+  return request<FieldReviewsResponse>(
+    'get',
+    `/fields/${id}/reviews`,
+    undefined,
+    params,
+  );
+};
+
+export interface VoucherValidateResult {
+  valid: boolean;
+  message: string;
+  code?: string;
+  discountType?: 'PERCENT' | 'FIXED';
+  discountValue?: number;
+  discountAmount?: number;
+  finalPrice?: number;
+}
+
+export const validateVoucherApi = async (
+  code: string,
+  originalPrice: number,
+  fieldId?: string,
+): Promise<VoucherValidateResult> => {
+  try {
+    const res = await api.post<VoucherValidateResult>('/vouchers/validate', {
+      code,
+      originalPrice,
+      fieldId,
+    });
+    return res.data;
+  } catch {
+    return {
+      valid: false,
+      message: 'Không thể kết nối máy chủ để kiểm tra mã giảm giá.',
+    };
+  }
+};

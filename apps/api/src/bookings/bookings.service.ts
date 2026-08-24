@@ -10,7 +10,7 @@ import {
   discount_type,
   field_status,
 } from '../generated/prisma/client.js';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 import type { AuthenticatedProfile } from '../auth/supabase-auth.service.js';
 import { EmailService } from '../email/email.service.js';
 import type { CancelBookingDto } from './dto/cancel-booking.dto.js';
@@ -170,7 +170,7 @@ export class BookingsService {
     });
 
     const response = this.mapBooking(booking);
-    await this.email.sendBookingCreated(profile.email, response);
+    this.email.enqueueBookingCreated(profile.email, response);
     return { data: response };
   }
 
@@ -305,7 +305,7 @@ export class BookingsService {
     });
 
     const response = this.mapBooking(updated);
-    await this.email.sendBookingCancelled(profile.email, response);
+    this.email.enqueueBookingCancelled(profile.email, response);
     return { data: response };
   }
 

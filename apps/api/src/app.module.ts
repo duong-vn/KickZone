@@ -2,18 +2,21 @@ import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { SupabaseAuthGuard } from './auth/supabase-auth.guard.js';
-import { SupabaseAuthService } from './auth/supabase-auth.service.js';
-import { BookingsController } from './bookings/bookings.controller.js';
-import { BookingsService } from './bookings/bookings.service.js';
-import { EmailService } from './email/email.service.js';
-import { FieldsController } from './fields/fields.controller.js';
-import { FieldsService } from './fields/fields.service.js';
-import { VouchersController } from './vouchers/vouchers.controller.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { AuthModule } from './auth/auth.module';
+import { SupabaseAuthGuard } from './auth/supabase-auth.guard';
+import { SupabaseAuthService } from './auth/supabase-auth.service';
+import { BookingsController } from './bookings/bookings.controller';
+import { BookingsService } from './bookings/bookings.service';
+import { EmailService } from './email/email.service';
+import { FavoritesModule } from './favorites/favorites.module';
+import { FieldsController } from './fields/fields.controller';
+import { FieldsService } from './fields/fields.service';
+import { VouchersController } from './vouchers/vouchers.controller';
+import { VouchersService } from './vouchers/vouchers.service';
+import { PrismaService } from './prisma/prisma.service';
 
 @Module({
-  imports: [ScheduleModule.forRoot()],
+  imports: [ScheduleModule.forRoot(), AuthModule, FavoritesModule],
   controllers: [
     AppController,
     FieldsController,
@@ -25,6 +28,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
     FieldsService,
     BookingsService,
     EmailService,
+    VouchersService,
     PrismaService,
     SupabaseAuthService,
     SupabaseAuthGuard,

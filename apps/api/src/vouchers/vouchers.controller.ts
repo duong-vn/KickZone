@@ -1,22 +1,20 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
-import { CurrentProfile } from '../auth/current-profile.decorator.js';
-import {
-  SupabaseAuthGuard,
-  type AuthenticatedProfile,
-} from '../auth/supabase-auth.guard.js';
-import { BookingsService } from '../bookings/bookings.service.js';
-import { ValidateVoucherDto } from './dto/validate-voucher.dto.js';
+import { Body, Controller, Post } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ValidateVoucherDto } from './dto/validate-voucher.dto';
+import { VouchersService } from './vouchers.service';
 
+@ApiTags('vouchers')
 @Controller('vouchers')
-@UseGuards(SupabaseAuthGuard)
 export class VouchersController {
-  constructor(private readonly bookings: BookingsService) {}
+  constructor(private readonly vouchersService: VouchersService) {}
 
   @Post('validate')
-  validate(
-    @Body() dto: ValidateVoucherDto,
-    @CurrentProfile() profile: AuthenticatedProfile,
-  ) {
-    return this.bookings.validateVoucher(dto, profile);
+  @ApiOperation({ summary: 'Kiểm tra và tính toán giảm giá của voucher' })
+  @ApiResponse({
+    status: 200,
+    description: 'Kết quả kiểm tra mã giảm giá',
+  })
+  validate(@Body() dto: ValidateVoucherDto) {
+    return this.vouchersService.validate(dto);
   }
 }

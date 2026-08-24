@@ -1,11 +1,10 @@
-
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   Prisma,
   field_status,
   booking_status,
-} from '../generated/prisma/client.js';
-import { PrismaService } from '../../prisma/prisma.service.js';
+} from '../generated/prisma/client';
 import {
   getSegments,
   getSqlTimeMinutes,
@@ -13,38 +12,40 @@ import {
   parseAvailabilityDate,
   type BookingInterval,
   type PriceRuleInput,
-} from '../bookings/booking-rules.js';
-import { GetFieldsQueryDto } from './dto/get-fields-query.dto.js';
+} from '../bookings/booking-rules';
+import { GetFieldReviewsQueryDto } from './dto/get-field-reviews-query.dto';
+import { GetFieldsQueryDto } from './dto/get-fields-query.dto';
+
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 9;
+const MAX_LIMIT = 100;
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const PUBLIC_FIELD_WHERE = {
   status: field_status.ACTIVE,
   deleted_at: null,
 } satisfies Prisma.fieldsWhereInput;
 
-const DEFAULT_PAGE = 1;
-const DEFAULT_LIMIT = 9;
-const MAX_LIMIT = 100;
-
-
 @Injectable()
 export class FieldsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query: GetFieldsQueryDto) {
     const page =
       query.page &&
-        Number.isInteger(Number(query.page)) &&
-        Number(query.page) >= 1
+      Number.isInteger(Number(query.page)) &&
+      Number(query.page) >= 1
         ? Number(query.page)
         : DEFAULT_PAGE;
     const rawLimit =
       query.limit &&
-        Number.isInteger(Number(query.limit)) &&
-        Number(query.limit) >= 1
+      Number.isInteger(Number(query.limit)) &&
+      Number(query.limit) >= 1
         ? Number(query.limit)
         : DEFAULT_LIMIT;
     const limit = Math.min(rawLimit, MAX_LIMIT);
-    const skip = (page - 1) * limit;
 
     const where: Prisma.fieldsWhereInput = {
       status: 'ACTIVE',
@@ -101,23 +102,10 @@ export class FieldsService {
       };
     }
 
-    const minPrice =
-      query.minPrice !== undefined &&
-        Number.isFinite(Number(query.minPrice)) &&
-        Number(query.minPrice) >= 0
-        ? Number(query.minPrice)
-        : undefined;
-    const maxPrice =
-      query.maxPrice !== undefined &&
-        Number.isFinite(Number(query.maxPrice)) &&
-        Number(query.maxPrice) >= 0
-        ? Number(query.maxPrice)
-        : undefined;
-
-    if (minPrice !== undefined || maxPrice !== undefined) {
+    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
       where.base_price_per_hour = {
-        ...(query.minPrice !== undefined && { gte: query.minPrice }),
-        ...(query.maxPrice !== undefined && { lte: query.maxPrice }),
+        ...(query.minPrice !== undefined && { gte: Number(query.minPrice) }),
+        ...(query.maxPrice !== undefined && { lte: Number(query.maxPrice) }),
       };
     }
 
@@ -203,25 +191,38 @@ export class FieldsService {
       this.prisma.fields.count({ where }),
     ]);
 
+    const formatFieldTypeName = (name?: string | null): string => {
+      if (!name) return 'Sân 7 người';
+      const clean = name.toLowerCase().trim();
+      if (clean === '5-a-side' || clean === '5' || clean.includes('5'))
+        return 'Sân 5 người';
+      if (clean === '7-a-side' || clean === '7' || clean.includes('7'))
+        return 'Sân 7 người';
+      if (clean === '11-a-side' || clean === '11' || clean.includes('11'))
+        return 'Sân 11 người';
+      return name;
+    };
+
     const transformedData = fields.map((field) => {
       const reviews = field.reviews ?? [];
       const reviewsCount = reviews.length;
       const ratingAvg =
         reviewsCount > 0
           ? Number(
-            (
-              reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount
-            ).toFixed(1),
-          )
+              (
+                reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount
+              ).toFixed(1),
+            )
           : 5.0;
 
-      const fieldTypeName = field.field_types?.name ?? 'Sân bóng đá';
-      const primaryImage =
+      const rawTypeName = field.field_types?.name ?? '7-a-side';
+      const fieldTypeName = formatFieldTypeName(rawTypeName);
+      const primaryImg =
         field.field_images?.find((img) => img.is_primary) ??
         field.field_images?.[0];
       const imageUrl =
-        primaryImage?.storage_path ||
-        'https://images.unsplash.com/photo-1529900240051-5120302b7405?auto=format&fit=crop&w=800&q=80';
+        primaryImg?.storage_path ||
+        'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80';
 
       return {
         id: field.id,
@@ -265,21 +266,294 @@ export class FieldsService {
   }
 
   async findOne(id: string) {
-    const field = await this.prisma.fields.findFirst({
-      where: { ...PUBLIC_FIELD_WHERE, id },
-      include: {
-        field_types: true,
-        field_images: { orderBy: { sort_order: 'asc' } },
-        field_operating_hours: { orderBy: { day_of_week: 'asc' } },
-      },
-    });
-    if (!field) {
-      throw new NotFoundException({
-        code: 'FIELD_NOT_FOUND',
-        message: 'Field was not found.',
-      });
+    if (!id || !UUID_REGEX.test(id)) {
+      throw new NotFoundException(`Field with ID "${id}" not found`);
     }
-    return { data: this.mapField(field) };
+
+    const [field, images] = await Promise.all([
+      this.prisma.fields.findFirst({
+        where: {
+          id,
+          status: 'ACTIVE',
+          deleted_at: null,
+        },
+        include: {
+          field_types: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+            },
+          },
+          field_operating_hours: {
+            orderBy: {
+              day_of_week: 'asc',
+            },
+            select: {
+              id: true,
+              field_id: true,
+              day_of_week: true,
+              open_time: true,
+              close_time: true,
+              is_closed: true,
+            },
+          },
+          price_rules: {
+            where: {
+              is_active: true,
+            },
+            orderBy: [{ priority: 'desc' }, { created_at: 'desc' }],
+            select: {
+              id: true,
+              field_id: true,
+              name: true,
+              day_of_week: true,
+              start_time: true,
+              end_time: true,
+              price_per_hour: true,
+              effective_from: true,
+              effective_to: true,
+              priority: true,
+              is_active: true,
+            },
+          },
+          reviews: {
+            orderBy: {
+              created_at: 'desc',
+            },
+            select: {
+              id: true,
+              user_id: true,
+              rating: true,
+              content: true,
+              created_at: true,
+              updated_at: true,
+              profiles: {
+                select: {
+                  id: true,
+                  full_name: true,
+                  avatar_path: true,
+                  role: true,
+                },
+              },
+              bookings: {
+                select: {
+                  id: true,
+                  code: true,
+                  start_time: true,
+                  end_time: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.field_images.findMany({
+        where: { field_id: id },
+        orderBy: [
+          { is_primary: 'desc' },
+          { sort_order: 'asc' },
+          { created_at: 'asc' },
+        ],
+        select: {
+          id: true,
+          field_id: true,
+          storage_path: true,
+          alt_text: true,
+          sort_order: true,
+          is_primary: true,
+          created_at: true,
+        },
+      }),
+    ]);
+
+    if (!field) {
+      throw new NotFoundException(`Field with ID "${id}" not found`);
+    }
+
+    const reviews = field.reviews ?? [];
+    const reviewsCount = reviews.length;
+    const ratingAvg =
+      reviewsCount > 0
+        ? Number(
+            (
+              reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount
+            ).toFixed(1),
+          )
+        : 5.0;
+
+    const formatFieldTypeName = (name?: string | null): string => {
+      if (!name) return 'Sân 7 người';
+      const clean = name.toLowerCase().trim();
+      if (clean === '5-a-side' || clean === '5' || clean.includes('5'))
+        return 'Sân 5 người';
+      if (clean === '7-a-side' || clean === '7' || clean.includes('7'))
+        return 'Sân 7 người';
+      if (clean === '11-a-side' || clean === '11' || clean.includes('11'))
+        return 'Sân 11 người';
+      return name;
+    };
+
+    const rawTypeName = field.field_types?.name ?? '7-a-side';
+    const fieldTypeName = formatFieldTypeName(rawTypeName);
+
+    const defaultImages = [
+      'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1577223625816-7546f13df25d?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=800&q=80',
+    ];
+
+    const imageList =
+      images.length > 0 ? images.map((img) => img.storage_path) : defaultImages;
+
+    const primaryImage =
+      images.find((img) => img.is_primary)?.storage_path ||
+      images[0]?.storage_path ||
+      defaultImages[0];
+
+    // Format operating hours display string
+    let operatingHoursDisplay = '06:00 - 23:00 hàng ngày';
+    if (field.field_operating_hours && field.field_operating_hours.length > 0) {
+      const firstOpen = field.field_operating_hours.find(
+        (h) => !h.is_closed && h.open_time && h.close_time,
+      );
+      if (firstOpen && firstOpen.open_time && firstOpen.close_time) {
+        const formatTime = (d: Date) => {
+          const dateObj = new Date(d);
+          return dateObj.toISOString().substring(11, 16);
+        };
+        operatingHoursDisplay = `${formatTime(firstOpen.open_time)} - ${formatTime(firstOpen.close_time)} hàng ngày`;
+      }
+    }
+
+    const amenities = [
+      {
+        icon: 'Car',
+        label: 'Bãi giữ xe rộng rãi',
+        desc: 'Có chỗ đỗ ô tô và xe máy an toàn',
+      },
+      {
+        icon: 'Droplets',
+        label: 'Nước uống phục vụ',
+        desc: 'Trà đá và nước mát giải khát',
+      },
+      {
+        icon: 'Shirt',
+        label: 'Phòng thay đồ & Tủ khóa',
+        desc: 'Khu vực thay đồ sạch sẽ, có tủ gửi đồ',
+      },
+      {
+        icon: 'Wifi',
+        label: 'Wifi miễn phí',
+        desc: 'Phủ sóng toàn bộ khuôn viên sân',
+      },
+      {
+        icon: 'Lightbulb',
+        label: 'Dàn đèn LED cao áp',
+        desc: 'Độ sáng đạt chuẩn thi đấu ban đêm',
+      },
+      {
+        icon: 'Coffee',
+        label: 'Căn tin giải khát',
+        desc: 'Phục vụ nước uống và đồ ăn nhẹ',
+      },
+    ];
+
+    const rules = [
+      'Vui lòng sử dụng giày đế TF (đinh dăm) hoặc IC (futsal), nghiêm cấm giày đinh sắt SG.',
+      'Đến trước giờ thi đấu 10-15 phút để chuẩn bị và làm thủ tục nhận sân.',
+      'Nghiêm cấm hút thuốc, xả rác bừa bãi và mang chất dễ cháy nổ vào sân.',
+      'Hủy hoặc thay đổi lịch đặt phải thực hiện trước giờ bắt đầu ít nhất 12 tiếng.',
+    ];
+
+    const subPitches = [
+      {
+        id: `${field.id}-1`,
+        name: `${fieldTypeName} - Sân A1 (Cỏ mới)`,
+        type: fieldTypeName,
+        pricePerHour: field.base_price_per_hour,
+      },
+      {
+        id: `${field.id}-2`,
+        name: `${fieldTypeName} - Sân A2 (Tiêu chuẩn)`,
+        type: fieldTypeName,
+        pricePerHour: field.base_price_per_hour,
+      },
+    ];
+
+    const mappedReviews = reviews.map((r) => ({
+      id: r.id,
+      author: r.profiles?.full_name || 'Khách hàng',
+      avatar:
+        r.profiles?.avatar_path ||
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+      date: r.created_at
+        ? new Date(r.created_at).toISOString()
+        : new Date().toISOString(),
+      rating: r.rating,
+      content: r.content,
+      verified: true,
+      user: {
+        id: r.profiles?.id || r.user_id,
+        fullName: r.profiles?.full_name || 'Khách hàng',
+        avatarUrl: r.profiles?.avatar_path || null,
+        role: r.profiles?.role || 'USER',
+      },
+      booking: r.bookings
+        ? {
+            id: r.bookings.id,
+            code: r.bookings.code,
+            fieldName: field.name,
+            matchDate: r.bookings.start_time
+              ? new Date(r.bookings.start_time).toISOString().split('T')[0]
+              : '',
+            timeSlot:
+              r.bookings.start_time && r.bookings.end_time
+                ? `${new Date(r.bookings.start_time).toISOString().substring(11, 16)} - ${new Date(r.bookings.end_time).toISOString().substring(11, 16)}`
+                : '',
+            fieldTypeName,
+          }
+        : undefined,
+    }));
+
+    return {
+      id: field.id,
+      name: field.name,
+      slug: field.slug,
+      description: field.description,
+      address: field.address,
+      location: field.address,
+      city: field.city,
+      district: field.district,
+      latitude: field.latitude ? Number(field.latitude) : null,
+      longitude: field.longitude ? Number(field.longitude) : null,
+      base_price_per_hour: field.base_price_per_hour,
+      pricePerHour: field.base_price_per_hour,
+      status: field.status,
+      created_at: field.created_at,
+      updated_at: field.updated_at,
+      field_type_id: field.field_type_id,
+      field_types: field.field_types,
+      field_type: field.field_types,
+      type: fieldTypeName,
+      types: [fieldTypeName],
+      image: primaryImage,
+      primary_image_url: primaryImage,
+      images: imageList,
+      field_images: images,
+      field_operating_hours: field.field_operating_hours,
+      price_rules: field.price_rules,
+      rating: ratingAvg,
+      rating_avg: ratingAvg,
+      reviews_count: reviewsCount,
+      reviewCount: reviewsCount,
+      available: true,
+      operatingHours: operatingHoursDisplay,
+      amenities,
+      rules,
+      subPitches,
+      reviews: mappedReviews,
+    };
   }
 
   async getAvailability(id: string, dateValue: string) {
@@ -347,70 +621,148 @@ export class FieldsService {
     };
   }
 
-  mapField(field: {
-    id: string;
-    field_type_id: string;
-    name: string;
-    slug: string;
-    description: string | null;
-    address: string;
-    city: string;
-    district: string;
-    latitude: unknown;
-    longitude: unknown;
-    base_price_per_hour: number;
-    status: field_status;
-    deleted_at: Date | null;
-    created_at: Date;
-    updated_at: Date;
-    field_types?: { id: string; name: string; description: string | null };
-    field_images?: Array<{
-      id: string;
-      storage_path: string;
-      alt_text: string | null;
-      sort_order: number;
-      is_primary: boolean;
-    }>;
-    field_operating_hours?: Array<{
-      day_of_week: number;
-      open_time: Date | null;
-      close_time: Date | null;
-      is_closed: boolean;
-    }>;
-  }) {
-    return {
-      id: field.id,
-      name: field.name,
-      slug: field.slug,
-      description: field.description,
-      address: field.address,
-      city: field.city,
-      district: field.district,
-      latitude: field.latitude,
-      longitude: field.longitude,
-      basePricePerHour: field.base_price_per_hour,
-      type: field.field_types
+  async findReviews(id: string, query: GetFieldReviewsQueryDto) {
+    if (!id || !UUID_REGEX.test(id)) {
+      throw new NotFoundException(`Field with ID "${id}" not found`);
+    }
+
+    const field = await this.prisma.fields.findFirst({
+      where: {
+        id,
+        status: 'ACTIVE',
+        deleted_at: null,
+      },
+      select: { id: true, name: true, field_types: { select: { name: true } } },
+    });
+
+    if (!field) {
+      throw new NotFoundException(`Field with ID "${id}" not found`);
+    }
+
+    const page = query.page && Number(query.page) >= 1 ? Number(query.page) : 1;
+    const limit =
+      query.limit && Number(query.limit) >= 1
+        ? Math.min(Number(query.limit), 50)
+        : 10;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.reviewsWhereInput = {
+      field_id: id,
+      ...(query.rating ? { rating: Number(query.rating) } : {}),
+    };
+
+    let orderBy: Prisma.reviewsOrderByWithRelationInput = {
+      created_at: 'desc',
+    };
+    if (query.sortBy === 'oldest') {
+      orderBy = { created_at: 'asc' };
+    } else if (query.sortBy === 'highest') {
+      orderBy = { rating: 'desc' };
+    } else if (query.sortBy === 'lowest') {
+      orderBy = { rating: 'asc' };
+    }
+
+    const [reviews, total, allFieldReviews] = await Promise.all([
+      this.prisma.reviews.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        include: {
+          profiles: {
+            select: {
+              id: true,
+              full_name: true,
+              avatar_path: true,
+              role: true,
+            },
+          },
+          bookings: {
+            select: {
+              id: true,
+              code: true,
+              start_time: true,
+              end_time: true,
+            },
+          },
+        },
+      }),
+      this.prisma.reviews.count({ where }),
+      this.prisma.reviews.findMany({
+        where: { field_id: id },
+        select: { rating: true },
+      }),
+    ]);
+
+    const totalAllReviews = allFieldReviews.length;
+    const averageRating =
+      totalAllReviews > 0
+        ? Number(
+            (
+              allFieldReviews.reduce((sum, r) => sum + r.rating, 0) /
+              totalAllReviews
+            ).toFixed(1),
+          )
+        : 5.0;
+
+    const breakdown = [5, 4, 3, 2, 1].map((star) => {
+      const count = allFieldReviews.filter((r) => r.rating === star).length;
+      const percentage =
+        totalAllReviews > 0 ? Math.round((count / totalAllReviews) * 100) : 0;
+      return { star, count, percentage };
+    });
+
+    const transformedData = reviews.map((r) => ({
+      id: r.id,
+      userId: r.user_id,
+      fieldId: r.field_id,
+      bookingId: r.booking_id,
+      rating: r.rating,
+      content: r.content,
+      createdAt: r.created_at
+        ? new Date(r.created_at).toISOString()
+        : new Date().toISOString(),
+      updatedAt: r.updated_at
+        ? new Date(r.updated_at).toISOString()
+        : undefined,
+      user: {
+        id: r.profiles?.id || r.user_id,
+        fullName: r.profiles?.full_name || 'Khách hàng',
+        avatarUrl: r.profiles?.avatar_path || null,
+        role: r.profiles?.role || 'USER',
+      },
+      booking: r.bookings
         ? {
-          id: field.field_types.id,
-          name: field.field_types.name,
-          description: field.field_types.description,
-        }
-        : null,
-      images: (field.field_images ?? []).map((image) => ({
-        id: image.id,
-        storagePath: image.storage_path,
-        altText: image.alt_text,
-        sortOrder: image.sort_order,
-        isPrimary: image.is_primary,
-      })),
-      operatingHours: (field.field_operating_hours ?? []).map((hours) => ({
-        dayOfWeek: hours.day_of_week,
-        openTime: hours.open_time?.toISOString().slice(11, 16) ?? null,
-        closeTime: hours.close_time?.toISOString().slice(11, 16) ?? null,
-        isClosed: hours.is_closed,
-      })),
-      createdAt: field.created_at.toISOString(),
-      updatedAt: field.updated_at.toISOString(),
+            id: r.bookings.id,
+            code: r.bookings.code,
+            fieldName: field.name,
+            matchDate: r.bookings.start_time
+              ? new Date(r.bookings.start_time).toISOString().split('T')[0]
+              : '',
+            timeSlot:
+              r.bookings.start_time && r.bookings.end_time
+                ? `${new Date(r.bookings.start_time).toISOString().substring(11, 16)} - ${new Date(r.bookings.end_time).toISOString().substring(11, 16)}`
+                : '',
+            fieldTypeName: field.field_types?.name || 'Sân bóng đá',
+          }
+        : undefined,
+      comments: [],
+      verifiedBooking: true,
+    }));
+
+    return {
+      data: transformedData,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: total > 0 ? Math.ceil(total / limit) : 0,
+      },
+      summary: {
+        averageRating,
+        totalReviews: totalAllReviews,
+        breakdown,
+      },
     };
   }
 }
