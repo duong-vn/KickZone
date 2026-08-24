@@ -466,12 +466,51 @@ export default function FieldDetailPage({
 
   const field: FieldDetailData = useMemo(() => {
     if (apiField) {
+      const rawField = apiField as any;
       return {
-        ...apiField,
+        id: rawField.id,
+        name: rawField.name,
+        location:
+          rawField.location ||
+          `${rawField.address}, ${rawField.district}, ${rawField.city}`,
+        address: rawField.address,
+        district: rawField.district,
+        city: rawField.city,
+        rating: rawField.rating || rawField.rating_avg || 4.8,
+        reviewCount: rawField.reviewCount || rawField.reviews_count || 0,
+        basePricePerHour:
+          rawField.basePricePerHour || rawField.base_price_per_hour || 200000,
+        types:
+          rawField.types || [
+            rawField.fieldType || rawField.field_type?.name || 'Sân bóng đá',
+          ],
+        subPitches: rawField.subPitches || [
+          {
+            id: `sp-${rawField.id}-1`,
+            name: `${rawField.name} - Sân A`,
+            type: rawField.fieldType || rawField.field_type?.name || 'Sân 7',
+            pricePerHour:
+              rawField.basePricePerHour || rawField.base_price_per_hour || 200000,
+          },
+        ],
         images:
-          apiField.images && apiField.images.length > 0
-            ? apiField.images
+          rawField.images && rawField.images.length > 0
+            ? rawField.images
             : DEFAULT_IMAGES,
+        description: rawField.description || '',
+        amenities: rawField.amenities || [
+          { icon: 'Wifi', label: 'Wifi miễn phí', desc: 'Tốc độ cao' },
+          { icon: 'Car', label: 'Bãi đỗ xe', desc: 'Ô tô và xe máy rộng rãi' },
+          { icon: 'Droplets', label: 'Nước uống', desc: 'Căng tin phục vụ' },
+          { icon: 'Shirt', label: 'Phòng thay đồ', desc: 'Sạch sẽ thoáng mát' },
+        ],
+        rules: rawField.rules || [
+          'Giữ gìn tư trang cá nhân cẩn thận.',
+          'Sử dụng đúng trang phục thể thao và giày đinh phù hợp.',
+          'Nghiêm cấm các hành vi bạo lực trên sân.',
+        ],
+        operatingHours: rawField.operatingHours || '06:00 - 22:00 hàng ngày',
+        reviews: rawField.reviews || [],
       } as FieldDetailData;
     }
     return getFieldById(fieldId);

@@ -126,7 +126,6 @@ export default function AdminBookingsPage() {
           field: {
             id: item.fieldId,
             name: item.fieldName,
-            zone: 'Khu vực chính',
             fieldType: item.fieldTypeLabel || 'Sân bóng',
           },
           bookingDate: item.bookingDate,
@@ -665,18 +664,18 @@ export default function AdminBookingsPage() {
               {/* Reason notice if rejected or cancelled */}
               {(selectedBooking.rejectionReason ||
                 selectedBooking.cancellationReason) && (
-                <div className="rounded-xl border border-[#ba1a1a]/30 bg-[#ffdad6]/30 p-3 text-xs text-[#93000a]">
-                  <p className="font-bold">
-                    {selectedBooking.status === 'REJECTED'
-                      ? 'Lý do từ chối:'
-                      : 'Lý do hủy đơn:'}
-                  </p>
-                  <p className="mt-1">
-                    {selectedBooking.rejectionReason ||
-                      selectedBooking.cancellationReason}
-                  </p>
-                </div>
-              )}
+                  <div className="rounded-xl border border-[#ba1a1a]/30 bg-[#ffdad6]/30 p-3 text-xs text-[#93000a]">
+                    <p className="font-bold">
+                      {selectedBooking.status === 'REJECTED'
+                        ? 'Lý do từ chối:'
+                        : 'Lý do hủy đơn:'}
+                    </p>
+                    <p className="mt-1">
+                      {selectedBooking.rejectionReason ||
+                        selectedBooking.cancellationReason}
+                    </p>
+                  </div>
+                )}
             </div>
 
             {/* Action buttons inside modal if PENDING */}

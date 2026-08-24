@@ -18,15 +18,15 @@ export class FieldsController {
     return this.fieldsService.findAll(query);
   }
 
-  @Get('fields/:id')
-  @ApiOperation({ summary: 'Public: Get soccer field detail by ID or Slug' })
-  findOne(@Param('id') id: string) {
-    return this.fieldsService.findOne(id);
-  }
-
   @Get('field-types')
   @ApiOperation({ summary: 'Public: Get all soccer field types' })
   findFieldTypes() {
     return this.fieldsService.findFieldTypes();
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Public: Get soccer field detail by ID or Slug' })
+  findOne(@Param('id') id: string) {
+    return this.fieldsService.findOne(id);
   }
 }
