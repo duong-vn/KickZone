@@ -66,6 +66,7 @@ export default function AdminBookingsPage() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const { data: apiResponse, isLoading } = useQuery({
     queryKey: [
@@ -74,6 +75,7 @@ export default function AdminBookingsPage() {
       statusFilter,
       bookingDateFilter,
       currentPage,
+      pageSize,
     ],
     queryFn: () =>
       fetchAdminBookings({
@@ -86,7 +88,7 @@ export default function AdminBookingsPage() {
           ? `${bookingDateFilter}T23:59:59.999Z`
           : undefined,
         page: currentPage,
-        limit: 10,
+        limit: pageSize,
       }),
     retry: false,
   });
@@ -147,6 +149,13 @@ export default function AdminBookingsPage() {
   }, [apiResponse]);
 
   const filteredBookings = bookings;
+  const totalRecords = apiResponse?.meta?.total ?? filteredBookings.length ?? 0;
+  const totalPages =
+    apiResponse?.meta?.totalPages ??
+    Math.max(1, Math.ceil(totalRecords / pageSize));
+  const startRecord =
+    totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endRecord = Math.min(currentPage * pageSize, totalRecords);
 
   // Selected booking for detailed view/actions
   const [selectedBooking, setSelectedBooking] =
@@ -181,6 +190,35 @@ export default function AdminBookingsPage() {
     setBookingDateFilter('');
     setCreatedDateFilter('');
     setCurrentPage(1);
+  };
+
+  // Helper for generating page numbers
+  const getPageNumbers = () => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (currentPage <= 3) {
+      return [1, 2, 3, 4, '...', totalPages];
+    }
+    if (currentPage >= totalPages - 2) {
+      return [
+        1,
+        '...',
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      ];
+    }
+    return [
+      1,
+      '...',
+      currentPage - 1,
+      currentPage,
+      currentPage + 1,
+      '...',
+      totalPages,
+    ];
   };
 
   // Quick Approve Booking
@@ -266,7 +304,7 @@ export default function AdminBookingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="w-full space-y-5">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="flex items-center justify-between rounded-xl border border-[#22c55e]/40 bg-[#22c55e]/15 px-4 py-3 text-sm font-semibold text-[#004b1e] shadow-sm animate-in fade-in slide-in-from-top-2">
@@ -287,9 +325,9 @@ export default function AdminBookingsPage() {
       {/* Filters Section (Glassmorphism Card) */}
       <section
         aria-label="Bộ lọc tìm kiếm"
-        className="rounded-xl border border-[#bccbb9] bg-white/80 p-6 shadow-sm backdrop-blur-sm"
+        className="rounded-xl border border-[#bccbb9] bg-white p-4 sm:p-5 shadow-sm"
       >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* Search Box */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-[#575e70]">
@@ -300,7 +338,10 @@ export default function AdminBookingsPage() {
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
                 placeholder="Tìm theo mã đơn / khách hàng / sân"
                 className="w-full rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-9 pr-4 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
               />
@@ -315,7 +356,10 @@ export default function AdminBookingsPage() {
             <div className="relative">
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full appearance-none rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-3 pr-8 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
               >
                 <option value="">Tất cả</option>
@@ -339,7 +383,10 @@ export default function AdminBookingsPage() {
               <input
                 type="date"
                 value={bookingDateFilter}
-                onChange={(e) => setBookingDateFilter(e.target.value)}
+                onChange={(e) => {
+                  setBookingDateFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-9 pr-4 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
               />
             </div>
@@ -355,7 +402,10 @@ export default function AdminBookingsPage() {
               <input
                 type="date"
                 value={createdDateFilter}
-                onChange={(e) => setCreatedDateFilter(e.target.value)}
+                onChange={(e) => {
+                  setCreatedDateFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-9 pr-4 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
               />
             </div>
@@ -363,18 +413,18 @@ export default function AdminBookingsPage() {
         </div>
 
         {/* Filter Action Buttons */}
-        <div className="mt-5 flex items-center justify-end gap-3 border-t border-[#bccbb9]/40 pt-4">
+        <div className="mt-4 flex items-center justify-end gap-3 border-t border-[#bccbb9]/40 pt-3.5">
           <button
             type="button"
             onClick={handleResetFilters}
-            className="flex items-center gap-1.5 rounded-lg border border-[#bccbb9] px-4 py-2 text-xs sm:text-sm font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9]"
+            className="flex items-center gap-1.5 rounded-lg border border-[#bccbb9] px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9]"
           >
             <RotateCcw className="h-4 w-4" />
             <span>Xóa bộ lọc</span>
           </button>
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-lg bg-[#006e2f] px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#004b1e]"
+            className="flex items-center gap-1.5 rounded-lg bg-[#006e2f] px-4 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#004b1e]"
           >
             <Filter className="h-4 w-4" />
             <span>Lọc kết quả</span>
@@ -383,22 +433,34 @@ export default function AdminBookingsPage() {
       </section>
 
       {/* Table Section */}
-      <section className="flex flex-col overflow-hidden rounded-xl border border-[#bccbb9] bg-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)]">
+      <section className="flex flex-col overflow-hidden rounded-xl border border-[#bccbb9] bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left whitespace-nowrap text-sm">
             <thead className="border-b border-[#bccbb9] bg-[#f3f4f5] text-xs font-semibold uppercase tracking-wider text-[#575e70]">
               <tr>
-                <th className="px-6 py-4">Mã đơn</th>
-                <th className="px-6 py-4">Khách hàng</th>
-                <th className="px-6 py-4">Sân</th>
-                <th className="px-6 py-4">Ngày đặt / Khung giờ</th>
-                <th className="px-6 py-4">Tổng tiền</th>
-                <th className="px-6 py-4">Trạng thái</th>
-                <th className="px-6 py-4 text-right">Hành động</th>
+                <th className="px-4 py-3.5">Mã đơn</th>
+                <th className="px-4 py-3.5">Khách hàng</th>
+                <th className="px-4 py-3.5">Sân</th>
+                <th className="px-4 py-3.5">Ngày đặt / Khung giờ</th>
+                <th className="px-4 py-3.5">Tổng tiền</th>
+                <th className="px-4 py-3.5">Trạng thái</th>
+                <th className="px-4 py-3.5 text-center">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#bccbb9]/50 text-xs sm:text-sm text-[#191c1d]">
-              {filteredBookings.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="py-12 text-center text-sm text-[#575e70]"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#006e2f] border-t-transparent" />
+                      <span>Đang tải danh sách đơn đặt sân...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredBookings.length === 0 ? (
                 <tr>
                   <td
                     colSpan={7}
@@ -414,21 +476,26 @@ export default function AdminBookingsPage() {
                     className="group transition-colors hover:bg-[#f8f9fa]"
                   >
                     {/* Mã đơn */}
-                    <td className="px-6 py-4 font-bold text-[#006e2f]">
-                      {booking.code}
+                    <td className="px-4 py-3.5 font-bold text-[#006e2f]">
+                      <Link
+                        href={`/admin/bookings/${booking.id}`}
+                        className="hover:underline"
+                      >
+                        {booking.code}
+                      </Link>
                     </td>
 
                     {/* Khách hàng */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dce2f3] font-bold text-[#151c27]">
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#dce2f3] text-xs font-bold text-[#151c27]">
                           {booking.user.fullName.charAt(0)}
                         </div>
                         <div>
                           <p className="font-semibold text-[#191c1d]">
                             {booking.user.fullName}
                           </p>
-                          <p className="text-xs text-[#575e70]">
+                          <p className="text-[11px] text-[#575e70]">
                             {booking.user.phone}
                           </p>
                         </div>
@@ -436,7 +503,7 @@ export default function AdminBookingsPage() {
                     </td>
 
                     {/* Sân */}
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3.5">
                       <p className="font-semibold text-[#191c1d]">
                         {booking.field.name}
                         {booking.field.zone && (
@@ -452,59 +519,37 @@ export default function AdminBookingsPage() {
                     </td>
 
                     {/* Ngày đặt / Khung giờ */}
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3.5">
                       <div className="flex flex-col">
                         <span className="font-medium text-[#191c1d]">
                           {formatDateVN(booking.bookingDate)}
                         </span>
-                        <span className="mt-0.5 flex items-center gap-1 text-xs text-[#575e70]">
-                          <Clock className="h-3.5 w-3.5" />
+                        <span className="mt-0.5 flex items-center gap-1 text-[11px] text-[#575e70]">
+                          <Clock className="h-3 w-3" />
                           {booking.startTime} - {booking.endTime}
                         </span>
                       </div>
                     </td>
 
                     {/* Tổng tiền */}
-                    <td className="px-6 py-4 font-bold text-[#191c1d]">
+                    <td className="px-4 py-3.5 font-bold text-[#191c1d]">
                       {formatVND(booking.finalPrice)}
                     </td>
 
                     {/* Trạng thái */}
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3.5">
                       {renderStatusBadge(booking.status)}
                     </td>
 
-                    {/* Hành động */}
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5 opacity-90 transition-opacity group-hover:opacity-100">
-                        {booking.status === 'PENDING' && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => handleApprove(booking.id)}
-                              className="rounded-lg p-1.5 text-[#006e2f] transition-colors hover:bg-[#22c55e]/20"
-                              title="Duyệt đơn"
-                            >
-                              <CheckCircle2 className="h-5 w-5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setRejectingBooking(booking)}
-                              className="rounded-lg p-1.5 text-[#ba1a1a] transition-colors hover:bg-[#ffdad6]"
-                              title="Từ chối đơn"
-                            >
-                              <XCircle className="h-5 w-5" />
-                            </button>
-                          </>
-                        )}
-                        <Link
-                          href={`/admin/bookings/${booking.code.replace('#', '').toLowerCase()}`}
-                          className="rounded-lg p-1.5 text-[#575e70] transition-colors hover:bg-[#e7e8e9] hover:text-[#191c1d]"
-                          title="Xem chi tiết đơn"
-                        >
-                          <Eye className="h-5 w-5" />
-                        </Link>
-                      </div>
+                    {/* Hành động (Chỉ giữ lại icon Xem chi tiết) */}
+                    <td className="px-4 py-3.5 text-center">
+                      <Link
+                        href={`/admin/bookings/${booking.id}`}
+                        className="inline-flex items-center justify-center rounded-lg p-2 text-[#575e70] transition-colors hover:bg-[#006e2f]/10 hover:text-[#006e2f]"
+                        title="Xem chi tiết đơn"
+                      >
+                        <Eye className="h-4.5 w-4.5" />
+                      </Link>
                     </td>
                   </tr>
                 ))
@@ -514,48 +559,72 @@ export default function AdminBookingsPage() {
         </div>
 
         {/* Pagination */}
-        <div className="flex flex-col items-center justify-between gap-3 border-t border-[#bccbb9] bg-white px-6 py-4 sm:flex-row">
-          <span className="text-xs sm:text-sm text-[#575e70]">
-            Hiển thị 1 - {filteredBookings.length} của 124 đơn
-          </span>
+        <div className="flex flex-col items-center justify-between gap-3 border-t border-[#bccbb9] bg-white px-4 py-3.5 sm:flex-row sm:px-6">
+          <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-[#575e70]">
+            <span>
+              {totalRecords === 0
+                ? 'Không có đơn nào'
+                : `Hiển thị ${startRecord} - ${endRecord} của ${totalRecords} đơn`}
+            </span>
+            <div className="flex items-center gap-1.5 border-l border-[#bccbb9]/60 pl-3">
+              <span className="text-xs text-[#575e70]">Hiển thị:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="rounded-lg border border-[#bccbb9] bg-[#f8f9fa] px-2 py-1 text-xs font-semibold text-[#191c1d] transition-colors focus:border-[#006e2f] focus:outline-none"
+              >
+                <option value={5}>5 đơn / trang</option>
+                <option value={10}>10 đơn / trang</option>
+                <option value={20}>20 đơn / trang</option>
+                <option value={50}>50 đơn / trang</option>
+              </select>
+            </div>
+          </div>
+
           <div className="flex items-center gap-1">
             <button
               type="button"
-              disabled={currentPage === 1}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bccbb9] text-[#575e70] transition-colors hover:bg-[#e7e8e9] disabled:opacity-40"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bccbb9] text-[#575e70] transition-colors hover:bg-[#e7e8e9] disabled:opacity-40 disabled:pointer-events-none"
+              title="Trang trước"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
+
+            {getPageNumbers().map((pageNum, idx) =>
+              pageNum === '...' ? (
+                <span
+                  key={`ellipsis-${idx}`}
+                  className="flex h-8 w-8 items-center justify-center text-xs text-[#575e70]"
+                >
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={`page-${pageNum}`}
+                  type="button"
+                  onClick={() => setCurrentPage(Number(pageNum))}
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                    currentPage === pageNum
+                      ? 'bg-[#006e2f] text-white shadow-sm'
+                      : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ),
+            )}
+
             <button
               type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#006e2f] text-xs font-bold text-white"
-            >
-              1
-            </button>
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bccbb9] text-xs font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9]"
-            >
-              2
-            </button>
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bccbb9] text-xs font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9]"
-            >
-              3
-            </button>
-            <span className="flex h-8 w-8 items-center justify-center text-xs text-[#575e70]">
-              ...
-            </span>
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bccbb9] text-xs font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9]"
-            >
-              13
-            </button>
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bccbb9] text-[#575e70] transition-colors hover:bg-[#e7e8e9]"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages || totalPages === 0}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bccbb9] text-[#575e70] transition-colors hover:bg-[#e7e8e9] disabled:opacity-40 disabled:pointer-events-none"
+              title="Trang sau"
             >
               <ChevronRight className="h-4 w-4" />
             </button>

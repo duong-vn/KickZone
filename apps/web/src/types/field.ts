@@ -1,3 +1,5 @@
+import { Review, ReviewSummary } from './review';
+
 export type FieldStatus = 'ACTIVE' | 'INACTIVE';
 
 export interface FieldType {
@@ -20,8 +22,8 @@ export interface FieldOperatingHours {
   id: string;
   field_id: string;
   day_of_week: number; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  open_time: string | null; // HH:mm
-  close_time: string | null; // HH:mm
+  open_time: string | null; // HH:mm or ISO
+  close_time: string | null; // HH:mm or ISO
   is_closed: boolean;
 }
 
@@ -37,6 +39,19 @@ export interface PriceRule {
   effective_to?: string | null;
   priority: number;
   is_active: boolean;
+}
+
+export interface SubPitch {
+  id: string;
+  name: string;
+  type: string;
+  pricePerHour: number;
+}
+
+export interface Amenity {
+  icon: string;
+  label: string;
+  desc: string;
 }
 
 export interface Field {
@@ -58,6 +73,7 @@ export interface Field {
 
   // Relations
   field_type?: FieldType;
+  field_types?: FieldType;
   field_images?: FieldImage[];
   field_operating_hours?: FieldOperatingHours[];
   price_rules?: PriceRule[];
@@ -65,16 +81,23 @@ export interface Field {
   // Frontend & UI computed helpers
   rating_avg?: number;
   reviews_count?: number;
+  reviewCount?: number;
   is_available_today?: boolean;
   primary_image_url?: string;
   supported_types?: string[];
   location?: string;
   pricePerHour?: number;
   image?: string;
+  images?: string[];
   rating?: number;
   available?: boolean;
   type?: string;
   types?: string[];
+  operatingHours?: string;
+  amenities?: Amenity[];
+  rules?: string[];
+  subPitches?: SubPitch[];
+  reviews?: Review[];
 }
 
 export interface FieldsMeta {
@@ -89,3 +112,8 @@ export interface FieldsResponse {
   meta: FieldsMeta;
 }
 
+export interface FieldReviewsResponse {
+  data: Review[];
+  meta: FieldsMeta;
+  summary: ReviewSummary;
+}

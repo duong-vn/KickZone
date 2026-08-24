@@ -10,6 +10,8 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
+  private pool: Pool;
+
   constructor() {
     const connectionString = process.env.DATABASE_URL;
 
@@ -19,22 +21,29 @@ export class PrismaService
 
     const caCertPath = process.env.DATABASE_CA_CERT_PATH;
     const databaseUrl = new URL(connectionString);
-    const poolConfig: PoolConfig = caCertPath
-      ? {
-          database: databaseUrl.pathname.slice(1),
-          host: databaseUrl.hostname,
-          password: decodeURIComponent(databaseUrl.password),
-          port: Number(databaseUrl.port) || 5432,
-          user: decodeURIComponent(databaseUrl.username),
-          // ponytail: certificate reload requires an API restart; add a cert manager only for live rotation.
-          ssl: {
-            ca: readFileSync(resolve(caCertPath), 'utf8'),
-            rejectUnauthorized: true,
-          },
-        }
-      : { connectionString };
+    const poolConfig: PoolConfig = {
+      ...(caCertPath
+        ? {
+            database: databaseUrl.pathname.slice(1),
+            host: databaseUrl.hostname,
+            password: decodeURIComponent(databaseUrl.password),
+            port: Number(databaseUrl.port) || 5432,
+            user: decodeURIComponent(databaseUrl.username),
+            // ponytail: certificate reload requires an API restart; add a cert manager only for live rotation.
+            ssl: {
+              ca: readFileSync(resolve(caCertPath), 'utf8'),
+              rejectUnauthorized: true,
+            },
+          }
+        : { connectionString }),
+      max: 5,
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 10000,
+    };
 
-    super({ adapter: new PrismaPg(new Pool(poolConfig)) });
+    const pool = new Pool(poolConfig);
+    super({ adapter: new PrismaPg(pool) });
+    this.pool = pool;
   }
 
   async onModuleInit() {
@@ -43,5 +52,6 @@ export class PrismaService
 
   async onModuleDestroy() {
     await this.$disconnect();
+    await this.pool.end();
   }
 }

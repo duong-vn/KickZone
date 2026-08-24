@@ -63,7 +63,7 @@ export default function AdminLayout({
         </div>
       )}
 
-      <div className="flex flex-1 flex-col md:pl-64">
+      <div className="flex flex-1 flex-col md:pl-64 min-w-0 overflow-x-hidden">
         <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-[#bccbb9] bg-white/80 px-6 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <button
@@ -108,7 +108,7 @@ export default function AdminLayout({
           </div>
         </header>
 
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-4 md:p-6 min-w-0">{children}</main>
       </div>
     </div>
   );

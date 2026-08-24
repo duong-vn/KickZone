@@ -508,7 +508,8 @@ function FieldsContent() {
                     Không tìm thấy sân bóng nào phù hợp
                   </h3>
                   <p className="text-sm text-[#575e70] mt-1">
-                    Hãy thử thay đổi từ khóa hoặc mở rộng tiêu chí bộ lọc của bạn.
+                    Hãy thử thay đổi từ khóa hoặc mở rộng tiêu chí bộ lọc của
+                    bạn.
                   </p>
                 </div>
                 <Button

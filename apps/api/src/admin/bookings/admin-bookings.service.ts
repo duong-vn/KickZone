@@ -140,8 +140,15 @@ export class AdminBookingsService {
   }
 
   async findOne(id: string) {
-    const booking = await this.prisma.bookings.findUnique({
-      where: { id },
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        id,
+      );
+
+    const booking = await this.prisma.bookings.findFirst({
+      where: isUuid
+        ? { id }
+        : { code: { equals: id, mode: 'insensitive' } },
       include: {
         profiles: true,
         fields: {
@@ -222,9 +229,14 @@ export class AdminBookingsService {
   }
 
   async approve(id: string) {
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        id,
+      );
+
     const updated = await this.prisma.bookings.updateMany({
       where: {
-        id,
+        ...(isUuid ? { id } : { code: { equals: id, mode: 'insensitive' } }),
         status: booking_status.PENDING,
       },
       data: {
@@ -243,9 +255,14 @@ export class AdminBookingsService {
   }
 
   async reject(id: string, dto: RejectBookingDto) {
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        id,
+      );
+
     const updated = await this.prisma.bookings.updateMany({
       where: {
-        id,
+        ...(isUuid ? { id } : { code: { equals: id, mode: 'insensitive' } }),
         status: booking_status.PENDING,
       },
       data: {
