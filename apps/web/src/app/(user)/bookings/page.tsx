@@ -62,6 +62,9 @@ export default function MyBookingsPage() {
       setReason('');
       toast.success('Đã hủy đơn đặt sân.');
       await queryClient.invalidateQueries({ queryKey: ['bookings', 'me'] });
+      await queryClient.invalidateQueries({ queryKey: ['booking'] });
+      await queryClient.invalidateQueries({ queryKey: ['availability'] });
+      await queryClient.invalidateQueries({ queryKey: ['fields'] });
     },
     onError: (error: ApiError) => {
       toast.error(error.message);

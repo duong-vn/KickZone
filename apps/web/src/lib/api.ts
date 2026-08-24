@@ -10,7 +10,7 @@ import type {
 import type {
   AvailabilityResponse,
   FieldDetail,
-  FieldSummary,
+  FieldsResponse,
   Paginated,
 } from '@/types/field';
 
@@ -32,8 +32,11 @@ export class ApiError extends Error {
   }
 }
 
-const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001',
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
+export const api = axios.create({
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -41,7 +44,7 @@ async function request<T>(
   method: 'get' | 'post' | 'patch',
   url: string,
   data?: unknown,
-  params?: Record<string, string | number | undefined>,
+  params?: Record<string, string | number | boolean | undefined | null>,
   protectedRequest = false,
 ): Promise<T> {
   try {
@@ -58,11 +61,19 @@ async function request<T>(
         });
       headers.Authorization = `Bearer ${token}`;
     }
+    const cleanParams: Record<string, string | number> = {};
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          cleanParams[key] = typeof value === 'boolean' ? String(value) : value;
+        }
+      });
+    }
     const response = await api.request<T>({
       method,
       url,
       data,
-      params,
+      params: cleanParams,
       headers,
     });
     return response.data;
@@ -79,9 +90,9 @@ async function request<T>(
 }
 
 export function fetchFields(
-  params: Record<string, string | number | undefined>,
+  params: Record<string, string | number | boolean | undefined | null>,
 ) {
-  return request<Paginated<FieldSummary>>('get', '/fields', undefined, params);
+  return request<FieldsResponse>('get', '/fields', undefined, params);
 }
 
 export function fetchFieldById(id: string) {

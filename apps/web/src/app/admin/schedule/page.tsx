@@ -97,7 +97,8 @@ export default function AdminSchedulePage() {
   const bookings = INITIAL_SCHEDULE_BOOKINGS;
 
   // Selected booking for quick inspection modal
-  const [selectedBooking, setSelectedBooking] = useState<ScheduleBookingItem | null>(null);
+  const [selectedBooking, setSelectedBooking] =
+    useState<ScheduleBookingItem | null>(null);
 
   // Format date display
   const dateFormatted = useMemo(() => {
@@ -274,7 +275,9 @@ export default function AdminSchedulePage() {
             }}
           >
             {displayCourts.map((court) => {
-              const courtBookings = bookings.filter((b) => b.courtId === court.id);
+              const courtBookings = bookings.filter(
+                (b) => b.courtId === court.id,
+              );
 
               return (
                 <div
@@ -287,9 +290,12 @@ export default function AdminSchedulePage() {
                     const blockHeight = b.durationHours * HOUR_ROW_HEIGHT;
 
                     // Colors by status
-                    let bgClass = 'bg-[#bfdbfe] border-[#3b82f6] text-[#1e3a8a]';
+                    let bgClass =
+                      'bg-[#bfdbfe] border-[#3b82f6] text-[#1e3a8a]';
                     let titleColor = 'text-[#1e40af]';
-                    let icon = <CheckCircle2 className="h-4 w-4 text-[#1e3a8a]" />;
+                    let icon = (
+                      <CheckCircle2 className="h-4 w-4 text-[#1e3a8a]" />
+                    );
 
                     if (b.status === 'CONFIRMED') {
                       bgClass = 'bg-[#bbf7d0] border-[#22c55e] text-[#14532d]';

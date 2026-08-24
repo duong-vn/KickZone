@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 
 // Types mapping directly to KickZone database schema
-type BookingStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED';
+type BookingStatus =
+  'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED';
 
 interface PendingBookingItem {
   id: string;
@@ -167,8 +168,11 @@ const RECENT_ACTIVITIES: ActivityItem[] = [
 ];
 
 export default function AdminDashboardPage() {
-  const [bookings, setBookings] = useState<PendingBookingItem[]>(INITIAL_PENDING_BOOKINGS);
-  const [selectedBooking, setSelectedBooking] = useState<PendingBookingItem | null>(null);
+  const [bookings, setBookings] = useState<PendingBookingItem[]>(
+    INITIAL_PENDING_BOOKINGS,
+  );
+  const [selectedBooking, setSelectedBooking] =
+    useState<PendingBookingItem | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
   const formatVND = (value: number) => {
@@ -219,11 +223,16 @@ export default function AdminDashboardPage() {
         {/* Left Column (8 cols on XL) */}
         <div className="flex flex-col gap-6 xl:col-span-8">
           {/* KPI Cards Row */}
-          <section aria-label="Thống kê tổng quan" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <section
+            aria-label="Thống kê tổng quan"
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+          >
             {/* KPI 1: Đơn chờ xác nhận */}
             <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
               <div className="flex items-start justify-between">
-                <span className="text-xs font-medium text-[#575e70]">Đơn chờ xác nhận</span>
+                <span className="text-xs font-medium text-[#575e70]">
+                  Đơn chờ xác nhận
+                </span>
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ffdad6] text-[#ba1a1a]">
                   <Clock className="h-4 w-4" />
                 </div>
@@ -242,7 +251,9 @@ export default function AdminDashboardPage() {
             {/* KPI 2: Đơn đã xác nhận hôm nay */}
             <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
               <div className="flex items-start justify-between">
-                <span className="text-xs font-medium text-[#575e70]">Đơn đã xác nhận hôm nay</span>
+                <span className="text-xs font-medium text-[#575e70]">
+                  Đơn đã xác nhận hôm nay
+                </span>
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#22c55e]/20 text-[#006e2f]">
                   <CheckCircle2 className="h-4 w-4" />
                 </div>
@@ -261,7 +272,9 @@ export default function AdminDashboardPage() {
             {/* KPI 3: Sân đang hoạt động */}
             <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
               <div className="flex items-start justify-between">
-                <span className="text-xs font-medium text-[#575e70]">Sân đang hoạt động</span>
+                <span className="text-xs font-medium text-[#575e70]">
+                  Sân đang hoạt động
+                </span>
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d9dff5] text-[#575e70]">
                   <Trophy className="h-4 w-4" />
                 </div>
@@ -279,7 +292,9 @@ export default function AdminDashboardPage() {
             {/* KPI 4: Người dùng đang HĐ */}
             <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
               <div className="flex items-start justify-between">
-                <span className="text-xs font-medium text-[#575e70]">Người dùng đang HĐ</span>
+                <span className="text-xs font-medium text-[#575e70]">
+                  Người dùng đang HĐ
+                </span>
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#dce2f3] text-[#585f6c]">
                   <Users className="h-4 w-4" />
                 </div>
@@ -323,7 +338,10 @@ export default function AdminDashboardPage() {
                 <tbody className="divide-y divide-[#bccbb9]/50 text-xs sm:text-sm text-[#191c1d]">
                   {bookings.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-sm text-[#575e70]">
+                      <td
+                        colSpan={7}
+                        className="py-12 text-center text-sm text-[#575e70]"
+                      >
                         Không có đơn đặt sân nào đang chờ duyệt.
                       </td>
                     </tr>
@@ -340,13 +358,19 @@ export default function AdminDashboardPage() {
                           {booking.customerName}
                         </td>
                         <td className="px-6 py-4 text-[#575e70]">
-                          <span className="font-semibold text-[#191c1d]">{booking.fieldName}</span>{' '}
+                          <span className="font-semibold text-[#191c1d]">
+                            {booking.fieldName}
+                          </span>{' '}
                           <span>({booking.fieldType})</span>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
-                            <span className="font-semibold text-[#191c1d]">{booking.dateLabel}</span>
-                            <span className="text-xs text-[#575e70]">{booking.timeSlot}</span>
+                            <span className="font-semibold text-[#191c1d]">
+                              {booking.dateLabel}
+                            </span>
+                            <span className="text-xs text-[#575e70]">
+                              {booking.timeSlot}
+                            </span>
                           </div>
                         </td>
                         <td className="px-6 py-4 font-bold text-[#006e2f]">
@@ -397,31 +421,36 @@ export default function AdminDashboardPage() {
                 <div key={item.id} className="relative">
                   {/* Timeline Dot */}
                   <div
-                    className={`absolute -left-[23px] top-1.5 h-3.5 w-3.5 rounded-full border-2 border-white ${item.isPending ? 'bg-[#6d7b6c]' : 'bg-[#006e2f]'
-                      }`}
+                    className={`absolute -left-[23px] top-1.5 h-3.5 w-3.5 rounded-full border-2 border-white ${
+                      item.isPending ? 'bg-[#6d7b6c]' : 'bg-[#006e2f]'
+                    }`}
                   />
 
                   {/* Card content */}
                   <div
-                    className={`rounded-lg border p-3 transition-colors ${item.isPending
-                      ? 'border-[#bccbb9]/60 bg-[#f8f9fa] opacity-80'
-                      : 'border-[#bccbb9] bg-[#f3f4f5]'
-                      }`}
+                    className={`rounded-lg border p-3 transition-colors ${
+                      item.isPending
+                        ? 'border-[#bccbb9]/60 bg-[#f8f9fa] opacity-80'
+                        : 'border-[#bccbb9] bg-[#f3f4f5]'
+                    }`}
                   >
                     <div className="mb-1 flex items-center justify-between">
                       <span className="text-xs font-bold text-[#191c1d]">
                         {item.timeSlot}
                       </span>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.isPending
-                          ? 'bg-[#e1e3e4] text-[#575e70]'
-                          : 'bg-[#22c55e]/20 text-[#006e2f]'
-                          }`}
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          item.isPending
+                            ? 'bg-[#e1e3e4] text-[#575e70]'
+                            : 'bg-[#22c55e]/20 text-[#006e2f]'
+                        }`}
                       >
                         {item.courtName}
                       </span>
                     </div>
-                    <p className="text-xs text-[#575e70]">{item.customerName}</p>
+                    <p className="text-xs text-[#575e70]">
+                      {item.customerName}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -494,7 +523,9 @@ export default function AdminDashboardPage() {
           <div className="w-full max-w-md rounded-2xl border border-[#bccbb9] bg-white p-6 shadow-xl animate-in zoom-in-95 duration-150">
             <div className="flex items-start justify-between border-b border-[#bccbb9]/60 pb-3">
               <div>
-                <span className="text-xs font-semibold text-[#575e70]">Chi tiết đơn đặt sân</span>
+                <span className="text-xs font-semibold text-[#575e70]">
+                  Chi tiết đơn đặt sân
+                </span>
                 <h4 className="font-(family-name:--font-manrope) text-lg font-bold text-[#191c1d]">
                   {selectedBooking.code}
                 </h4>
@@ -511,12 +542,16 @@ export default function AdminDashboardPage() {
             <div className="my-4 space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-[#575e70]">Khách hàng:</span>
-                <span className="font-semibold text-[#191c1d]">{selectedBooking.customerName}</span>
+                <span className="font-semibold text-[#191c1d]">
+                  {selectedBooking.customerName}
+                </span>
               </div>
               {selectedBooking.customerPhone && (
                 <div className="flex justify-between">
                   <span className="text-[#575e70]">Số điện thoại:</span>
-                  <span className="font-medium text-[#191c1d]">{selectedBooking.customerPhone}</span>
+                  <span className="font-medium text-[#191c1d]">
+                    {selectedBooking.customerPhone}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between">

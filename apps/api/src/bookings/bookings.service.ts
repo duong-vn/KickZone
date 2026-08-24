@@ -170,9 +170,7 @@ export class BookingsService {
     });
 
     const response = this.mapBooking(booking);
-    if (profile.email) {
-      // ponytail: no booking-created email until the issue explicitly requires it.
-    }
+    await this.email.sendBookingCreated(profile.email, response);
     return { data: response };
   }
 

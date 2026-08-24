@@ -22,11 +22,7 @@ import {
 
 // Types mapping directly to KickZone database schema (init.sql)
 export type BookingStatus =
-  | 'PENDING'
-  | 'CONFIRMED'
-  | 'REJECTED'
-  | 'CANCELLED'
-  | 'COMPLETED';
+  'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED';
 
 export interface AdminBookingItem {
   id: string;
@@ -207,7 +203,8 @@ const INITIAL_BOOKINGS: AdminBookingItem[] = [
 
 export default function AdminBookingsPage() {
   // State for data and filtering
-  const [bookings, setBookings] = useState<AdminBookingItem[]>(INITIAL_BOOKINGS);
+  const [bookings, setBookings] =
+    useState<AdminBookingItem[]>(INITIAL_BOOKINGS);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [bookingDateFilter, setBookingDateFilter] = useState('');
@@ -217,8 +214,10 @@ export default function AdminBookingsPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   // Selected booking for detailed view/actions
-  const [selectedBooking, setSelectedBooking] = useState<AdminBookingItem | null>(null);
-  const [rejectingBooking, setRejectingBooking] = useState<AdminBookingItem | null>(null);
+  const [selectedBooking, setSelectedBooking] =
+    useState<AdminBookingItem | null>(null);
+  const [rejectingBooking, setRejectingBooking] =
+    useState<AdminBookingItem | null>(null);
   const [rejectReasonInput, setRejectReasonInput] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -272,7 +271,13 @@ export default function AdminBookingsPage() {
 
       return true;
     });
-  }, [bookings, searchQuery, statusFilter, bookingDateFilter, createdDateFilter]);
+  }, [
+    bookings,
+    searchQuery,
+    statusFilter,
+    bookingDateFilter,
+    createdDateFilter,
+  ]);
 
   // Reset all filters
   const handleResetFilters = () => {
@@ -286,14 +291,16 @@ export default function AdminBookingsPage() {
   // Quick Approve Booking
   const handleApprove = (bookingId: string) => {
     setBookings((prev) =>
-      prev.map((b) => (b.id === bookingId ? { ...b, status: 'CONFIRMED' } : b))
+      prev.map((b) => (b.id === bookingId ? { ...b, status: 'CONFIRMED' } : b)),
     );
     const target = bookings.find((b) => b.id === bookingId);
     if (target) {
       showToast(`Đã duyệt thành công đơn ${target.code}!`);
     }
     if (selectedBooking?.id === bookingId) {
-      setSelectedBooking((prev) => (prev ? { ...prev, status: 'CONFIRMED' } : null));
+      setSelectedBooking((prev) =>
+        prev ? { ...prev, status: 'CONFIRMED' } : null,
+      );
     }
   };
 
@@ -306,13 +313,13 @@ export default function AdminBookingsPage() {
       prev.map((b) =>
         b.id === rejectingBooking.id
           ? { ...b, status: 'REJECTED', rejectionReason: reason }
-          : b
-      )
+          : b,
+      ),
     );
     showToast(`Đã từ chối đơn ${rejectingBooking.code}.`);
     if (selectedBooking?.id === rejectingBooking.id) {
       setSelectedBooking((prev) =>
-        prev ? { ...prev, status: 'REJECTED', rejectionReason: reason } : null
+        prev ? { ...prev, status: 'REJECTED', rejectionReason: reason } : null,
       );
     }
     setRejectingBooking(null);
@@ -389,7 +396,9 @@ export default function AdminBookingsPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* Search Box */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#575e70]">Tìm kiếm</label>
+            <label className="text-xs font-semibold text-[#575e70]">
+              Tìm kiếm
+            </label>
             <div className="relative">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#575e70]" />
               <input
@@ -404,7 +413,9 @@ export default function AdminBookingsPage() {
 
           {/* Status Select */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#575e70]">Trạng thái</label>
+            <label className="text-xs font-semibold text-[#575e70]">
+              Trạng thái
+            </label>
             <div className="relative">
               <select
                 value={statusFilter}
@@ -424,7 +435,9 @@ export default function AdminBookingsPage() {
 
           {/* Booking Date Range */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#575e70]">Khoảng ngày đặt</label>
+            <label className="text-xs font-semibold text-[#575e70]">
+              Khoảng ngày đặt
+            </label>
             <div className="relative">
               <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-[#575e70]" />
               <input
@@ -438,7 +451,9 @@ export default function AdminBookingsPage() {
 
           {/* Created Date Range */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#575e70]">Khoảng ngày tạo</label>
+            <label className="text-xs font-semibold text-[#575e70]">
+              Khoảng ngày tạo
+            </label>
             <div className="relative">
               <CalendarDays className="absolute left-3 top-2.5 h-4 w-4 text-[#575e70]" />
               <input
@@ -489,7 +504,10 @@ export default function AdminBookingsPage() {
             <tbody className="divide-y divide-[#bccbb9]/50 text-xs sm:text-sm text-[#191c1d]">
               {filteredBookings.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-sm text-[#575e70]">
+                  <td
+                    colSpan={7}
+                    className="py-12 text-center text-sm text-[#575e70]"
+                  >
                     Không tìm thấy đơn đặt sân nào phù hợp với bộ lọc.
                   </td>
                 </tr>
@@ -526,7 +544,10 @@ export default function AdminBookingsPage() {
                       <p className="font-semibold text-[#191c1d]">
                         {booking.field.name}
                         {booking.field.zone && (
-                          <span className="text-[#575e70]"> - {booking.field.zone}</span>
+                          <span className="text-[#575e70]">
+                            {' '}
+                            - {booking.field.zone}
+                          </span>
                         )}
                       </p>
                       <span className="text-[11px] text-[#575e70]">
@@ -671,7 +692,9 @@ export default function AdminBookingsPage() {
             <div className="my-4 space-y-4 text-xs sm:text-sm">
               {/* Customer Box */}
               <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-3.5">
-                <p className="mb-2 font-bold text-[#191c1d]">Thông tin khách hàng</p>
+                <p className="mb-2 font-bold text-[#191c1d]">
+                  Thông tin khách hàng
+                </p>
                 <div className="space-y-1.5 text-[#575e70]">
                   <div className="flex justify-between">
                     <span>Họ và tên:</span>
@@ -699,13 +722,15 @@ export default function AdminBookingsPage() {
                 <div className="flex justify-between">
                   <span className="text-[#575e70]">Sân đặt:</span>
                   <span className="font-semibold text-[#191c1d]">
-                    {selectedBooking.field.name} ({selectedBooking.field.fieldType})
+                    {selectedBooking.field.name} (
+                    {selectedBooking.field.fieldType})
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#575e70]">Thời gian đá:</span>
                   <span className="font-semibold text-[#191c1d]">
-                    {formatDateVN(selectedBooking.bookingDate)}, {selectedBooking.startTime} - {selectedBooking.endTime}
+                    {formatDateVN(selectedBooking.bookingDate)},{' '}
+                    {selectedBooking.startTime} - {selectedBooking.endTime}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -741,7 +766,8 @@ export default function AdminBookingsPage() {
               </div>
 
               {/* Reason notice if rejected or cancelled */}
-              {(selectedBooking.rejectionReason || selectedBooking.cancellationReason) && (
+              {(selectedBooking.rejectionReason ||
+                selectedBooking.cancellationReason) && (
                 <div className="rounded-xl border border-[#ba1a1a]/30 bg-[#ffdad6]/30 p-3 text-xs text-[#93000a]">
                   <p className="font-bold">
                     {selectedBooking.status === 'REJECTED'
@@ -749,7 +775,8 @@ export default function AdminBookingsPage() {
                       : 'Lý do hủy đơn:'}
                   </p>
                   <p className="mt-1">
-                    {selectedBooking.rejectionReason || selectedBooking.cancellationReason}
+                    {selectedBooking.rejectionReason ||
+                      selectedBooking.cancellationReason}
                   </p>
                 </div>
               )}
@@ -795,7 +822,10 @@ export default function AdminBookingsPage() {
 
             <p className="mt-3 text-xs sm:text-sm text-[#575e70]">
               Bạn có chắc chắn muốn từ chối yêu cầu đặt sân của khách hàng{' '}
-              <strong className="text-[#191c1d]">{rejectingBooking.user.fullName}</strong>?
+              <strong className="text-[#191c1d]">
+                {rejectingBooking.user.fullName}
+              </strong>
+              ?
             </p>
 
             <div className="mt-4 space-y-1.5">

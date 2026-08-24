@@ -1,46 +1,10 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+
 import { FieldsService } from './fields.service.js';
+import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 
-export class GetFieldsQueryDto {
-  @IsOptional()
-  @IsString()
-  search?: string;
-
-  @IsOptional()
-  @IsString()
-  type?: string;
-
-  @IsOptional()
-  @IsString()
-  district?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  minPrice?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  maxPrice?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number;
-}
+import { GetFieldsQueryDto } from './dto/get-fields-query.dto.js';
+import { IsString } from 'class-validator';
 
 export class AvailabilityQueryDto {
   @IsString()
@@ -49,9 +13,14 @@ export class AvailabilityQueryDto {
 
 @Controller('fields')
 export class FieldsController {
-  constructor(private readonly fieldsService: FieldsService) {}
+  constructor(private readonly fieldsService: FieldsService) { }
 
   @Get()
+  @ApiOperation({
+    summary:
+      'Lấy danh sách sân bóng kèm tìm kiếm, lọc và phân trang (dành cho Guest)',
+  })
+  @ApiResponse({ status: 200, description: 'Lấy danh sách sân thành công' })
   findAll(@Query() query: GetFieldsQueryDto) {
     return this.fieldsService.findAll(query);
   }

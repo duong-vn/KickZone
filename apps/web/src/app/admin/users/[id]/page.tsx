@@ -152,7 +152,7 @@ export default function AdminUserDetailPage({
     showToast(
       nextStatus === 'ACTIVE'
         ? `Đã kích hoạt lại tài khoản cho ${user.fullName}!`
-        : `Đã vô hiệu hóa tài khoản của ${user.fullName}.`
+        : `Đã vô hiệu hóa tài khoản của ${user.fullName}.`,
     );
   };
 
@@ -230,7 +230,9 @@ export default function AdminUserDetailPage({
               Người dùng
             </Link>
             <ChevronRight className="h-4 w-4 text-[#bccbb9]" />
-            <span className="font-semibold text-[#191c1d]">{user.fullName}</span>
+            <span className="font-semibold text-[#191c1d]">
+              {user.fullName}
+            </span>
           </div>
         </div>
 
@@ -291,7 +293,9 @@ export default function AdminUserDetailPage({
                 className={`absolute bottom-1 right-1 h-4 w-4 rounded-full border-2 border-white ${
                   user.status === 'ACTIVE' ? 'bg-[#22c55e]' : 'bg-[#575e70]'
                 }`}
-                title={user.status === 'ACTIVE' ? 'Đang hoạt động' : 'Vô hiệu hóa'}
+                title={
+                  user.status === 'ACTIVE' ? 'Đang hoạt động' : 'Vô hiệu hóa'
+                }
               />
             </div>
 
@@ -418,7 +422,9 @@ export default function AdminUserDetailPage({
                     <th className="p-4 whitespace-nowrap">Sân Bóng</th>
                     <th className="p-4 whitespace-nowrap">Thời Gian</th>
                     <th className="p-4 whitespace-nowrap">Trạng Thái</th>
-                    <th className="p-4 text-right whitespace-nowrap">Thao Tác</th>
+                    <th className="p-4 text-right whitespace-nowrap">
+                      Thao Tác
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#bccbb9]/40">
@@ -522,7 +528,10 @@ export default function AdminUserDetailPage({
               </button>
             </div>
 
-            <form onSubmit={handleSaveEdit} className="my-4 space-y-3.5 text-xs sm:text-sm">
+            <form
+              onSubmit={handleSaveEdit}
+              className="my-4 space-y-3.5 text-xs sm:text-sm"
+            >
               <div>
                 <label className="mb-1 block font-semibold text-[#191c1d]">
                   Họ và tên
@@ -532,7 +541,10 @@ export default function AdminUserDetailPage({
                   required
                   value={editFormData.fullName}
                   onChange={(e) =>
-                    setEditFormData({ ...editFormData, fullName: e.target.value })
+                    setEditFormData({
+                      ...editFormData,
+                      fullName: e.target.value,
+                    })
                   }
                   className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
                 />

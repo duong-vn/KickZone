@@ -111,7 +111,10 @@ export default function FavoritesPage() {
           return (b.field.rating_avg ?? 0) - (a.field.rating_avg ?? 0);
         }
         if (sortBy === 'price-asc') {
-          return a.field.base_price_per_hour - b.field.base_price_per_hour;
+          return (
+            (a.field.base_price_per_hour ?? a.field.basePricePerHour ?? 0) -
+            (b.field.base_price_per_hour ?? b.field.basePricePerHour ?? 0)
+          );
         }
         return (
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -345,7 +348,11 @@ export default function FavoritesPage() {
                           Từ
                         </span>
                         <div className="font-['Manrope',sans-serif] text-base font-extrabold text-[#006e2f]">
-                          {formatVND(field.base_price_per_hour)}
+                          {formatVND(
+                            field.base_price_per_hour ??
+                              field.basePricePerHour ??
+                              0,
+                          )}
                           <span className="font-['Inter',sans-serif] text-[11px] font-normal text-[#575e70]">
                             /giờ
                           </span>

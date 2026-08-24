@@ -47,6 +47,8 @@ export default function BookingDetailPage({
       toast.success('Đã hủy đơn đặt sân.');
       await client.invalidateQueries({ queryKey: ['booking', id] });
       await client.invalidateQueries({ queryKey: ['bookings', 'me'] });
+      await client.invalidateQueries({ queryKey: ['availability'] });
+      await client.invalidateQueries({ queryKey: ['fields'] });
     },
     onError: (error: ApiError) => {
       toast.error(error.message);

@@ -33,15 +33,15 @@ export interface FieldSummary {
   district: string;
   latitude?: number | string | null;
   longitude?: number | string | null;
-  basePricePerHour: number;
-  base_price_per_hour: number;
+  basePricePerHour?: number;
+  base_price_per_hour?: number;
   status?: 'ACTIVE' | 'INACTIVE';
   deleted_at?: string | null;
   createdAt?: string;
   created_at?: string;
   updatedAt?: string;
   updated_at?: string;
-  type?: FieldType | null;
+  type?: FieldType | string | null;
   field_type?: FieldType;
   images?: FieldImage[];
   field_images?: FieldImage[];
@@ -52,9 +52,18 @@ export interface FieldSummary {
   is_available_today?: boolean;
   primary_image_url?: string;
   supported_types?: string[];
+  location?: string;
+  pricePerHour?: number;
+  image?: string;
+  rating?: number;
+  available?: boolean;
+  types?: string[];
 }
 export type Field = FieldSummary;
 export interface FieldDetail extends FieldSummary {
+  basePricePerHour: number;
+  base_price_per_hour: number;
+  type?: FieldType | null;
   images: FieldImage[];
   operatingHours: OperatingHours[];
 }
@@ -74,3 +83,16 @@ export interface Paginated<T> {
   data: T[];
   meta: { total: number; page: number; limit: number; totalPages: number };
 }
+
+export interface FieldsMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface FieldsResponse {
+  data: Field[];
+  meta: FieldsMeta;
+}
+
