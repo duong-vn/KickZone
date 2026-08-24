@@ -1,40 +1,48 @@
 export type BookingStatus =
-  | 'PENDING'
-  | 'CONFIRMED'
-  | 'COMPLETED'
-  | 'CANCELLED'
-  | 'REJECTED';
+  'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'REJECTED';
 
-export interface BookingItem {
+export type BookingItem = Booking;
+export type NewBooking = Booking;
+
+export interface Booking {
   id: string;
   code: string;
-  userId: string;
-  fieldId: string;
-  fieldName: string;
-  fieldAddress: string;
-  fieldType: string;
-  fieldImage: string;
-  courtName: string;
-  date: string;
-  dateDisplay: string;
+  field: {
+    id: string;
+    name: string;
+    address: string;
+    city: string;
+    district: string;
+    type: { id: string; name: string } | null;
+    primaryImagePath: string | null;
+  };
+  voucher: { code: string } | null;
   startTime: string;
   endTime: string;
-  durationMinutes: number;
-  pricePerHour: number;
+  status: BookingStatus;
   originalPrice: number;
   discountAmount: number;
   finalPrice: number;
-  voucherId?: string;
-  voucherCode?: string;
-  status: BookingStatus;
+  cancellationReason: string | null;
+  rejectionReason: string | null;
   createdAt: string;
   updatedAt: string;
-  cancellationReason?: string;
-  rejectionReason?: string;
-  hostPhone?: string;
 }
 
-export type NewBooking = Omit<
-  BookingItem,
-  'id' | 'code' | 'createdAt' | 'updatedAt' | 'status'
->;
+export interface CreateBookingRequest {
+  fieldId: string;
+  startTime: string;
+  endTime: string;
+  voucherCode?: string;
+}
+
+export interface CancelBookingRequest {
+  reason?: string;
+}
+
+export interface VoucherPreview {
+  code: string;
+  originalPrice: number;
+  discountAmount: number;
+  finalPrice: number;
+}

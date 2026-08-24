@@ -1,43 +1,158 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
+import { getSupabaseBrowserClient } from './supabase';
+import type {
+  Booking,
+  BookingStatus,
+  CancelBookingRequest,
+  CreateBookingRequest,
+  VoucherPreview,
+} from '@/types/booking';
+import type {
+  AvailabilityResponse,
+  FieldDetail,
+  FieldSummary,
+  Paginated,
+} from '@/types/field';
 
-export const api = axios.create({
+export interface ApiErrorShape {
+  status: number;
+  code: string;
+  message: string;
+}
+
+export class ApiError extends Error {
+  status: number;
+  code: string;
+
+  constructor({ status, code, message }: ApiErrorShape) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-export const fetchFields = async (
-  params: Record<string, string | number | boolean | undefined | null>,
-) => {
-  const cleanParams: Record<string, string> = {};
-
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      cleanParams[key] = String(value);
+async function request<T>(
+  method: 'get' | 'post' | 'patch',
+  url: string,
+  data?: unknown,
+  params?: Record<string, string | number | undefined>,
+  protectedRequest = false,
+): Promise<T> {
+  try {
+    const headers: Record<string, string> = {};
+    if (protectedRequest) {
+      const { data: sessionData } =
+        await getSupabaseBrowserClient().auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_REQUIRED',
+          message: 'Vui lòng đăng nhập.',
+        });
+      headers.Authorization = `Bearer ${token}`;
     }
-  });
-
-  const query = new URLSearchParams(cleanParams).toString();
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333'}/fields${query ? `?${query}` : ''}`,
-  );
-
-  if (!res.ok) {
-    throw new Error('Failed to fetch fields');
+    const response = await api.request<T>({
+      method,
+      url,
+      data,
+      params,
+      headers,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    const axiosError = error as AxiosError<{ code?: string; message?: string }>;
+    throw new ApiError({
+      status: axiosError.response?.status ?? 0,
+      code: axiosError.response?.data?.code ?? 'NETWORK_ERROR',
+      message:
+        axiosError.response?.data?.message ?? 'Không thể kết nối máy chủ.',
+    });
   }
+}
 
-  return res.json();
-};
+export function fetchFields(
+  params: Record<string, string | number | undefined>,
+) {
+  return request<Paginated<FieldSummary>>('get', '/fields', undefined, params);
+}
 
-export const fetchFieldById = async (id: string) => {
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/fields/${id}`,
+export function fetchFieldById(id: string) {
+  return request<{ data: FieldDetail }>('get', `/fields/${id}`);
+}
+
+export function fetchAvailability(fieldId: string, date: string) {
+  return request<{ data: AvailabilityResponse }>(
+    'get',
+    `/fields/${fieldId}/availability`,
+    undefined,
+    { date },
   );
+}
 
-  if (!res.ok) {
-    throw new Error(`Failed to fetch field ${id}`);
-  }
+export function validateVoucher(input: {
+  fieldId: string;
+  startTime: string;
+  endTime: string;
+  code: string;
+}) {
+  return request<{ data: VoucherPreview }>(
+    'post',
+    '/vouchers/validate',
+    input,
+    undefined,
+    true,
+  );
+}
 
-  return res.json();
-};
+export function createBooking(input: CreateBookingRequest) {
+  return request<{ data: Booking }>(
+    'post',
+    '/bookings',
+    input,
+    undefined,
+    true,
+  );
+}
+
+export function fetchMyBookings(params: {
+  page: number;
+  limit: number;
+  status?: BookingStatus;
+  search?: string;
+}) {
+  return request<Paginated<Booking>>(
+    'get',
+    '/bookings/me',
+    undefined,
+    params,
+    true,
+  );
+}
+
+export function fetchBooking(id: string) {
+  return request<{ data: Booking }>(
+    'get',
+    `/bookings/${id}`,
+    undefined,
+    undefined,
+    true,
+  );
+}
+
+export function cancelBooking(id: string, input: CancelBookingRequest) {
+  return request<{ data: Booking }>(
+    'patch',
+    `/bookings/${id}/cancel`,
+    input,
+    undefined,
+    true,
+  );
+}

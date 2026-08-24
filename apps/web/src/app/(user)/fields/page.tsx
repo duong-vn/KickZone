@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -19,6 +19,25 @@ import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { useDebounce } from '@/hooks/use-debounce';
 import { fetchFields } from '@/lib/api';
+import type { FieldSummary } from '@/types/field';
+
+const FALLBACK_IMAGE = '/images/field-placeholder.svg';
+
+function mapField(field: FieldSummary) {
+  return {
+    id: field.id,
+    name: field.name,
+    location: field.address,
+    district: field.district,
+    types: field.type ? [field.type.name] : [],
+    rating: 0,
+    pricePerHour: field.basePricePerHour,
+    available: true,
+    image:
+      field.images?.find((image) => image.isPrimary)?.storagePath ||
+      FALLBACK_IMAGE,
+  } satisfies FieldItem;
+}
 
 // Helper format YYYY-MM-DD -> DD/MM/YYYY
 function formatDateDisplay(isoDate: string) {
@@ -40,7 +59,9 @@ interface FieldItem {
   image: string;
 }
 
-const MOCK_FIELDS: FieldItem[] = [
+/* ponytail: remove this unused legacy block after the field UI is split into API components. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const UNUSED_MOCK_FIELDS: FieldItem[] = [
   {
     id: '1',
     name: 'Sân Chảo Lửa',
@@ -205,80 +226,28 @@ function FieldsContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  const { data: apiData } = useQuery({
+  const {
+    data: apiData,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: [
       'fields',
-      {
-        debouncedSearch,
-        district,
-        date,
-        timeSlot,
-        selectedTypes,
-        maxPrice,
-        sortBy,
-        page,
-      },
+      { debouncedSearch, district, selectedTypes, maxPrice, page },
     ],
     queryFn: () =>
       fetchFields({
         search: debouncedSearch,
-        district: district === 'Tất cả quận/huyện' ? '' : district,
-        date,
-        timeSlot: timeSlot === 'Tất cả' ? '' : timeSlot,
-        type: selectedTypes.join(','),
-        maxPrice,
+        district: district === 'Tất cả quận/huyện' ? undefined : district,
+        type: selectedTypes.join(',') || undefined,
+        maxPrice: maxPrice < 1000000 ? maxPrice : undefined,
         page,
       }),
     retry: false,
   });
 
-  const filteredMockData = useMemo(() => {
-    let result = [...MOCK_FIELDS];
-
-    if (debouncedSearch.trim()) {
-      const keyword = debouncedSearch.trim().toLowerCase();
-      result = result.filter(
-        (f) =>
-          f.name.toLowerCase().includes(keyword) ||
-          f.location.toLowerCase().includes(keyword),
-      );
-    }
-
-    if (district && district !== 'Tất cả quận/huyện') {
-      result = result.filter((f) => {
-        if (f.district) {
-          return f.district.toLowerCase() === district.toLowerCase();
-        }
-        const regex = new RegExp(
-          `(^|\\b|[,\\s])${district}($|\\b|[,\\s])`,
-          'i',
-        );
-        return regex.test(f.location);
-      });
-    }
-
-    if (selectedTypes.length > 0) {
-      result = result.filter((f) =>
-        selectedTypes.every((t) => f.types?.includes(t) ?? false),
-      );
-    }
-
-    result = result.filter((f) => f.pricePerHour <= maxPrice);
-
-    if (sortBy === 'price-asc') {
-      result.sort((a, b) => a.pricePerHour - b.pricePerHour);
-    } else if (sortBy === 'price-desc') {
-      result.sort((a, b) => b.pricePerHour - a.pricePerHour);
-    } else if (sortBy === 'rating') {
-      result.sort((a, b) => b.rating - a.rating);
-    }
-
-    return result;
-  }, [debouncedSearch, district, selectedTypes, maxPrice, sortBy]);
-
-  const displayFields =
-    apiData?.data && apiData.data.length > 0 ? apiData.data : filteredMockData;
-  const totalResults = apiData?.meta?.total ?? displayFields.length;
+  const displayFields = (apiData?.data ?? []).map(mapField);
+  const totalResults = apiData?.meta?.total ?? 0;
 
   const toggleType = (t: string) => {
     const nextTypes = selectedTypes.includes(t)
@@ -511,7 +480,15 @@ function FieldsContent() {
               </div>
             </div>
 
-            {displayFields.length === 0 ? (
+            {isLoading ? (
+              <div className="bg-white border border-[#bccbb9]/40 rounded-xl p-12 text-center text-[#575e70]">
+                Đang tải danh sách sân...
+              </div>
+            ) : isError ? (
+              <div className="bg-white border border-red-200 rounded-xl p-12 text-center text-red-700">
+                Không thể tải danh sách sân. Vui lòng thử lại.
+              </div>
+            ) : displayFields.length === 0 ? (
               <div className="bg-white border border-[#bccbb9]/40 rounded-xl p-12 text-center space-y-3">
                 <p className="text-[#575e70] font-medium">
                   Không tìm thấy sân bóng nào phù hợp với bộ lọc.

@@ -1,4 +1,4 @@
-import { ValidationPipe } from '@nestjs/common';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -15,6 +15,13 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
       whitelist: true,
+      exceptionFactory: (errors) =>
+        new BadRequestException({
+          code: 'VALIDATION_ERROR',
+          message: errors.flatMap((error) =>
+            Object.values(error.constraints ?? {}),
+          ),
+        }),
     }),
   );
 
