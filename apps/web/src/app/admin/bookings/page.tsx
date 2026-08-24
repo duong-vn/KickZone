@@ -2,6 +2,12 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  fetchAdminBookings,
+  approveAdminBooking,
+  rejectAdminBooking,
+} from '@/lib/api';
 import {
   Search,
   Filter,
@@ -51,160 +57,8 @@ export interface AdminBookingItem {
   cancellationReason?: string;
 }
 
-// Initial mock data reflecting typical database entries from init.sql
-const INITIAL_BOOKINGS: AdminBookingItem[] = [
-  {
-    id: 'bk-1',
-    code: '#KZ-8092',
-    user: {
-      id: 'u-1',
-      fullName: 'Nguyễn Văn A',
-      phone: '0901234567',
-      email: 'nguyenvana@gmail.com',
-    },
-    field: {
-      id: 'f-1',
-      name: 'Sân 7A',
-      zone: 'Zone 1',
-      fieldType: '7-a-side',
-    },
-    bookingDate: '2023-10-24',
-    startTime: '18:00',
-    endTime: '19:30',
-    originalPrice: 450000,
-    discountAmount: 0,
-    finalPrice: 450000,
-    status: 'PENDING',
-    createdAt: '2023-10-23',
-  },
-  {
-    id: 'bk-2',
-    code: '#KZ-8091',
-    user: {
-      id: 'u-2',
-      fullName: 'Trần Thị B',
-      phone: '0912345678',
-      email: 'tranthib@gmail.com',
-    },
-    field: {
-      id: 'f-2',
-      name: 'Sân 5B',
-      zone: 'Zone 2',
-      fieldType: '5-a-side',
-    },
-    bookingDate: '2023-10-24',
-    startTime: '19:30',
-    endTime: '21:00',
-    originalPrice: 350000,
-    discountAmount: 50000,
-    finalPrice: 300000,
-    status: 'CONFIRMED',
-    createdAt: '2023-10-23',
-  },
-  {
-    id: 'bk-3',
-    code: '#KZ-8090',
-    user: {
-      id: 'u-3',
-      fullName: 'Lê Văn C',
-      phone: '0987654321',
-      email: 'levanc@gmail.com',
-    },
-    field: {
-      id: 'f-3',
-      name: 'Sân 11A',
-      zone: 'Zone Main',
-      fieldType: '11-a-side',
-    },
-    bookingDate: '2023-10-23',
-    startTime: '16:00',
-    endTime: '18:00',
-    originalPrice: 1200000,
-    discountAmount: 0,
-    finalPrice: 1200000,
-    status: 'COMPLETED',
-    createdAt: '2023-10-22',
-  },
-  {
-    id: 'bk-4',
-    code: '#KZ-8089',
-    user: {
-      id: 'u-4',
-      fullName: 'Phạm Minh D',
-      phone: '0933112233',
-      email: 'phamminhd@gmail.com',
-    },
-    field: {
-      id: 'f-4',
-      name: 'Sân 5A',
-      zone: 'Zone 1',
-      fieldType: '5-a-side',
-    },
-    bookingDate: '2023-10-25',
-    startTime: '17:00',
-    endTime: '18:30',
-    originalPrice: 300000,
-    discountAmount: 0,
-    finalPrice: 300000,
-    status: 'CANCELLED',
-    createdAt: '2023-10-23',
-    cancellationReason: 'Khách hàng có việc bận đột xuất',
-  },
-  {
-    id: 'bk-5',
-    code: '#KZ-8088',
-    user: {
-      id: 'u-5',
-      fullName: 'Hoàng Quốc E',
-      phone: '0944556677',
-      email: 'hoangquoce@gmail.com',
-    },
-    field: {
-      id: 'f-5',
-      name: 'Sân 7B',
-      zone: 'Zone 2',
-      fieldType: '7-a-side',
-    },
-    bookingDate: '2023-10-25',
-    startTime: '20:00',
-    endTime: '21:30',
-    originalPrice: 450000,
-    discountAmount: 0,
-    finalPrice: 450000,
-    status: 'PENDING',
-    createdAt: '2023-10-23',
-  },
-  {
-    id: 'bk-6',
-    code: '#KZ-8087',
-    user: {
-      id: 'u-6',
-      fullName: 'Vũ Thị F',
-      phone: '0977889900',
-      email: 'vuthif@gmail.com',
-    },
-    field: {
-      id: 'f-6',
-      name: 'Sân 5C',
-      zone: 'Zone 3',
-      fieldType: '5-a-side',
-    },
-    bookingDate: '2023-10-22',
-    startTime: '19:00',
-    endTime: '20:30',
-    originalPrice: 350000,
-    discountAmount: 0,
-    finalPrice: 350000,
-    status: 'REJECTED',
-    createdAt: '2023-10-21',
-    rejectionReason: 'Sân đang bảo dưỡng cỏ nhân tạo',
-  },
-];
-
 export default function AdminBookingsPage() {
-  // State for data and filtering
-  const [bookings, setBookings] =
-    useState<AdminBookingItem[]>(INITIAL_BOOKINGS);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [bookingDateFilter, setBookingDateFilter] = useState('');
@@ -212,6 +66,88 @@ export default function AdminBookingsPage() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
+
+  const { data: apiResponse, isLoading } = useQuery({
+    queryKey: [
+      'admin-bookings',
+      searchQuery,
+      statusFilter,
+      bookingDateFilter,
+      currentPage,
+    ],
+    queryFn: () =>
+      fetchAdminBookings({
+        search: searchQuery || undefined,
+        status: statusFilter || undefined,
+        from: bookingDateFilter
+          ? `${bookingDateFilter}T00:00:00.000Z`
+          : undefined,
+        to: bookingDateFilter
+          ? `${bookingDateFilter}T23:59:59.999Z`
+          : undefined,
+        page: currentPage,
+        limit: 10,
+      }),
+    retry: false,
+  });
+
+  const bookings: AdminBookingItem[] = useMemo(() => {
+    if (apiResponse?.data) {
+      return apiResponse.data.map(
+        (item: {
+          id: string;
+          code: string;
+          userId: string;
+          customerName: string;
+          customerPhone: string;
+          customerEmail: string;
+          fieldId: string;
+          fieldName: string;
+          fieldTypeLabel?: string;
+          bookingDate: string;
+          startTime?: string;
+          endTime?: string;
+          originalPrice: number;
+          discountAmount: number;
+          finalPrice: number;
+          status: BookingStatus;
+          createdAt?: string;
+          rejectionReason?: string;
+          cancellationReason?: string;
+        }) => ({
+          id: item.id,
+          code: item.code,
+          user: {
+            id: item.userId,
+            fullName: item.customerName,
+            phone: item.customerPhone,
+            email: item.customerEmail,
+          },
+          field: {
+            id: item.fieldId,
+            name: item.fieldName,
+            zone: 'Khu vực chính',
+            fieldType: item.fieldTypeLabel || 'Sân bóng',
+          },
+          bookingDate: item.bookingDate,
+          startTime: item.startTime
+            ? item.startTime.substring(11, 16)
+            : '00:00',
+          endTime: item.endTime ? item.endTime.substring(11, 16) : '00:00',
+          originalPrice: item.originalPrice,
+          discountAmount: item.discountAmount,
+          finalPrice: item.finalPrice,
+          status: item.status,
+          createdAt: item.createdAt ? item.createdAt.split('T')[0] : '',
+          rejectionReason: item.rejectionReason,
+          cancellationReason: item.cancellationReason,
+        }),
+      );
+    }
+    return [];
+  }, [apiResponse]);
+
+  const filteredBookings = bookings;
 
   // Selected booking for detailed view/actions
   const [selectedBooking, setSelectedBooking] =
@@ -239,46 +175,6 @@ export default function AdminBookingsPage() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Filter logic
-  const filteredBookings = useMemo(() => {
-    return bookings.filter((item) => {
-      // Search text matches code, customer name, customer phone, or field name
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesCode = item.code.toLowerCase().includes(q);
-        const matchesName = item.user.fullName.toLowerCase().includes(q);
-        const matchesPhone = item.user.phone.includes(q);
-        const matchesField = item.field.name.toLowerCase().includes(q);
-        if (!matchesCode && !matchesName && !matchesPhone && !matchesField) {
-          return false;
-        }
-      }
-
-      // Status filter
-      if (statusFilter && item.status !== statusFilter) {
-        return false;
-      }
-
-      // Booking date filter
-      if (bookingDateFilter && item.bookingDate !== bookingDateFilter) {
-        return false;
-      }
-
-      // Created date filter
-      if (createdDateFilter && item.createdAt !== createdDateFilter) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [
-    bookings,
-    searchQuery,
-    statusFilter,
-    bookingDateFilter,
-    createdDateFilter,
-  ]);
-
   // Reset all filters
   const handleResetFilters = () => {
     setSearchQuery('');
@@ -289,41 +185,42 @@ export default function AdminBookingsPage() {
   };
 
   // Quick Approve Booking
-  const handleApprove = (bookingId: string) => {
-    setBookings((prev) =>
-      prev.map((b) => (b.id === bookingId ? { ...b, status: 'CONFIRMED' } : b)),
-    );
-    const target = bookings.find((b) => b.id === bookingId);
-    if (target) {
-      showToast(`Đã duyệt thành công đơn ${target.code}!`);
-    }
-    if (selectedBooking?.id === bookingId) {
-      setSelectedBooking((prev) =>
-        prev ? { ...prev, status: 'CONFIRMED' } : null,
-      );
+  const handleApprove = async (bookingId: string) => {
+    try {
+      await approveAdminBooking(bookingId);
+      queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
+      showToast(`Đã duyệt thành công đơn đặt sân!`);
+      if (selectedBooking?.id === bookingId) {
+        setSelectedBooking((prev) =>
+          prev ? { ...prev, status: 'CONFIRMED' } : null,
+        );
+      }
+    } catch (err) {
+      showToast(`Lỗi khi duyệt đơn: ${(err as Error).message}`);
     }
   };
 
   // Quick Reject Booking
-  const handleConfirmReject = () => {
+  const handleConfirmReject = async () => {
     if (!rejectingBooking) return;
     const reason = rejectReasonInput.trim() || 'Admin từ chối yêu cầu đặt sân';
 
-    setBookings((prev) =>
-      prev.map((b) =>
-        b.id === rejectingBooking.id
-          ? { ...b, status: 'REJECTED', rejectionReason: reason }
-          : b,
-      ),
-    );
-    showToast(`Đã từ chối đơn ${rejectingBooking.code}.`);
-    if (selectedBooking?.id === rejectingBooking.id) {
-      setSelectedBooking((prev) =>
-        prev ? { ...prev, status: 'REJECTED', rejectionReason: reason } : null,
-      );
+    try {
+      await rejectAdminBooking(rejectingBooking.id, reason);
+      queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
+      showToast(`Đã từ chối đơn ${rejectingBooking.code}.`);
+      if (selectedBooking?.id === rejectingBooking.id) {
+        setSelectedBooking((prev) =>
+          prev
+            ? { ...prev, status: 'REJECTED', rejectionReason: reason }
+            : null,
+        );
+      }
+      setRejectingBooking(null);
+      setRejectReasonInput('');
+    } catch (err) {
+      showToast(`Lỗi khi từ chối đơn: ${(err as Error).message}`);
     }
-    setRejectingBooking(null);
-    setRejectReasonInput('');
   };
 
   // Status Badge Component

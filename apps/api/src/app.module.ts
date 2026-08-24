@@ -8,9 +8,17 @@ import { PrismaService } from '../prisma/prisma.service';
 
 import { AuthModule } from './auth/auth.module';
 import { FavoritesModule } from './favorites/favorites.module';
+import { StorageModule } from './storage/storage.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), AuthModule, FavoritesModule],
+  imports: [
+    ScheduleModule.forRoot(),
+    AuthModule,
+    FavoritesModule,
+    StorageModule,
+    AdminModule,
+  ],
   controllers: [AppController, FieldsController],
   providers: [AppService, FieldsService, PrismaService],
 })

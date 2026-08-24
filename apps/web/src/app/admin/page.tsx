@@ -1,7 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  fetchAdminDashboardStats,
+  fetchAdminBookings,
+  approveAdminBooking,
+  rejectAdminBooking,
+} from '@/lib/api';
 import {
   Clock,
   CheckCircle2,
@@ -53,62 +60,6 @@ interface ActivityItem {
   timeAgo: string;
 }
 
-// Sample initial data strictly aligned with design mockups and KickZone schema
-const INITIAL_PENDING_BOOKINGS: PendingBookingItem[] = [
-  {
-    id: 'b1',
-    code: '#BK-9271',
-    customerName: 'Nguyễn Văn C',
-    customerPhone: '0901 234 567',
-    fieldName: 'Sân 3',
-    fieldType: '5 người',
-    dateLabel: 'Hôm nay',
-    timeSlot: '19:30 - 21:00',
-    finalPrice: 350000,
-    status: 'PENDING',
-    statusLabel: 'Chờ xác nhận',
-  },
-  {
-    id: 'b2',
-    code: '#BK-9272',
-    customerName: 'Trần Thị B',
-    customerPhone: '0912 345 678',
-    fieldName: 'Sân 1',
-    fieldType: '7 người',
-    dateLabel: 'Hôm nay',
-    timeSlot: '20:00 - 21:30',
-    finalPrice: 450000,
-    status: 'PENDING',
-    statusLabel: 'Chờ xác nhận',
-  },
-  {
-    id: 'b3',
-    code: '#BK-9273',
-    customerName: 'Lê Hoàng D',
-    customerPhone: '0983 456 789',
-    fieldName: 'Sân 5',
-    fieldType: '5 người',
-    dateLabel: 'Ngày mai',
-    timeSlot: '17:00 - 18:30',
-    finalPrice: 300000,
-    status: 'PENDING',
-    statusLabel: 'Chờ xác nhận',
-  },
-  {
-    id: 'b4',
-    code: '#BK-9274',
-    customerName: 'Phạm Văn E',
-    customerPhone: '0974 567 890',
-    fieldName: 'Sân 2',
-    fieldType: '7 người',
-    dateLabel: 'Ngày mai',
-    timeSlot: '18:30 - 20:00',
-    finalPrice: 450000,
-    status: 'PENDING',
-    statusLabel: 'Chờ xác nhận',
-  },
-];
-
 const TODAY_SCHEDULE: ScheduleTimelineItem[] = [
   {
     id: 'sch-1',
@@ -117,22 +68,6 @@ const TODAY_SCHEDULE: ScheduleTimelineItem[] = [
     customerName: 'Trần Văn A',
     isPending: false,
     status: 'CONFIRMED',
-  },
-  {
-    id: 'sch-2',
-    timeSlot: '19:30 - 21:00',
-    courtName: 'Sân 3',
-    customerName: 'Nguyễn Văn C (Chờ)',
-    isPending: true,
-    status: 'PENDING',
-  },
-  {
-    id: 'sch-3',
-    timeSlot: '20:00 - 21:30',
-    courtName: 'Sân 1',
-    customerName: 'Trần Thị B (Chờ)',
-    isPending: true,
-    status: 'PENDING',
   },
 ];
 
@@ -168,34 +103,89 @@ const RECENT_ACTIVITIES: ActivityItem[] = [
 ];
 
 export default function AdminDashboardPage() {
-  const [bookings, setBookings] = useState<PendingBookingItem[]>(
-    INITIAL_PENDING_BOOKINGS,
-  );
+  const queryClient = useQueryClient();
   const [selectedBooking, setSelectedBooking] =
     useState<PendingBookingItem | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+
+  const { data: statsData } = useQuery({
+    queryKey: ['admin-dashboard-stats'],
+    queryFn: () => fetchAdminDashboardStats(),
+    retry: false,
+  });
+
+  const { data: pendingResponse } = useQuery({
+    queryKey: ['admin-pending-bookings-dashboard'],
+    queryFn: () => fetchAdminBookings({ status: 'PENDING', limit: 5 }),
+    retry: false,
+  });
+
+  const bookings: PendingBookingItem[] = useMemo(() => {
+    if (pendingResponse?.data && pendingResponse.data.length > 0) {
+      return pendingResponse.data.map(
+        (b: {
+          id: string;
+          code: string;
+          customerName: string;
+          customerPhone?: string;
+          fieldName: string;
+          fieldTypeLabel?: string;
+          bookingDate: string;
+          startTime?: string;
+          endTime?: string;
+          finalPrice: number;
+          status: BookingStatus;
+        }) => ({
+          id: b.id,
+          code: b.code,
+          customerName: b.customerName,
+          customerPhone: b.customerPhone,
+          fieldName: b.fieldName,
+          fieldType: b.fieldTypeLabel || 'Sân bóng',
+          dateLabel: b.bookingDate,
+          timeSlot: `${b.startTime ? b.startTime.substring(11, 16) : '00:00'} - ${b.endTime ? b.endTime.substring(11, 16) : '00:00'}`,
+          finalPrice: b.finalPrice,
+          status: b.status,
+          statusLabel: 'Chờ xác nhận',
+        }),
+      );
+    }
+    return [];
+  }, [pendingResponse]);
 
   const formatVND = (value: number) => {
     return new Intl.NumberFormat('vi-VN').format(value) + 'đ';
   };
 
-  const handleQuickApprove = (bookingId: string) => {
-    setBookings((prev) => prev.filter((b) => b.id !== bookingId));
-    const target = bookings.find((b) => b.id === bookingId);
+  const handleQuickApprove = async (bookingId: string) => {
     setSelectedBooking(null);
-    if (target) {
-      setActionSuccessMsg(`Đã duyệt đơn ${target.code} thành công!`);
+    try {
+      await approveAdminBooking(bookingId);
+      queryClient.invalidateQueries({
+        queryKey: ['admin-pending-bookings-dashboard'],
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
+      setActionSuccessMsg('Đã duyệt đơn đặt sân thành công!');
       setTimeout(() => setActionSuccessMsg(null), 4000);
+    } catch (err) {
+      setActionSuccessMsg(`Lỗi duyệt đơn: ${(err as Error).message}`);
     }
   };
 
-  const handleQuickReject = (bookingId: string) => {
-    setBookings((prev) => prev.filter((b) => b.id !== bookingId));
-    const target = bookings.find((b) => b.id === bookingId);
+  const handleQuickReject = async (bookingId: string) => {
     setSelectedBooking(null);
-    if (target) {
-      setActionSuccessMsg(`Đã từ chối đơn ${target.code}.`);
+    try {
+      await rejectAdminBooking(bookingId, 'Admin từ chối');
+      queryClient.invalidateQueries({
+        queryKey: ['admin-pending-bookings-dashboard'],
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
+      setActionSuccessMsg('Đã từ chối đơn đặt sân.');
       setTimeout(() => setActionSuccessMsg(null), 4000);
+    } catch (err) {
+      setActionSuccessMsg(`Lỗi từ chối đơn: ${(err as Error).message}`);
     }
   };
 
@@ -239,20 +229,19 @@ export default function AdminDashboardPage() {
               </div>
               <div className="mt-4 flex items-end gap-2">
                 <span className="font-(family-name:--font-manrope) text-3xl font-extrabold tracking-tight text-[#191c1d]">
-                  {bookings.length > 0 ? bookings.length + 8 : 12}
+                  {statsData?.pendingBookingsCount ?? bookings.length}
                 </span>
                 <span className="mb-1 flex items-center text-xs font-semibold text-[#ba1a1a]">
-                  <ArrowUp className="h-3.5 w-3.5" />
-                  +3
+                  Cần duyệt
                 </span>
               </div>
             </div>
 
-            {/* KPI 2: Đơn đã xác nhận hôm nay */}
+            {/* KPI 2: Đơn đã xác nhận */}
             <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
               <div className="flex items-start justify-between">
                 <span className="text-xs font-medium text-[#575e70]">
-                  Đơn đã xác nhận hôm nay
+                  Đơn đã xác nhận
                 </span>
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#22c55e]/20 text-[#006e2f]">
                   <CheckCircle2 className="h-4 w-4" />
@@ -260,11 +249,10 @@ export default function AdminDashboardPage() {
               </div>
               <div className="mt-4 flex items-end gap-2">
                 <span className="font-(family-name:--font-manrope) text-3xl font-extrabold tracking-tight text-[#191c1d]">
-                  45
+                  {statsData?.confirmedBookingsCount ?? 0}
                 </span>
                 <span className="mb-1 flex items-center text-xs font-semibold text-[#006e2f]">
-                  <ArrowUp className="h-3.5 w-3.5" />
-                  +12%
+                  Hoạt động
                 </span>
               </div>
             </div>
@@ -281,19 +269,19 @@ export default function AdminDashboardPage() {
               </div>
               <div className="mt-4 flex items-baseline">
                 <span className="font-(family-name:--font-manrope) text-3xl font-extrabold tracking-tight text-[#191c1d]">
-                  8
+                  {statsData?.activeFieldsCount ?? 0}
                 </span>
-                <span className="font-(family-name:--font-manrope) text-xl font-bold text-[#575e70]">
-                  /10
+                <span className="font-(family-name:--font-manrope) text-sm font-semibold text-[#575e70] ml-1">
+                  sân
                 </span>
               </div>
             </div>
 
-            {/* KPI 4: Người dùng đang HĐ */}
+            {/* KPI 4: Người dùng */}
             <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
               <div className="flex items-start justify-between">
                 <span className="text-xs font-medium text-[#575e70]">
-                  Người dùng đang HĐ
+                  Tổng người dùng
                 </span>
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#dce2f3] text-[#585f6c]">
                   <Users className="h-4 w-4" />
@@ -301,7 +289,10 @@ export default function AdminDashboardPage() {
               </div>
               <div className="mt-4 flex items-end">
                 <span className="font-(family-name:--font-manrope) text-3xl font-extrabold tracking-tight text-[#191c1d]">
-                  1.2k
+                  {statsData?.totalUsersCount ?? 0}
+                </span>
+                <span className="font-(family-name:--font-manrope) text-sm font-semibold text-[#575e70] ml-1">
+                  khách
                 </span>
               </div>
             </div>

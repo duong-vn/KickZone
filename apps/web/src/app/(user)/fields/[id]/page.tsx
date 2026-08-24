@@ -36,6 +36,8 @@ import {
   CURRENT_USER,
   calculateReviewSummary,
 } from '@/data/mock-reviews';
+import { useQuery } from '@tanstack/react-query';
+import { fetchFieldById } from '@/lib/api';
 import {
   useFavoriteStatusQuery,
   useToggleFavoriteMutation,
@@ -456,7 +458,24 @@ export default function FieldDetailPage({
   const fieldId = resolvedParams.id;
   const router = useRouter();
 
-  const field = useMemo(() => getFieldById(fieldId), [fieldId]);
+  const { data: apiField, isLoading } = useQuery({
+    queryKey: ['field', fieldId],
+    queryFn: () => fetchFieldById(fieldId),
+    retry: false,
+  });
+
+  const field: FieldDetailData = useMemo(() => {
+    if (apiField) {
+      return {
+        ...apiField,
+        images:
+          apiField.images && apiField.images.length > 0
+            ? apiField.images
+            : DEFAULT_IMAGES,
+      } as FieldDetailData;
+    }
+    return getFieldById(fieldId);
+  }, [apiField, fieldId]);
 
   // Gallery state
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -738,6 +757,53 @@ export default function FieldDetailPage({
 
     router.push(`/checkout?${params.toString()}`);
   };
+
+  if (isLoading) {
+    return (
+      <div className="bg-[#f8f9fa] min-h-screen pb-16 font-sans">
+        <div className="bg-white border-b border-[#bccbb9]/40 py-6 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-3">
+            <div className="h-4 w-48 bg-slate-200 animate-pulse rounded" />
+            <div className="h-8 w-80 bg-slate-200 animate-pulse rounded" />
+            <div className="h-4 w-96 bg-slate-200 animate-pulse rounded" />
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 h-72 sm:h-96 lg:h-[430px]">
+            <div className="lg:col-span-2 bg-slate-200 animate-pulse rounded-2xl" />
+            <div className="hidden lg:flex flex-col gap-3 h-full">
+              <div className="h-1/2 bg-slate-200 animate-pulse rounded-xl" />
+              <div className="h-1/2 bg-slate-200 animate-pulse rounded-xl" />
+            </div>
+            <div className="hidden lg:block bg-slate-200 animate-pulse rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!apiField && !FIELDS_DATABASE[fieldId]) {
+    return (
+      <div className="bg-[#f8f9fa] min-h-screen flex flex-col items-center justify-center p-6 text-center font-sans">
+        <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mb-4 text-emerald-600">
+          <MapPin className="w-8 h-8" />
+        </div>
+        <h1 className="text-2xl font-bold text-[#191c1d] mb-2 font-['Manrope']">
+          Không tìm thấy sân bóng
+        </h1>
+        <p className="text-[#575e70] text-sm max-w-md mb-6">
+          Sân bóng này không tồn tại hoặc đã bị tạm ngừng hoạt động trên hệ
+          thống.
+        </p>
+        <Link
+          href="/fields"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#006e2f] text-white font-semibold hover:bg-[#005524] transition-colors shadow-sm"
+        >
+          Khám phá sân bóng khác
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#f8f9fa] text-[#191c1d] min-h-screen pb-16 font-sans">

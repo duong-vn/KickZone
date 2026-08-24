@@ -1,7 +1,13 @@
 'use client';
 
-import React, { useState, use } from 'react';
+import React, { useState, use, useMemo } from 'react';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  fetchAdminUserById,
+  updateAdminUserStatus,
+  updateAdminUser,
+} from '@/lib/api';
 import {
   ChevronRight,
   Edit,
@@ -13,6 +19,7 @@ import {
   X,
   Check,
   UserCheck,
+  ArrowLeft,
 } from 'lucide-react';
 
 // Types aligned with database/init.sql
@@ -36,14 +43,20 @@ export interface UserDetailReview {
 
 export interface UserDetailData {
   id: string;
+  authUserId: string;
   fullName: string;
   email: string;
   phone: string;
-  registeredDate: string; // '15/08/2023'
-  loginProvider: string; // 'Google' | 'Email' | 'Facebook'
+  registeredDate?: string;
+  createdAt?: string;
+  loginProvider?: string;
+  role: 'USER' | 'ADMIN';
+  roleLabel: string;
   status: 'ACTIVE' | 'INACTIVE';
-  avatarUrl: string;
-  stats: {
+  avatarUrl?: string;
+  totalBookings?: number;
+  totalSpent?: number;
+  stats?: {
     totalBookings: number;
     completed: number;
     cancelled: number;
@@ -56,65 +69,37 @@ export interface UserDetailData {
 // Sample User Detail Data
 const MOCK_USER_DETAIL: UserDetailData = {
   id: 'u-1',
-  fullName: 'Nguyễn Văn A',
-  email: 'nguyenvana@example.com',
-  phone: '0901234567',
-  registeredDate: '15/08/2023',
-  loginProvider: 'Google',
+  authUserId: 'auth-1',
+  fullName: 'Nguyễn Văn An',
+  email: 'nguyenvanan@email.com',
+  phone: '0901 234 567',
+  role: 'USER',
+  roleLabel: 'Khách hàng',
   status: 'ACTIVE',
   avatarUrl:
-    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
-  stats: {
-    totalBookings: 42,
-    completed: 38,
-    cancelled: 3,
-    pending: 1,
-  },
+    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
+  createdAt: '2023-10-10',
+  totalBookings: 12,
+  totalSpent: 3600000,
   recentBookings: [
     {
-      id: 'bk-1042',
-      code: '#BK-1042',
-      fieldName: 'Sân Cỏ Nhân Tạo A1',
-      fieldLocation: 'Khu Thể Thao Thanh Xuân',
-      bookingDate: '24/10/2023',
+      id: 'b-1',
+      code: 'KZ-20231101-01',
+      fieldName: 'Sân bóng Lam Sơn 1',
+      fieldLocation: 'Quận 5, TP. HCM',
+      bookingDate: '2023-11-01',
       timeRange: '18:00 - 19:30',
-      status: 'PENDING',
-    },
-    {
-      id: 'bk-1028',
-      code: '#BK-1028',
-      fieldName: 'Sân 7 Người Víp',
-      fieldLocation: 'Cụm Sân Mỹ Đình',
-      bookingDate: '20/10/2023',
-      timeRange: '19:00 - 20:30',
-      status: 'COMPLETED',
-    },
-    {
-      id: 'bk-0985',
-      code: '#BK-0985',
-      fieldName: 'Sân Cỏ Nhân Tạo B2',
-      fieldLocation: 'Khu Thể Thao Thanh Xuân',
-      bookingDate: '15/10/2023',
-      timeRange: '17:30 - 19:00',
       status: 'COMPLETED',
     },
   ],
   recentReviews: [
     {
-      id: 'rev-1',
-      fieldName: 'Sân Cỏ Nhân Tạo A1',
+      id: 'r-1',
+      fieldName: 'Sân bóng Lam Sơn 1',
       rating: 5,
       content:
-        'Sân đẹp, mặt cỏ tốt, ánh sáng ban đêm rất rõ. Tuy nhiên giá hơi cao so với mặt bằng chung.',
-      date: '24/10/2023',
-    },
-    {
-      id: 'rev-2',
-      fieldName: 'Sân 7 Người Víp',
-      rating: 4,
-      content:
-        'Chất lượng sân tạm ổn, chỗ để xe rộng rãi nhưng nhân viên không nhiệt tình lắm.',
-      date: '20/10/2023',
+        'Sân đẹp, mặt cỏ rất êm, hệ thống đèn chiếu sáng cực tốt ban đêm!',
+      date: '2023-11-02',
     },
   ],
 };
@@ -126,19 +111,34 @@ export default function AdminUserDetailPage({
 }) {
   const resolvedParams = use(params);
   const userId = resolvedParams.id;
+  const queryClient = useQueryClient();
 
-  const [user, setUser] = useState<UserDetailData>({
-    ...MOCK_USER_DETAIL,
-    id: userId,
+  const { data: apiUser, isLoading } = useQuery({
+    queryKey: ['admin-user', userId],
+    queryFn: () => fetchAdminUserById(userId),
+    retry: false,
   });
+
+  const [localUser, setLocalUser] = useState<Partial<UserDetailData> | null>(
+    null,
+  );
+  const user: UserDetailData = useMemo(() => {
+    return {
+      ...MOCK_USER_DETAIL,
+      ...(apiUser || {}),
+      ...(localUser || {}),
+      id: userId,
+    };
+  }, [apiUser, localUser, userId]);
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Edit form state
   const [editFormData, setEditFormData] = useState({
-    fullName: user.fullName,
-    phone: user.phone,
-    status: user.status,
+    fullName: '',
+    phone: '',
+    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
   });
 
   const showToast = (msg: string) => {
@@ -146,26 +146,46 @@ export default function AdminUserDetailPage({
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleToggleStatus = () => {
+  const handleToggleStatus = async () => {
+    if (!user) return;
     const nextStatus = user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-    setUser((prev) => ({ ...prev, status: nextStatus }));
-    showToast(
-      nextStatus === 'ACTIVE'
-        ? `Đã kích hoạt lại tài khoản cho ${user.fullName}!`
-        : `Đã vô hiệu hóa tài khoản của ${user.fullName}.`,
-    );
+    setLocalUser((prev) => ({ ...(prev || {}), status: nextStatus }));
+    try {
+      await updateAdminUserStatus(userId, nextStatus);
+      queryClient.invalidateQueries({ queryKey: ['admin-user', userId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      showToast(
+        nextStatus === 'ACTIVE'
+          ? `Đã kích hoạt lại tài khoản cho ${user.fullName}!`
+          : `Đã vô hiệu hóa tài khoản của ${user.fullName}.`,
+      );
+    } catch (err) {
+      showToast(`Lỗi cập nhật trạng thái: ${(err as Error).message}`);
+    }
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUser((prev) => ({
-      ...prev,
+    if (!user) return;
+    setLocalUser((prev) => ({
+      ...(prev || {}),
       fullName: editFormData.fullName,
       phone: editFormData.phone,
       status: editFormData.status,
     }));
-    setIsEditModalOpen(false);
-    showToast('Cập nhật thông tin người dùng thành công!');
+    try {
+      await updateAdminUser(userId, {
+        fullName: editFormData.fullName,
+        phone: editFormData.phone,
+        status: editFormData.status,
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-user', userId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setIsEditModalOpen(false);
+      showToast('Cập nhật thông tin người dùng thành công!');
+    } catch (err) {
+      showToast(`Lỗi cập nhật: ${(err as Error).message}`);
+    }
   };
 
   const renderBookingStatusBadge = (status: UserDetailBooking['status']) => {
@@ -196,6 +216,42 @@ export default function AdminUserDetailPage({
         );
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto w-full max-w-7xl space-y-6">
+        <div className="h-6 w-32 bg-slate-200 animate-pulse rounded" />
+        <div className="h-40 bg-slate-200 animate-pulse rounded-2xl" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="h-48 bg-slate-200 animate-pulse rounded-2xl" />
+          <div className="h-48 bg-slate-200 animate-pulse rounded-2xl" />
+          <div className="h-48 bg-slate-200 animate-pulse rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!apiUser && userId !== 'u-1') {
+    return (
+      <div className="mx-auto w-full max-w-7xl py-16 flex flex-col items-center justify-center text-center">
+        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4 text-slate-400">
+          <Ban className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 mb-2">
+          Không tìm thấy người dùng
+        </h2>
+        <p className="text-slate-500 text-sm max-w-md mb-6">
+          Tài khoản này không tồn tại trong hệ thống.
+        </p>
+        <Link
+          href="/admin/users"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -312,13 +368,15 @@ export default function AdminUserDetailPage({
               <div className="space-y-3">
                 <div className="flex justify-between items-center border-b border-[#bccbb9]/50 pb-2">
                   <span className="text-[#575e70]">Số điện thoại</span>
-                  <span className="font-bold text-[#191c1d]">{user.phone}</span>
+                  <span className="font-bold text-[#191c1d]">
+                    {user.phone || 'Chưa cập nhật'}
+                  </span>
                 </div>
 
                 <div className="flex justify-between items-center border-b border-[#bccbb9]/50 pb-2">
                   <span className="text-[#575e70]">Ngày đăng ký</span>
                   <span className="font-semibold text-[#191c1d]">
-                    {user.registeredDate}
+                    {user.registeredDate || user.createdAt || 'Mới tham gia'}
                   </span>
                 </div>
 
@@ -326,9 +384,9 @@ export default function AdminUserDetailPage({
                   <span className="text-[#575e70]">Đăng nhập</span>
                   <span className="flex items-center gap-1.5 font-bold text-[#191c1d]">
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-blue-600 font-bold text-[10px]">
-                      G
+                      {user.loginProvider ? user.loginProvider.charAt(0) : 'E'}
                     </span>
-                    {user.loginProvider}
+                    {user.loginProvider || 'Email/Password'}
                   </span>
                 </div>
 
@@ -361,7 +419,9 @@ export default function AdminUserDetailPage({
                   Tổng đơn
                 </div>
                 <div className="font-(family-name:--font-manrope) text-2xl sm:text-3xl font-extrabold text-[#191c1d]">
-                  {user.stats.totalBookings}
+                  {user.stats?.totalBookings ??
+                    user.totalBookings ??
+                    user.recentBookings.length}
                 </div>
               </div>
 
@@ -371,7 +431,9 @@ export default function AdminUserDetailPage({
                   Hoàn thành
                 </div>
                 <div className="font-(family-name:--font-manrope) text-2xl sm:text-3xl font-extrabold text-[#006e2f]">
-                  {user.stats.completed}
+                  {user.stats?.completed ??
+                    user.recentBookings.filter((b) => b.status === 'COMPLETED')
+                      .length}
                 </div>
               </div>
 
@@ -381,7 +443,9 @@ export default function AdminUserDetailPage({
                   Đã hủy
                 </div>
                 <div className="font-(family-name:--font-manrope) text-2xl sm:text-3xl font-extrabold text-[#ba1a1a]">
-                  {user.stats.cancelled}
+                  {user.stats?.cancelled ??
+                    user.recentBookings.filter((b) => b.status === 'CANCELLED')
+                      .length}
                 </div>
               </div>
 
@@ -391,7 +455,9 @@ export default function AdminUserDetailPage({
                   Chờ xác nhận
                 </div>
                 <div className="font-(family-name:--font-manrope) text-2xl sm:text-3xl font-extrabold text-[#F57F17]">
-                  {user.stats.pending}
+                  {user.stats?.pending ??
+                    user.recentBookings.filter((b) => b.status === 'PENDING')
+                      .length}
                 </div>
               </div>
             </div>

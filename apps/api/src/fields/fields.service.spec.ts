@@ -20,12 +20,24 @@ describe('FieldsService', () => {
       meta: { limit: 9, page: 1, total: 0, totalPages: 0 },
     });
     expect(findMany).toHaveBeenCalledWith({
-      orderBy: { created_at: 'desc' },
+      where: {
+        deleted_at: null,
+        status: 'ACTIVE',
+      },
+      include: {
+        field_types: true,
+        field_images: true,
+      },
       skip: 0,
       take: 9,
-      where: {},
+      orderBy: { created_at: 'desc' },
     });
-    expect(count).toHaveBeenCalledWith({ where: {} });
+    expect(count).toHaveBeenCalledWith({
+      where: {
+        deleted_at: null,
+        status: 'ACTIVE',
+      },
+    });
   });
 
   it('uses schema field names and ignores invalid numeric filters', async () => {
@@ -41,19 +53,25 @@ describe('FieldsService', () => {
     });
 
     const where = {
+      deleted_at: null,
+      status: 'ACTIVE',
       OR: [
         { name: { contains: 'Sân 7', mode: 'insensitive' } },
         { address: { contains: 'Sân 7', mode: 'insensitive' } },
       ],
-      base_price_per_hour: { lte: 500000 },
       district: { equals: 'Quận 1', mode: 'insensitive' },
+      base_price_per_hour: { lte: 500000 },
     };
 
     expect(findMany).toHaveBeenCalledWith({
-      orderBy: { created_at: 'desc' },
+      where,
+      include: {
+        field_types: true,
+        field_images: true,
+      },
       skip: 0,
       take: 100,
-      where,
+      orderBy: { created_at: 'desc' },
     });
     expect(count).toHaveBeenCalledWith({ where });
   });

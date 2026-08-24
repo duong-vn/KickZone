@@ -232,52 +232,7 @@ function FieldsContent() {
     retry: false,
   });
 
-  const filteredMockData = useMemo(() => {
-    let result = [...MOCK_FIELDS];
-
-    if (debouncedSearch.trim()) {
-      const keyword = debouncedSearch.trim().toLowerCase();
-      result = result.filter(
-        (f) =>
-          f.name.toLowerCase().includes(keyword) ||
-          f.location.toLowerCase().includes(keyword),
-      );
-    }
-
-    if (district && district !== 'Tất cả quận/huyện') {
-      result = result.filter((f) => {
-        if (f.district) {
-          return f.district.toLowerCase() === district.toLowerCase();
-        }
-        const regex = new RegExp(
-          `(^|\\b|[,\\s])${district}($|\\b|[,\\s])`,
-          'i',
-        );
-        return regex.test(f.location);
-      });
-    }
-
-    if (selectedTypes.length > 0) {
-      result = result.filter((f) =>
-        selectedTypes.every((t) => f.types?.includes(t) ?? false),
-      );
-    }
-
-    result = result.filter((f) => f.pricePerHour <= maxPrice);
-
-    if (sortBy === 'price-asc') {
-      result.sort((a, b) => a.pricePerHour - b.pricePerHour);
-    } else if (sortBy === 'price-desc') {
-      result.sort((a, b) => b.pricePerHour - a.pricePerHour);
-    } else if (sortBy === 'rating') {
-      result.sort((a, b) => b.rating - a.rating);
-    }
-
-    return result;
-  }, [debouncedSearch, district, selectedTypes, maxPrice, sortBy]);
-
-  const displayFields =
-    apiData?.data && apiData.data.length > 0 ? apiData.data : filteredMockData;
+  const displayFields = apiData?.data !== undefined ? apiData.data : [];
   const totalResults = apiData?.meta?.total ?? displayFields.length;
 
   const toggleType = (t: string) => {

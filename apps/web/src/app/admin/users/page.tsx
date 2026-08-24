@@ -2,6 +2,12 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  fetchAdminUsers,
+  createAdminUser,
+  updateAdminUserStatus,
+} from '@/lib/api';
 import {
   Search,
   UserPlus,
@@ -33,68 +39,47 @@ export interface AdminUserItem {
   totalBookings?: number;
 }
 
-// Initial mock data based on design mockup and PostgreSQL schema
-const INITIAL_USERS: AdminUserItem[] = [
-  {
-    id: 'u-1',
-    authUserId: 'auth-1',
-    fullName: 'Nguyễn Văn An',
-    email: 'nguyenvanan@email.com',
-    phone: '0901 234 567',
-    role: 'USER',
-    roleLabel: 'Khách hàng',
-    status: 'ACTIVE',
-    avatarUrl:
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-    createdAt: '2023-10-10',
-    totalBookings: 12,
-  },
-  {
-    id: 'u-2',
-    authUserId: 'auth-2',
-    fullName: 'Trần Thị Bình',
-    email: 'binh.tran@email.com',
-    phone: '0912 345 678',
-    role: 'USER',
-    roleLabel: 'Khách hàng',
-    status: 'INACTIVE',
-    createdAt: '2023-10-12',
-    totalBookings: 5,
-  },
-  {
-    id: 'u-3',
-    authUserId: 'auth-3',
-    fullName: 'Lê Hoàng Nam',
-    email: 'nam.le.sport@email.com',
-    phone: '0987 654 321',
-    role: 'MANAGER',
-    roleLabel: 'Chủ sân',
-    status: 'PENDING',
-    avatarUrl:
-      'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&auto=format&fit=crop&q=80',
-    createdAt: '2023-10-15',
-    totalBookings: 0,
-  },
-  {
-    id: 'u-4',
-    authUserId: 'auth-4',
-    fullName: 'Phạm Thị Mai',
-    email: 'mai.pham99@email.com',
-    phone: '0934 567 890',
-    role: 'USER',
-    roleLabel: 'Khách hàng',
-    status: 'ACTIVE',
-    createdAt: '2023-10-16',
-    totalBookings: 8,
-  },
-];
-
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<AdminUserItem[]>(INITIAL_USERS);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
+
+  const {
+    data: apiResponse,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: [
+      'admin-users',
+      searchQuery,
+      statusFilter,
+      roleFilter,
+      currentPage,
+    ],
+    queryFn: () =>
+      fetchAdminUsers({
+        search: searchQuery || undefined,
+        status:
+          statusFilter !== 'all'
+            ? statusFilter === 'active'
+              ? 'ACTIVE'
+              : 'INACTIVE'
+            : undefined,
+        role:
+          roleFilter !== 'all'
+            ? roleFilter === 'customer'
+              ? 'USER'
+              : 'ADMIN'
+            : undefined,
+        page: currentPage,
+      }),
+    retry: false,
+  });
+
+  const [localUsers, setLocalUsers] = useState<AdminUserItem[] | null>(null);
+  const users: AdminUserItem[] = localUsers || apiResponse?.data || [];
 
   // Modal states
   const [viewingUser, setViewingUser] = useState<AdminUserItem | null>(null);
@@ -105,6 +90,7 @@ export default function AdminUsersPage() {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
+    password: '',
     phone: '',
     role: 'USER' as UserRole,
     status: 'ACTIVE' as UserStatus,
@@ -170,74 +156,95 @@ export default function AdminUsersPage() {
   }, [users, searchQuery, statusFilter, roleFilter]);
 
   // Toggle user status
-  const handleToggleStatus = (userId: string) => {
-    setUsers((prev) =>
-      prev.map((u) => {
+  const handleToggleStatus = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+    const nextStatus: UserStatus =
+      target.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+
+    setLocalUsers((prev) =>
+      (prev || apiResponse?.data || []).map((u: AdminUserItem) => {
         if (u.id === userId) {
-          const nextStatus: UserStatus =
-            u.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-          showToast(
-            nextStatus === 'ACTIVE'
-              ? `Đã kích hoạt tài khoản cho ${u.fullName}!`
-              : `Đã vô hiệu hóa tài khoản của ${u.fullName}.`,
-          );
           return { ...u, status: nextStatus };
         }
         return u;
       }),
     );
+
+    try {
+      await updateAdminUserStatus(
+        userId,
+        nextStatus === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+      );
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      showToast(
+        nextStatus === 'ACTIVE'
+          ? `Đã kích hoạt tài khoản cho ${target.fullName}!`
+          : `Đã vô hiệu hóa tài khoản của ${target.fullName}.`,
+      );
+    } catch (err) {
+      showToast(`Lỗi cập nhật trạng thái: ${(err as Error).message}`);
+    }
   };
 
   // Approve pending user
-  const handleApproveUser = (userId: string) => {
-    setUsers((prev) =>
-      prev.map((u) => {
+  const handleApproveUser = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+
+    setLocalUsers((prev) =>
+      (prev || apiResponse?.data || []).map((u: AdminUserItem) => {
         if (u.id === userId) {
-          showToast(`Đã duyệt kích hoạt tài khoản cho ${u.fullName}!`);
           return { ...u, status: 'ACTIVE' };
         }
         return u;
       }),
     );
+
+    try {
+      await updateAdminUserStatus(userId, 'ACTIVE');
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      showToast(`Đã duyệt kích hoạt tài khoản cho ${target.fullName}!`);
+    } catch (err) {
+      showToast(`Lỗi cập nhật: ${(err as Error).message}`);
+    }
   };
 
   // Add User submit
-  const handleAddUserSubmit = (e: React.FormEvent) => {
+  const handleAddUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.fullName.trim() || !formData.email.trim()) {
       alert('Vui lòng nhập họ tên và email.');
       return;
     }
 
-    const roleMap: Record<UserRole, string> = {
-      USER: 'Khách hàng',
-      MANAGER: 'Chủ sân',
-      ADMIN: 'Quản trị viên',
-    };
+    try {
+      await createAdminUser({
+        fullName: formData.fullName,
+        email: formData.email,
+        password: formData.password || 'KickZone@2026',
+        phone: formData.phone || undefined,
+        role: formData.role === 'ADMIN' ? 'ADMIN' : 'USER',
+        status: formData.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+      });
 
-    const newUser: AdminUserItem = {
-      id: `u-${Date.now()}`,
-      authUserId: `auth-${Date.now()}`,
-      fullName: formData.fullName,
-      email: formData.email,
-      phone: formData.phone || '0900 000 000',
-      role: formData.role,
-      roleLabel: roleMap[formData.role],
-      status: formData.status,
-      createdAt: new Date().toISOString().split('T')[0],
-      totalBookings: 0,
-    };
-
-    setUsers((prev) => [newUser, ...prev]);
-    showToast(`Đã thêm người dùng mới "${formData.fullName}" thành công!`);
-    setIsAddUserModalOpen(false);
-    setFormData({
-      fullName: '',
-      email: '',
-      phone: '',
-      role: 'USER',
-      status: 'ACTIVE',
-    });
+      await refetch();
+      showToast(`Đã thêm người dùng mới "${formData.fullName}" thành công!`);
+      setIsAddUserModalOpen(false);
+      setFormData({
+        fullName: '',
+        email: '',
+        password: '',
+        phone: '',
+        role: 'USER',
+        status: 'ACTIVE',
+      });
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || 'Có lỗi xảy ra khi tạo người dùng';
+      alert(errorMsg);
+    }
   };
 
   // Render Status Badge

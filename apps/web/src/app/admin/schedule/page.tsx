@@ -2,6 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import { fetchAdminFields, fetchAdminBookingCalendar } from '@/lib/api';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -33,57 +35,10 @@ export interface ScheduleBookingItem {
   status: 'PENDING' | 'CONFIRMED' | 'COMPLETED';
 }
 
-const COURTS: ScheduleCourt[] = [
+const DEFAULT_COURTS: ScheduleCourt[] = [
   { id: 'c-1', name: 'Sân 5 - A1', type: 'Sân 5' },
   { id: 'c-2', name: 'Sân 5 - A2', type: 'Sân 5' },
   { id: 'c-3', name: 'Sân 7 - B1', type: 'Sân 7' },
-];
-
-const INITIAL_SCHEDULE_BOOKINGS: ScheduleBookingItem[] = [
-  {
-    id: 'bk-1023',
-    code: '#DH-1023',
-    courtId: 'c-1',
-    customerName: 'Nguyễn Văn A',
-    customerPhone: '0901 234 567',
-    startHour: 7, // 07:00
-    durationHours: 1.5, // 90 min -> 08:30
-    timeDisplay: '07:00 - 08:30',
-    status: 'COMPLETED',
-  },
-  {
-    id: 'bk-1045',
-    code: '#DH-1045',
-    courtId: 'c-1',
-    customerName: 'FC Sài Gòn',
-    customerPhone: '0912 345 678',
-    startHour: 17.5, // 17:30
-    durationHours: 1.5, // 19:00
-    timeDisplay: '17:30 - 19:00',
-    status: 'CONFIRMED',
-  },
-  {
-    id: 'bk-1050',
-    code: '#DH-1050',
-    courtId: 'c-2',
-    customerName: 'Trần Bình',
-    customerPhone: '0987 654 321',
-    startHour: 18, // 18:00
-    durationHours: 2, // 20:00
-    timeDisplay: '18:00 - 20:00',
-    status: 'PENDING',
-  },
-  {
-    id: 'bk-1040',
-    code: '#DH-1040',
-    courtId: 'c-3',
-    customerName: 'Công ty Tech VN - Giao hữu',
-    customerPhone: '0934 567 890',
-    startHour: 16, // 16:00
-    durationHours: 2, // 18:00
-    timeDisplay: '16:00 - 18:00',
-    status: 'CONFIRMED',
-  },
 ];
 
 // Hours range 06:00 to 22:00 (17 hours)
@@ -92,9 +47,82 @@ const HOUR_ROW_HEIGHT = 64; // px per hour
 
 export default function AdminSchedulePage() {
   const [selectedCourtFilter, setSelectedCourtFilter] = useState('all');
-  const [selectedDate, setSelectedDate] = useState(new Date(2023, 9, 15));
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
-  const bookings = INITIAL_SCHEDULE_BOOKINGS;
+
+  const { data: apiFields } = useQuery({
+    queryKey: ['admin-fields-for-schedule'],
+    queryFn: () => fetchAdminFields({ limit: 50 }),
+    retry: false,
+  });
+
+  const courts: ScheduleCourt[] = useMemo(() => {
+    if (apiFields?.data && apiFields.data.length > 0) {
+      return apiFields.data.map(
+        (f: { id: string; name: string; fieldTypeLabel?: string }) => ({
+          id: f.id,
+          name: f.name,
+          type: f.fieldTypeLabel || 'Sân bóng',
+        }),
+      );
+    }
+    return DEFAULT_COURTS;
+  }, [apiFields]);
+
+  const dateString = useMemo(() => {
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, [selectedDate]);
+
+  const { data: calendarData } = useQuery({
+    queryKey: ['admin-schedule-calendar', dateString],
+    queryFn: () =>
+      fetchAdminBookingCalendar(
+        `${dateString}T00:00:00.000Z`,
+        `${dateString}T23:59:59.999Z`,
+      ),
+    retry: false,
+  });
+
+  const bookings: ScheduleBookingItem[] = useMemo(() => {
+    if (calendarData && calendarData.length > 0) {
+      return calendarData.map(
+        (b: {
+          id: string;
+          code: string;
+          fieldId: string;
+          customerName: string;
+          customerPhone?: string;
+          startTime: string;
+          endTime: string;
+          status: 'PENDING' | 'CONFIRMED' | 'COMPLETED';
+        }) => {
+          const s = new Date(b.startTime);
+          const e = new Date(b.endTime);
+          const startHour = s.getUTCHours() + s.getUTCMinutes() / 60;
+          const endHour = e.getUTCHours() + e.getUTCMinutes() / 60;
+          const duration = Math.max(endHour - startHour, 0.5);
+          const formatHM = (d: Date) =>
+            `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+
+          return {
+            id: b.id,
+            code: b.code,
+            courtId: b.fieldId,
+            customerName: b.customerName,
+            customerPhone: b.customerPhone,
+            startHour,
+            durationHours: duration,
+            timeDisplay: `${formatHM(s)} - ${formatHM(e)}`,
+            status: b.status,
+          };
+        },
+      );
+    }
+    return [];
+  }, [calendarData]);
 
   // Selected booking for quick inspection modal
   const [selectedBooking, setSelectedBooking] =
@@ -110,9 +138,9 @@ export default function AdminSchedulePage() {
 
   // Filtered courts
   const displayCourts = useMemo(() => {
-    if (selectedCourtFilter === 'all') return COURTS;
-    return COURTS.filter((c) => c.id === selectedCourtFilter);
-  }, [selectedCourtFilter]);
+    if (selectedCourtFilter === 'all') return courts;
+    return courts.filter((c) => c.id === selectedCourtFilter);
+  }, [selectedCourtFilter, courts]);
 
   const handlePrevDay = () => {
     setSelectedDate((prev) => new Date(prev.getTime() - 86400000));

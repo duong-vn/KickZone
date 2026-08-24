@@ -1,7 +1,13 @@
 'use client';
 
-import React, { useState, use } from 'react';
+import React, { useState, use, useMemo } from 'react';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  fetchAdminBookingById,
+  approveAdminBooking,
+  rejectAdminBooking,
+} from '@/lib/api';
 import {
   User,
   Mail,
@@ -19,6 +25,7 @@ import {
   ShieldCheck,
   Sparkles,
   Layers,
+  Ban,
 } from 'lucide-react';
 
 // Types aligned with database/init.sql
@@ -57,7 +64,6 @@ export interface BookingDetailData {
   cancellationReason?: string;
 }
 
-// Sample booking data
 const MOCK_BOOKING: BookingDetailData = {
   id: 'bk-9270',
   code: '#BK-9270',
@@ -97,13 +103,72 @@ export default function AdminBookingDetailPage({
 }) {
   const resolvedParams = use(params);
   const bookingId = resolvedParams.id;
+  const queryClient = useQueryClient();
 
-  const [booking, setBooking] = useState<BookingDetailData>({
-    ...MOCK_BOOKING,
-    code: bookingId.startsWith('#')
-      ? bookingId.toUpperCase()
-      : `#${bookingId.toUpperCase()}`,
+  const { data: apiBooking, isLoading } = useQuery({
+    queryKey: ['admin-booking', bookingId],
+    queryFn: () => fetchAdminBookingById(bookingId),
+    retry: false,
   });
+
+  const [localStatus, setLocalStatus] = useState<BookingStatus | null>(null);
+  const [localRejectionReason, setLocalRejectionReason] = useState<
+    string | null
+  >(null);
+
+  const booking: BookingDetailData | null = useMemo(() => {
+    if (apiBooking) {
+      return {
+        id: apiBooking.id,
+        code: apiBooking.code,
+        createdAt: apiBooking.createdAt
+          ? apiBooking.createdAt.replace('T', ' ').substring(0, 16)
+          : '',
+        status: localStatus || apiBooking.status,
+        user: {
+          id: apiBooking.user.id,
+          fullName: apiBooking.user.fullName,
+          email: apiBooking.user.email,
+          phone: apiBooking.user.phone || '',
+          avatarUrl:
+            apiBooking.user.avatarUrl ||
+            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
+        },
+        field: {
+          id: apiBooking.field.id,
+          name: apiBooking.field.name,
+          fieldType: apiBooking.field.fieldType || 'Sân bóng',
+          address: apiBooking.field.address,
+          imageUrl:
+            apiBooking.field.images?.[0] ||
+            'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&auto=format&fit=crop&q=80',
+        },
+        bookingDate: apiBooking.bookingDate,
+        startTime: apiBooking.startTime
+          ? apiBooking.startTime.substring(11, 16)
+          : '00:00',
+        endTime: apiBooking.endTime
+          ? apiBooking.endTime.substring(11, 16)
+          : '00:00',
+        durationMinutes: 90,
+        originalPrice: apiBooking.originalPrice,
+        voucherCode: apiBooking.voucher?.code,
+        discountAmount: apiBooking.discountAmount,
+        otherDiscount: 0,
+        finalPrice: apiBooking.finalPrice,
+        rejectionReason: localRejectionReason || apiBooking.rejectionReason,
+        cancellationReason: apiBooking.cancellationReason,
+      };
+    }
+    if (!isLoading && bookingId === 'bk-9270') {
+      return {
+        ...MOCK_BOOKING,
+        status: localStatus || MOCK_BOOKING.status,
+        rejectionReason: localRejectionReason || undefined,
+      };
+    }
+    return null;
+  }, [apiBooking, bookingId, isLoading, localStatus, localRejectionReason]);
 
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -119,21 +184,34 @@ export default function AdminBookingDetailPage({
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleConfirmApprove = () => {
-    setBooking((prev) => ({ ...prev, status: 'CONFIRMED' }));
+  const handleConfirmApprove = async () => {
+    if (!booking) return;
+    setLocalStatus('CONFIRMED');
     setIsApproveModalOpen(false);
-    showToast(`Đã duyệt đơn đặt sân ${booking.code} thành công!`);
+    try {
+      await approveAdminBooking(bookingId);
+      queryClient.invalidateQueries({ queryKey: ['admin-booking', bookingId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
+      showToast(`Đã duyệt đơn đặt sân ${booking.code} thành công!`);
+    } catch (err) {
+      showToast(`Lỗi khi duyệt đơn: ${(err as Error).message}`);
+    }
   };
 
-  const handleConfirmReject = () => {
+  const handleConfirmReject = async () => {
+    if (!booking) return;
     const reason = rejectReasonInput.trim() || 'Admin từ chối yêu cầu đặt sân';
-    setBooking((prev) => ({
-      ...prev,
-      status: 'REJECTED',
-      rejectionReason: reason,
-    }));
+    setLocalStatus('REJECTED');
+    setLocalRejectionReason(reason);
     setIsRejectModalOpen(false);
-    showToast(`Đã từ chối đơn ${booking.code}.`);
+    try {
+      await rejectAdminBooking(bookingId, reason);
+      queryClient.invalidateQueries({ queryKey: ['admin-booking', bookingId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
+      showToast(`Đã từ chối đơn ${booking.code}.`);
+    } catch (err) {
+      showToast(`Lỗi khi từ chối đơn: ${(err as Error).message}`);
+    }
   };
 
   const renderStatusBadge = (status: BookingStatus) => {
@@ -172,6 +250,52 @@ export default function AdminBookingDetailPage({
         return null;
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto w-full max-w-7xl space-y-6">
+        <div className="h-6 w-32 bg-slate-200 animate-pulse rounded" />
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <div className="h-8 w-64 bg-slate-200 animate-pulse rounded" />
+            <div className="h-4 w-48 bg-slate-200 animate-pulse rounded" />
+          </div>
+          <div className="h-10 w-40 bg-slate-200 animate-pulse rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-8 space-y-6">
+            <div className="h-48 bg-slate-200 animate-pulse rounded-2xl" />
+            <div className="h-64 bg-slate-200 animate-pulse rounded-2xl" />
+          </div>
+          <div className="lg:col-span-4 space-y-6">
+            <div className="h-80 bg-slate-200 animate-pulse rounded-2xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <div className="mx-auto w-full max-w-7xl py-16 flex flex-col items-center justify-center text-center">
+        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4 text-slate-400">
+          <Ban className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 mb-2">
+          Không tìm thấy đơn đặt sân
+        </h2>
+        <p className="text-slate-500 text-sm max-w-md mb-6">
+          Đơn đặt sân không tồn tại hoặc đã bị xóa khỏi hệ thống.
+        </p>
+        <Link
+          href="/admin/bookings"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">

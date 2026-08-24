@@ -57,6 +57,18 @@ export const fetchFieldById = async (id: string) => {
   return res.json();
 };
 
+export const fetchFieldTypes = async () => {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/field-types`,
+  );
+
+  if (!res.ok) {
+    throw new Error('Failed to fetch field types');
+  }
+
+  return res.json();
+};
+
 export async function toggleFavoriteField(
   fieldId: string,
 ): Promise<ToggleFavoriteResponse> {
@@ -117,5 +129,270 @@ export async function fetchFavorites(params?: {
     },
   });
 
+  return res.data;
+}
+
+// ---------------------------------------------------------------------------
+// Admin APIs
+// ---------------------------------------------------------------------------
+
+export async function fetchAdminFields(params?: {
+  search?: string;
+  status?: string;
+  type?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const token = await getAuthToken();
+  const res = await api.get('/admin/fields', {
+    params,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function fetchAdminFieldById(id: string) {
+  const token = await getAuthToken();
+  const res = await api.get(`/admin/fields/${id}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function createAdminField(dto: Record<string, unknown>) {
+  const token = await getAuthToken();
+  const res = await api.post('/admin/fields', dto, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function uploadAdminFieldImages(
+  fieldId: string,
+  formData: FormData,
+) {
+  const token = await getAuthToken();
+  const res = await api.post(`/admin/fields/${fieldId}/images`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  });
+  return res.data;
+}
+
+export async function fetchAdminUsers(params?: {
+  search?: string;
+  role?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const token = await getAuthToken();
+  const res = await api.get('/admin/users', {
+    params,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function fetchAdminUserById(id: string) {
+  const token = await getAuthToken();
+  const res = await api.get(`/admin/users/${id}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function createAdminUser(dto: Record<string, unknown>) {
+  const token = await getAuthToken();
+  const res = await api.post('/admin/users', dto, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function updateAdminFieldStatus(
+  id: string,
+  status: 'ACTIVE' | 'INACTIVE',
+) {
+  const token = await getAuthToken();
+  const res = await api.patch(
+    `/admin/fields/${id}/status`,
+    { status },
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    },
+  );
+  return res.data;
+}
+
+export async function updateAdminField(
+  id: string,
+  data: Record<string, unknown>,
+) {
+  const token = await getAuthToken();
+  const res = await api.patch(`/admin/fields/${id}`, data, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function updateAdminUserStatus(
+  id: string,
+  status: 'ACTIVE' | 'INACTIVE',
+) {
+  const token = await getAuthToken();
+  const res = await api.patch(
+    `/admin/users/${id}/status`,
+    { status },
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    },
+  );
+  return res.data;
+}
+
+export async function updateAdminUser(
+  id: string,
+  data: Record<string, unknown>,
+) {
+  const token = await getAuthToken();
+  const res = await api.patch(`/admin/users/${id}`, data, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function deleteAdminField(id: string) {
+  const token = await getAuthToken();
+  const res = await api.delete(`/admin/fields/${id}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function fetchAdminFieldSchedule(fieldId: string, date: string) {
+  const token = await getAuthToken();
+  const res = await api.get(`/admin/fields/${fieldId}/schedule?date=${date}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function fetchAdminPriceRules(fieldId: string) {
+  const token = await getAuthToken();
+  const res = await api.get(`/admin/fields/${fieldId}/price-rules`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function createAdminPriceRule(
+  fieldId: string,
+  data: Record<string, unknown>,
+) {
+  const token = await getAuthToken();
+  const res = await api.post(`/admin/fields/${fieldId}/price-rules`, data, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function updateAdminPriceRule(
+  fieldId: string,
+  ruleId: string,
+  data: Record<string, unknown>,
+) {
+  const token = await getAuthToken();
+  const res = await api.patch(
+    `/admin/fields/${fieldId}/price-rules/${ruleId}`,
+    data,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    },
+  );
+  return res.data;
+}
+
+export async function deleteAdminPriceRule(fieldId: string, ruleId: string) {
+  const token = await getAuthToken();
+  const res = await api.delete(
+    `/admin/fields/${fieldId}/price-rules/${ruleId}`,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    },
+  );
+  return res.data;
+}
+
+// ---------------- Admin Bookings APIs ----------------
+
+export async function fetchAdminBookings(params?: {
+  search?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+  fieldId?: string;
+  userId?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const token = await getAuthToken();
+  const res = await api.get('/admin/bookings', {
+    params,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function fetchAdminBookingById(id: string) {
+  const token = await getAuthToken();
+  const res = await api.get(`/admin/bookings/${id}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function approveAdminBooking(id: string) {
+  const token = await getAuthToken();
+  const res = await api.patch(
+    `/admin/bookings/${id}/approve`,
+    {},
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    },
+  );
+  return res.data;
+}
+
+export async function rejectAdminBooking(id: string, reason?: string) {
+  const token = await getAuthToken();
+  const res = await api.patch(
+    `/admin/bookings/${id}/reject`,
+    { reason },
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    },
+  );
+  return res.data;
+}
+
+export async function fetchAdminBookingCalendar(from?: string, to?: string) {
+  const token = await getAuthToken();
+  const res = await api.get('/admin/bookings/calendar', {
+    params: { from, to },
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+// ---------------- Admin Dashboard APIs ----------------
+
+export async function fetchAdminDashboardStats() {
+  const token = await getAuthToken();
+  const res = await api.get('/admin/dashboard/stats', {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   return res.data;
 }
