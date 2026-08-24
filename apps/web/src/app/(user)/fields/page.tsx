@@ -1,24 +1,24 @@
-/* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   Search,
-  MapPin,
-  Star,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   Calendar,
+  RotateCcw,
+  AlertCircle,
 } from 'lucide-react';
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
 import { Button } from '@/components/ui/button';
+import { FieldCard } from '@/components/fields/field-card';
 import { useDebounce } from '@/hooks/use-debounce';
 import { fetchFields } from '@/lib/api';
+import { Field } from '@/types/field';
 
 // Helper format YYYY-MM-DD -> DD/MM/YYYY
 function formatDateDisplay(isoDate: string) {
@@ -38,27 +38,6 @@ interface FieldItem {
   pricePerHour: number;
   available?: boolean;
   image: string;
-}
-
-interface RawApiField {
-  id: string;
-  name?: string;
-  location?: string;
-  address?: string;
-  city?: string;
-  district?: string;
-  types?: string[];
-  type?: string;
-  field_types?: { name?: string };
-  field_type?: { name?: string };
-  rating?: number;
-  rating_avg?: number;
-  pricePerHour?: number;
-  base_price_per_hour?: number;
-  available?: boolean;
-  image?: string;
-  primary_image_url?: string;
-  field_images?: { storage_path?: string } | Array<{ storage_path?: string }>;
 }
 
 const MOCK_FIELDS: FieldItem[] = [
@@ -139,12 +118,16 @@ const MOCK_FIELDS: FieldItem[] = [
 const DISTRICTS = [
   'Tất cả quận/huyện',
   'Quận 1',
+  'Quận 3',
   'Quận 7',
   'Quận 10',
   'Tân Bình',
+  'Bình Thạnh',
   'Gò Vấp',
+  'Phú Nhuận',
   'TP. Thủ Đức',
 ];
+
 const TIME_SLOTS = [
   'Tất cả',
   '06:00 - 08:00',
@@ -155,15 +138,66 @@ const TIME_SLOTS = [
   '19:30 - 21:00',
   '20:00 - 22:00',
 ];
+
 const FIELD_TYPES = ['Sân 5', 'Sân 7', 'Sân 11'];
 
-// ==========================================
-// THÀNH PHẦN CHÍNH (ĐƯỢC ẨN KHỎI TRÌNH BUILD SSR)
-// ==========================================
+// Helper to generate pagination page numbers
+function getPaginationRange(currentPage: number, totalPages: number) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, '...', totalPages];
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [
+      1,
+      '...',
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
+  }
+
+  return [
+    1,
+    '...',
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    '...',
+    totalPages,
+  ];
+}
+
+function FieldCardSkeleton() {
+  return (
+    <div className="bg-white border border-[#bccbb9]/60 rounded-2xl overflow-hidden shadow-2xs animate-pulse flex flex-col">
+      <div className="aspect-16/10 bg-slate-200" />
+      <div className="p-4 space-y-3 flex-grow flex flex-col justify-between">
+        <div className="space-y-2">
+          <div className="h-5 bg-slate-200 rounded w-3/4" />
+          <div className="h-3.5 bg-slate-200 rounded w-1/2" />
+          <div className="h-3.5 bg-slate-200 rounded w-2/3" />
+        </div>
+        <div className="pt-3 border-t border-[#bccbb9]/40 flex justify-between items-center">
+          <div className="h-6 bg-slate-200 rounded w-24" />
+          <div className="h-8 bg-slate-200 rounded w-20" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FieldsContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [, startTransition] = useTransition();
 
   const [search, setSearch] = useState(() => searchParams.get('search') || '');
   const [district, setDistrict] = useState(
@@ -175,7 +209,7 @@ function FieldsContent() {
   );
   const [selectedTypes, setSelectedTypes] = useState<string[]>(() => {
     const t = searchParams.get('type');
-    return t ? t.split(',') : [];
+    return t ? t.split(',').filter(Boolean) : [];
   });
   const [maxPrice, setMaxPrice] = useState<number>(
     () => Number(searchParams.get('maxPrice')) || 1000000,
@@ -218,7 +252,11 @@ function FieldsContent() {
     if (p > 1) params.set('page', String(p));
 
     const queryString = params.toString();
-    router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+    startTransition(() => {
+      router.replace(queryString ? `${pathname}?${queryString}` : pathname, {
+        scroll: false,
+      });
+    });
   };
 
   useEffect(() => {
@@ -226,7 +264,14 @@ function FieldsContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  const { data: apiData } = useQuery({
+  const {
+    data: apiData,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: [
       'fields',
       {
@@ -234,20 +279,21 @@ function FieldsContent() {
         district,
         date,
         timeSlot,
-        selectedTypes,
-        maxPrice,
+        selectedTypes: selectedTypes.join(','),
+        maxPrice: maxPrice < 1000000 ? maxPrice : undefined,
         sortBy,
         page,
       },
     ],
     queryFn: () =>
       fetchFields({
-        search: debouncedSearch,
-        district: district === 'Tất cả quận/huyện' ? '' : district,
-        date,
-        timeSlot: timeSlot === 'Tất cả' ? '' : timeSlot,
-        type: selectedTypes.join(','),
-        maxPrice,
+        search: debouncedSearch.trim() || undefined,
+        district: district !== 'Tất cả quận/huyện' ? district : undefined,
+        date: date || undefined,
+        timeSlot: timeSlot !== 'Tất cả' ? timeSlot : undefined,
+        type: selectedTypes.length > 0 ? selectedTypes.join(',') : undefined,
+        maxPrice: maxPrice < 1000000 ? maxPrice : undefined,
+        sortBy: sortBy !== 'featured' ? sortBy : undefined,
         page,
       }),
     retry: false,
@@ -297,66 +343,8 @@ function FieldsContent() {
     return result;
   }, [debouncedSearch, district, selectedTypes, maxPrice, sortBy]);
 
-  const normalizedApiData = useMemo(() => {
-    if (!apiData?.data || !Array.isArray(apiData.data)) return null;
-    return apiData.data.map((item: RawApiField) => {
-      const price =
-        typeof item.pricePerHour === 'number'
-          ? item.pricePerHour
-          : typeof item.base_price_per_hour === 'number'
-            ? item.base_price_per_hour
-            : 0;
-
-      const location =
-        item.location ||
-        item.address ||
-        (item.district ? `${item.district}, ${item.city || 'TP.HCM'}` : 'TP.HCM');
-
-      const types = Array.isArray(item.types)
-        ? item.types
-        : item.type
-          ? [item.type]
-          : item.field_types?.name
-            ? [item.field_types.name]
-            : item.field_type?.name
-              ? [item.field_type.name]
-              : ['Sân bóng'];
-
-      const rating =
-        typeof item.rating === 'number'
-          ? item.rating
-          : typeof item.rating_avg === 'number'
-            ? item.rating_avg
-            : 4.8;
-
-      const fieldImage = Array.isArray(item.field_images)
-        ? item.field_images[0]?.storage_path
-        : item.field_images?.storage_path;
-
-      const image =
-        item.image ||
-        item.primary_image_url ||
-        fieldImage ||
-        'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&auto=format&fit=crop&q=80';
-
-      return {
-        id: item.id,
-        name: item.name || 'Sân bóng',
-        location,
-        district: item.district,
-        types,
-        rating,
-        pricePerHour: price,
-        available: item.available ?? true,
-        image,
-      } as FieldItem;
-    });
-  }, [apiData]);
-
   const displayFields =
-    normalizedApiData && normalizedApiData.length > 0
-      ? normalizedApiData
-      : filteredMockData;
+    apiData?.data && apiData.data.length > 0 ? apiData.data : filteredMockData;
   const totalResults = apiData?.meta?.total ?? displayFields.length;
 
   const toggleType = (t: string) => {
@@ -385,10 +373,19 @@ function FieldsContent() {
     pushParams({ page: 1 });
   };
 
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages && newPage !== page) {
+      setPage(newPage);
+      pushParams({ page: newPage });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="bg-[#f8f9fa] min-h-screen py-8 text-[#191c1d]">
-      <div className="max-w-[1280px] mx-auto px-6">
+      <div className="max-w-[1280px] mx-auto px-4 sm:px-6">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
+          {/* ASIDE BỘ LỌC */}
           <aside className="w-full lg:w-1/4">
             <div className="bg-white border border-[#bccbb9]/40 rounded-xl p-5 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] space-y-4">
               <div className="flex items-center justify-between">
@@ -397,12 +394,14 @@ function FieldsContent() {
                 </h2>
                 <button
                   onClick={handleReset}
-                  className="text-[#006e2f] text-sm font-semibold hover:underline"
+                  className="text-[#006e2f] text-sm font-semibold hover:underline flex items-center gap-1"
                 >
+                  <RotateCcw className="w-3.5 h-3.5" />
                   Xóa lọc
                 </button>
               </div>
 
+              {/* TỪ KHÓA */}
               <div>
                 <label className="text-xs font-semibold text-[#575e70] block mb-1.5">
                   Từ khóa
@@ -411,7 +410,7 @@ function FieldsContent() {
                   <Search className="w-4 h-4 text-[#575e70] absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Tên sân, địa điểm..."
+                    placeholder="Tên sân, địa chỉ..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 text-sm border border-[#bccbb9]/60 rounded-lg outline-none focus:border-[#006e2f] focus:ring-1 focus:ring-[#006e2f] transition-all bg-white"
@@ -419,6 +418,7 @@ function FieldsContent() {
                 </div>
               </div>
 
+              {/* KHU VỰC */}
               <div>
                 <label className="text-xs font-semibold text-[#575e70] block mb-1.5">
                   Khu vực
@@ -443,6 +443,7 @@ function FieldsContent() {
                 </div>
               </div>
 
+              {/* NGÀY */}
               <div>
                 <label className="text-xs font-semibold text-[#575e70] block mb-1.5">
                   Ngày
@@ -472,6 +473,7 @@ function FieldsContent() {
                   <Calendar className="w-4 h-4 text-[#575e70] shrink-0 pointer-events-none" />
                   <input
                     type="date"
+                    min={new Date().toISOString().split('T')[0]}
                     value={date}
                     onChange={(e) => {
                       setDate(e.target.value);
@@ -484,6 +486,7 @@ function FieldsContent() {
                 </div>
               </div>
 
+              {/* KHUNG GIỜ */}
               <div>
                 <label className="text-xs font-semibold text-[#575e70] block mb-1.5">
                   Khung giờ
@@ -508,6 +511,7 @@ function FieldsContent() {
                 </div>
               </div>
 
+              {/* LOẠI SÂN */}
               <div>
                 <label className="text-xs font-semibold text-[#575e70] block mb-1.5">
                   Loại sân
@@ -520,11 +524,10 @@ function FieldsContent() {
                         key={t}
                         type="button"
                         onClick={() => toggleType(t)}
-                        className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${
-                          isChecked
+                        className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${isChecked
                             ? 'bg-[#22c55e] text-[#004b1e] border-[#006e2f]'
                             : 'bg-white text-[#191c1d] border-[#bccbb9]/60 hover:bg-[#f3f4f5]'
-                        }`}
+                          }`}
                       >
                         {t}
                       </button>
@@ -533,16 +536,19 @@ function FieldsContent() {
                 </div>
               </div>
 
+              {/* KHOẢNG GIÁ */}
               <div className="space-y-1 pt-1">
                 <div className="flex justify-between text-xs font-semibold text-[#575e70]">
                   <span>Khoảng giá</span>
                   <span className="text-[#006e2f] font-bold">
-                    {maxPrice.toLocaleString('vi-VN')}đ
+                    {maxPrice >= 1000000
+                      ? 'Tất cả mức giá'
+                      : `Dưới ${maxPrice.toLocaleString('vi-VN')}đ`}
                   </span>
                 </div>
                 <input
                   type="range"
-                  min={0}
+                  min={100000}
                   max={1000000}
                   step={50000}
                   value={maxPrice}
@@ -550,7 +556,7 @@ function FieldsContent() {
                   className="w-full accent-[#006e2f] h-2 bg-[#edeeef] rounded-lg appearance-none cursor-pointer"
                 />
                 <div className="flex justify-between text-xs text-[#575e70] pt-1">
-                  <span>0đ</span>
+                  <span>100.000đ</span>
                   <span>1.000.000đ+</span>
                 </div>
               </div>
@@ -559,15 +565,19 @@ function FieldsContent() {
                 onClick={handleApply}
                 className="w-full py-2.5 bg-[#006e2f] hover:bg-[#005321] text-white rounded-lg font-semibold text-sm transition-colors mt-2"
               >
-                Áp dụng
+                Áp dụng bộ lọc
               </Button>
             </div>
           </aside>
 
+          {/* MAIN NỘI DUNG DANH SÁCH */}
           <main className="w-full lg:w-3/4 space-y-4">
+            {/* THANH THỐNG KÊ & SẮP XẾP */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 border border-[#bccbb9]/40 rounded-xl shadow-sm">
               <h1 className="text-lg font-bold font-['Manrope'] text-[#191c1d]">
-                {totalResults} sân bóng tại TP.HCM
+                {isLoading
+                  ? 'Đang tải danh sách sân bóng...'
+                  : `${totalResults} sân bóng khả dụng`}
               </h1>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-[#575e70]">Sắp xếp:</span>
@@ -580,7 +590,7 @@ function FieldsContent() {
                     }}
                     className="appearance-none pl-3 pr-8 py-1.5 text-xs font-semibold border border-[#bccbb9]/60 rounded-lg outline-none bg-white text-[#191c1d] cursor-pointer"
                   >
-                    <option value="featured">Đề xuất</option>
+                    <option value="featured">Đề xuất / Mới nhất</option>
                     <option value="rating">Đánh giá cao</option>
                     <option value="price-asc">Giá thấp đến cao</option>
                     <option value="price-desc">Giá cao đến thấp</option>
@@ -590,20 +600,58 @@ function FieldsContent() {
               </div>
             </div>
 
-            {displayFields.length === 0 ? (
-              <div className="bg-white border border-[#bccbb9]/40 rounded-xl p-12 text-center space-y-3">
-                <p className="text-[#575e70] font-medium">
-                  Không tìm thấy sân bóng nào phù hợp với bộ lọc.
-                </p>
+            {/* ERROR STATE */}
+            {isError ? (
+              <div className="bg-white border border-red-200 rounded-xl p-8 text-center space-y-4 shadow-sm">
+                <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">
+                    Không thể tải dữ liệu sân bóng
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {error instanceof Error
+                      ? error.message
+                      : 'Đã xảy ra lỗi kết nối tới máy chủ. Vui lòng thử lại.'}
+                  </p>
+                </div>
+                <Button
+                  onClick={() => refetch()}
+                  className="bg-[#006e2f] hover:bg-[#005321] text-white text-xs px-5 py-2 rounded-lg"
+                >
+                  Thử lại
+                </Button>
+              </div>
+            ) : isLoading ? (
+              /* LOADING SKELETON STATE */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <FieldCardSkeleton key={idx} />
+                ))}
+              </div>
+            ) : fieldsList.length === 0 ? (
+              /* EMPTY STATE */
+              <div className="bg-white border border-[#bccbb9]/40 rounded-xl p-12 text-center space-y-4 shadow-sm">
+                <div className="w-16 h-16 bg-[#f3f4f5] rounded-full flex items-center justify-center mx-auto text-[#575e70]">
+                  <Search className="w-8 h-8 text-[#575e70]" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#191c1d]">
+                    Không tìm thấy sân bóng nào phù hợp
+                  </h3>
+                  <p className="text-sm text-[#575e70] mt-1">
+                    Hãy thử thay đổi từ khóa hoặc mở rộng tiêu chí bộ lọc của bạn.
+                  </p>
+                </div>
                 <Button
                   onClick={handleReset}
                   variant="outline"
-                  className="text-xs border-[#006e2f] text-[#006e2f]"
+                  className="text-xs border-[#006e2f] text-[#006e2f] hover:bg-[#006e2f]/5"
                 >
                   Đặt lại bộ lọc
                 </Button>
               </div>
             ) : (
+              /* FIELD GRID LIST */
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {displayFields.map((field: FieldItem) => {
                   const isAvailable = field.available ?? true;
@@ -614,19 +662,15 @@ function FieldsContent() {
                     >
                       <div className="h-48 relative overflow-hidden bg-slate-100">
                         <img
-                          src={
-                            field.image ||
-                            'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&auto=format&fit=crop&q=80'
-                          }
+                          src={field.image}
                           alt={field.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                         <div
-                          className={`absolute top-2.5 right-2.5 px-2 py-0.5 rounded text-xs font-semibold ${
-                            isAvailable
+                          className={`absolute top-2.5 right-2.5 px-2 py-0.5 rounded text-xs font-semibold ${isAvailable
                               ? 'bg-[#22c55e] text-[#004b1e]'
                               : 'bg-[#ffdad6] text-[#93000a]'
-                          }`}
+                            }`}
                         >
                           {isAvailable ? 'Còn sân' : 'Đã đặt'}
                         </div>
@@ -639,47 +683,38 @@ function FieldsContent() {
                           </h3>
                           <div className="flex items-center gap-1 text-[#575e70] text-xs mb-3">
                             <MapPin className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">
-                              {field.location || 'TP. Hồ Chí Minh'}
-                            </span>
+                            <span className="truncate">{field.location}</span>
                           </div>
 
                           <div className="flex items-center gap-1.5">
-                            {field.types && field.types.length > 0 ? (
-                              field.types.map((t: string) => (
-                                <span
-                                  key={t}
-                                  className="bg-[#f3f4f5] text-[#575e70] px-2 py-0.5 rounded text-xs"
-                                >
-                                  {t}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="bg-[#f3f4f5] text-[#575e70] px-2 py-0.5 rounded text-xs">
-                                Sân bóng
+                            {field.types?.map((t: string) => (
+                              <span
+                                key={t}
+                                className="bg-[#f3f4f5] text-[#575e70] px-2 py-0.5 rounded text-xs"
+                              >
+                                {t}
                               </span>
-                            )}
+                            ))}
                             <div className="flex items-center text-[#006e2f] ml-auto gap-0.5 font-bold text-xs">
                               <Star className="w-3.5 h-3.5 fill-[#006e2f] text-[#006e2f]" />
-                              <span>{field.rating ?? 4.8}</span>
+                              <span>{field.rating}</span>
                             </div>
                           </div>
                         </div>
 
                         <div className="mt-auto pt-3 border-t border-[#bccbb9]/30 flex justify-between items-center">
                           <div className="font-bold text-lg text-[#006e2f] font-['Manrope']">
-                            {(field.pricePerHour ?? 0).toLocaleString('vi-VN')}đ
+                            {field.pricePerHour.toLocaleString('vi-VN')}đ
                             <span className="text-xs font-normal text-[#575e70]">
                               /h
                             </span>
                           </div>
                           <Link href={`/fields/${field.id}`}>
                             <button
-                              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-[#bccbb9]/60 transition-colors ${
-                                isAvailable
+                              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-[#bccbb9]/60 transition-colors ${isAvailable
                                   ? 'bg-[#edeeef] text-[#191c1d] hover:bg-[#006e2f] hover:text-white hover:border-[#006e2f]'
                                   : 'bg-[#edeeef] text-[#575e70] hover:bg-slate-200'
-                              }`}
+                                }`}
                             >
                               {isAvailable ? 'Đặt ngay' : 'Chi tiết'}
                             </button>
@@ -692,61 +727,58 @@ function FieldsContent() {
               </div>
             )}
 
-            <div className="flex justify-center items-center pt-8 pb-10 gap-2">
-              <button
-                onClick={() => {
-                  const prevPage = Math.max(1, page - 1);
-                  setPage(prevPage);
-                  pushParams({ page: prevPage });
-                }}
-                disabled={page === 1}
-                className="w-10 h-10 flex items-center justify-center rounded-lg border border-[#bccbb9]/60 text-[#575e70] hover:bg-[#e7e8e9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-
-              {[1, 2, 3].map((num) => (
+            {/* PHÂN TRANG ĐỘNG (PAGINATION) */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center pt-8 pb-10 gap-2">
                 <button
-                  key={num}
-                  onClick={() => {
-                    setPage(num);
-                    pushParams({ page: num });
-                  }}
-                  className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
-                    page === num
-                      ? 'bg-[#006e2f] text-white'
-                      : 'border border-[#bccbb9]/60 text-[#575e70] hover:bg-[#e7e8e9]'
-                  }`}
+                  onClick={() => handlePageChange(page - 1)}
+                  disabled={page <= 1 || isFetching}
+                  className="w-10 h-10 flex items-center justify-center rounded-lg border border-[#bccbb9]/60 text-[#575e70] hover:bg-[#e7e8e9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Trang trước"
                 >
-                  {num}
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
-              ))}
 
-              <span className="text-[#575e70] text-sm px-1">...</span>
+                {getPaginationRange(page, totalPages).map((pageNum, idx) => {
+                  if (pageNum === '...') {
+                    return (
+                      <span
+                        key={`ellipsis-${idx}`}
+                        className="text-[#575e70] text-sm px-1 select-none"
+                      >
+                        ...
+                      </span>
+                    );
+                  }
 
-              <button
-                onClick={() => {
-                  setPage(12);
-                  pushParams({ page: 12 });
-                }}
-                className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-semibold border border-[#bccbb9]/60 text-[#575e70] hover:bg-[#e7e8e9] ${
-                  page === 12 ? 'bg-[#006e2f] text-white' : ''
-                }`}
-              >
-                12
-              </button>
+                  const pageNumber = Number(pageNum);
+                  const isCurrent = page === pageNumber;
 
-              <button
-                onClick={() => {
-                  const nextPage = page + 1;
-                  setPage(nextPage);
-                  pushParams({ page: nextPage });
-                }}
-                className="w-10 h-10 flex items-center justify-center rounded-lg border border-[#bccbb9]/60 text-[#575e70] hover:bg-[#e7e8e9] transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+                  return (
+                    <button
+                      key={pageNumber}
+                      onClick={() => handlePageChange(pageNumber)}
+                      disabled={isFetching}
+                      className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors ${isCurrent
+                          ? 'bg-[#006e2f] text-white shadow-sm'
+                          : 'border border-[#bccbb9]/60 text-[#575e70] hover:bg-[#e7e8e9]'
+                        }`}
+                    >
+                      {pageNumber}
+                    </button>
+                  );
+                })}
+
+                <button
+                  onClick={() => handlePageChange(page + 1)}
+                  disabled={page >= totalPages || isFetching}
+                  className="w-10 h-10 flex items-center justify-center rounded-lg border border-[#bccbb9]/60 text-[#575e70] hover:bg-[#e7e8e9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Trang sau"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </main>
         </div>
       </div>
@@ -754,15 +786,12 @@ function FieldsContent() {
   );
 }
 
-// ==========================================
-// TẮT CHẾ ĐỘ RENDER SERVER (SSR) CHO TRANG NÀY
-// Để tránh lỗi "Missing Suspense with CSR Bailout" của Next.js
-// ==========================================
+// TẮT SSR VỚI dynamic() ĐỂ TRÁNH LỖI CSR BAILOUT TRÊN NEXT.JS KHI DÙNG useSearchParams
 const DynamicFieldsSearchPage = dynamic(() => Promise.resolve(FieldsContent), {
   ssr: false,
   loading: () => (
-    <div className="min-h-screen flex items-center justify-center text-[#006e2f]">
-      Đang tải dữ liệu bộ lọc...
+    <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center text-[#006e2f] font-semibold text-sm">
+      Đang tải dữ liệu sân bóng...
     </div>
   ),
 });
