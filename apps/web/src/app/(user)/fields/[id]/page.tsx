@@ -1,15 +1,15 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useMemo, use, useState } from 'react';
+import { useMemo, use, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import {
   MapPin,
   Star,
   Share2,
   Heart,
-  Calendar,
   Clock,
   CheckCircle2,
   Shield,
@@ -20,22 +20,22 @@ import {
   Droplets,
   Shirt,
   Lightbulb,
-  Sparkles,
-  Award,
   X,
-  Flame,
   MessageSquarePlus,
   ArrowRight,
   StarOff,
+  AlertCircle,
+  RotateCcw,
+  Home,
+  ChevronLeft,
+  Lock,
+  ExternalLink,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { Review } from '@/types/review';
-import {
-  INITIAL_MOCK_REVIEWS,
-  CURRENT_USER,
-  calculateReviewSummary,
-} from '@/data/mock-reviews';
+import { CURRENT_USER, calculateReviewSummary } from '@/data/mock-reviews';
 import {
   useFavoriteStatusQuery,
   useToggleFavoriteMutation,
@@ -46,343 +46,65 @@ import {
   WriteReviewModal,
   DeleteReviewDialog,
 } from '@/components/reviews';
+import {
+  fetchFieldById,
+  fetchFieldReviews,
+  validateVoucherApi,
+} from '@/lib/api';
+import { getSupabaseBrowserClient } from '@/lib/supabase';
 
-// ==========================================
-// MOCK DATA & DETAILS CHO TỪNG SÂN BÓNG
-// ==========================================
-interface FieldDetailData {
-  id: string;
-  name: string;
-  location: string;
-  address: string;
-  district: string;
-  city: string;
-  rating: number;
-  reviewCount: number;
-  basePricePerHour: number;
-  types: string[];
-  subPitches: {
-    id: string;
-    name: string;
-    type: string;
-    pricePerHour: number;
-  }[];
-  images: string[];
-  description: string;
-  amenities: { icon: string; label: string; desc: string }[];
-  rules: string[];
-  operatingHours: string;
-  reviews: {
-    id: string;
-    author: string;
-    avatar: string;
-    date: string;
-    rating: number;
-    content: string;
-    verified: boolean;
-  }[];
+// Helper to format field type to clean Vietnamese
+export function formatFieldTypeName(name?: string | null): string {
+  if (!name) return 'Sân 7 người';
+  const clean = name.toLowerCase().trim();
+  if (clean === '5-a-side' || clean === '5' || clean.includes('5'))
+    return 'Sân 5 người';
+  if (clean === '7-a-side' || clean === '7' || clean.includes('7'))
+    return 'Sân 7 người';
+  if (clean === '11-a-side' || clean === '11' || clean.includes('11'))
+    return 'Sân 11 người';
+  return name;
 }
 
-const DEFAULT_IMAGES = [
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuDktZarJ1oqvt1SReM52aUFdOweqHi88lreVI76rs1DV_XDkDaNY9JYH4rZYe0nHJ-ge2Mm79Q51r5QYIDhbltGKpJIi2yTTgYl3S7-NLU6mAdIHWFUz7YOcixGJYO6stA18ZvArjAZCheXucZ96EvvVs__hRiX8OXlRMt6LC0oZ1kR3qSa8mSUXtl0jJ65vsVJw4H5-JWiFQRivO2W6CKIaj1jISy_lTkWCg1afGDdmsbleIm8qMUVyQ',
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuCycpjGfVdw9bygMpQMoccFbTMnc-x9vG8Zvo3YQUscucwN2e4E9LVttc9TNuUwhL2_L7uKTkoOzw5QE1F4Sdw227v-4CilRIO_TfTADrs2Bjsko4JN28bmdoyM1CNuHV2Whglz8mjX4dSTlttbE1YuY_xKmNKBELqOnEiiTUlr4cSH_pIwyQ6XR_Iz9G0unlBBylGy4wTCa1dAg-DKn6Tf1tWntfUDuood1RZWpfNGWCNVgleie8Ci7Q',
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuBt-bw1TY2b112YapIyVjp88DjcP6z2sekO_7Ns--ZTqUbdwA8lvS4k5m6Ry5zfWdqBVEcx-eKfeUVQd_K7AByOtrm_aRkx1PGAdImcM2hwM6c6T5onCYlFqFTusIxLPSBV7fWMi3i5O4KdtT__n3ZS8NB5rgHd9q_5ji6LxZpREQmPUOdA8zVW12napvl8k9cw8uOQZAUXP9hMIVfJSstmwvZUKfPSMbuOroNUu4ZS8E1cm4IQQk8RDQ',
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuDvyIQf86mDw18u-k6JPqzTAoH8umHVjvjZQaN2cxRw2XijVaHPW7HID17UiJgfbn4OiEIE4b1YgAnNR8xYwiLeeR5bYjxd9t1ugIWMX28tp9po5jmVzzUQb4YlQJR7kU0syXdxPDR5yF_j0CECDoJh_Y2jLuJUQ0pd4m4WYb13avJ0Wp3Xt_-vT5v2YiSJtlAtuhidkQEhJNnCzMwKGJFe7wuFJqUXeZyWNHZ1CJirMX1faytxZjSblQ',
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuDY5ITWfEe64qpM9lq4ObnImkUVdjUmJ_ZA02pyGyzyBHZ5tgrAp-Gh3HDDqDeX7ruD0zoLNtjgJla4p5DuKbsu_Q6wB1QYvi2d4Q62bqruZTpWs9R8SDMY80Ea2J6F9oia3E8VSNJmMSb1SMaqkJ4NReI3pBp1Y2ZmEFdOcbt9kgXkaG9JxTIrSxvhybaVld9L_NUyQBNk-lFTHNZFzjtIfuQDaRcQV_YSqjnIMM7g21luskUOxyXPiw',
+const DEFAULT_AMENITIES = [
+  {
+    icon: 'Car',
+    label: 'Bãi giữ xe rộng rãi',
+    desc: 'Có chỗ đỗ ô tô và xe máy an toàn',
+  },
+  {
+    icon: 'Droplets',
+    label: 'Nước uống phục vụ',
+    desc: 'Trà đá và nước mát giải khát',
+  },
+  {
+    icon: 'Shirt',
+    label: 'Phòng thay đồ & Tủ khóa',
+    desc: 'Khu vực thay đồ sạch sẽ, có tủ gửi đồ',
+  },
+  {
+    icon: 'Wifi',
+    label: 'Wifi miễn phí',
+    desc: 'Phủ sóng toàn bộ khuôn viên sân',
+  },
+  {
+    icon: 'Lightbulb',
+    label: 'Dàn đèn LED cao áp',
+    desc: 'Độ sáng đạt chuẩn thi đấu ban đêm',
+  },
+  {
+    icon: 'Coffee',
+    label: 'Căn tin giải khát',
+    desc: 'Phục vụ nước uống và đồ ăn nhẹ',
+  },
 ];
 
-const FIELDS_DATABASE: Record<string, FieldDetailData> = {
-  '1': {
-    id: '1',
-    name: 'Sân bóng đá Chảo Lửa',
-    location: '30 Phan Thúc Duyện, Phường 4, Quận Tân Bình, TP.HCM',
-    address: '30 Phan Thúc Duyện, Phường 4, Tân Bình, TP.HCM',
-    district: 'Tân Bình',
-    city: 'TP. Hồ Chí Minh',
-    rating: 4.8,
-    reviewCount: 142,
-    basePricePerHour: 250000,
-    types: ['Sân 5', 'Sân 7'],
-    subPitches: [
-      {
-        id: 'p1',
-        name: 'Sân 5 - A1 (Cỏ mới)',
-        type: 'Sân 5',
-        pricePerHour: 250000,
-      },
-      {
-        id: 'p2',
-        name: 'Sân 5 - A2 (Có mái che)',
-        type: 'Sân 5',
-        pricePerHour: 280000,
-      },
-      {
-        id: 'p3',
-        name: 'Sân 7 - B1 (Chuẩn thi đấu)',
-        type: 'Sân 7',
-        pricePerHour: 450000,
-      },
-      {
-        id: 'p4',
-        name: 'Sân 7 - B2 (Đèn LED cao cấp)',
-        type: 'Sân 7',
-        pricePerHour: 450000,
-      },
-    ],
-    images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDrDOm7rj2skKxqydXGm_2fCgpc8cOSpWpfQNWUjSyk-4a8dJ67OgaVYU9_8gXoZ7zVsNGiHktsLNrqgaBE1jMnGFe72lXAoL0bQmZNUNz0h8Wq87FFOo9oVZ2a87dzJkPll6s7TwgQcznmgYmfIyimnqqxY8RK6lLhDcZ4Bit1ySrjYbD52BLS0WIM6cOxPrR_ocu92EJjPiaknq_yREXKh7BKesXc5k_Se9YStukY_4DUzkvKvmPf1Q',
-      ...DEFAULT_IMAGES.slice(1),
-    ],
-    description:
-      'Sân bóng Chảo Lửa là một trong những cụm sân bóng đá cỏ nhân tạo chất lượng hàng đầu tại khu vực Tân Bình. Sân được trang bị cỏ nhân tạo đạt chuẩn FIFA 2 sao, hệ thống chiếu sáng LED chống chói chuẩn thi đấu ban đêm, thoát nước cực tốt khi trời mưa. Không gian thoáng mát, bãi đỗ xe máy và ô tô rộng rãi, căn tin phục vụ giải khát đầy đủ.',
-    amenities: [
-      {
-        icon: 'Car',
-        label: 'Bãi giữ xe rộng rãi',
-        desc: 'Có chỗ đỗ ô tô và xe máy miễn phí',
-      },
-      {
-        icon: 'Droplets',
-        label: 'Nước uống miễn phí',
-        desc: 'Bình nước mát lạnh phục vụ tận sân',
-      },
-      {
-        icon: 'Shirt',
-        label: 'Phòng thay đồ & Locker',
-        desc: 'Tủ có khóa an toàn, phòng tắm nóng lạnh',
-      },
-      {
-        icon: 'Wifi',
-        label: 'Wifi tốc độ cao',
-        desc: 'Phủ sóng toàn bộ khuôn viên',
-      },
-      {
-        icon: 'Lightbulb',
-        label: 'Dàn đèn LED chuẩn',
-        desc: 'Độ sáng 500 Lux, không gây chói mắt',
-      },
-      {
-        icon: 'Coffee',
-        label: 'Căn tin giải khát',
-        desc: 'Đa dạng nước ngọt, nước điện giải, đồ ăn nhẹ',
-      },
-    ],
-    rules: [
-      'Vui lòng sử dụng giày đế TF (đinh dăm) hoặc IC (futsal), nghiêm cấm giày đinh sắt SG.',
-      'Đến trước giờ đá 10-15 phút để làm thủ tục nhận sân và khởi động.',
-      'Nghiêm cấm hút thuốc, xả rác và mang chất kích thích vào khuôn viên sân cỏ.',
-      'Hủy sân phải thực hiện trước giờ bắt đầu ít nhất 12 tiếng để được hoàn cọc.',
-    ],
-    operatingHours: '06:00 - 23:00 hàng ngày',
-    reviews: [
-      {
-        id: 'r1',
-        author: 'Nguyễn Văn Hoàng',
-        avatar:
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-        date: '2 ngày trước',
-        rating: 5,
-        content:
-          'Mặt cỏ rất êm, bóng nảy chuẩn. Dàn đèn ban đêm sáng rực rỡ, đá không hề bị tối ở góc biên. Chỗ để xe ô tô thoải mái!',
-        verified: true,
-      },
-      {
-        id: 'r2',
-        author: 'Trần Minh Trí',
-        avatar:
-          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-        date: '5 ngày trước',
-        rating: 5,
-        content:
-          'Anh chủ sân và nhân viên hỗ trợ nhiệt tình. Có sẵn áo pitch và bóng thi đấu miễn phí cho đội.',
-        verified: true,
-      },
-      {
-        id: 'r3',
-        author: 'Lê Quốc Bảo',
-        avatar:
-          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
-        date: '1 tuần trước',
-        rating: 4,
-        content:
-          'Sân đẹp, giá giờ trưa rất mềm. Cuối tuần hơi đông nên các bạn nhớ đặt sớm trước 2 ngày.',
-        verified: true,
-      },
-    ],
-  },
-  '2': {
-    id: '2',
-    name: 'Sân bóng K34',
-    location: 'Nguyễn Thị Minh Khai, Phường Bến Nghé, Quận 1, TP.HCM',
-    address: 'Nguyễn Thị Minh Khai, Phường Bến Nghé, Quận 1, TP.HCM',
-    district: 'Quận 1',
-    city: 'TP. Hồ Chí Minh',
-    rating: 4.5,
-    reviewCount: 98,
-    basePricePerHour: 300000,
-    types: ['Sân 7'],
-    subPitches: [
-      {
-        id: 'p1',
-        name: 'Sân 7 - K1 (Trung tâm)',
-        type: 'Sân 7',
-        pricePerHour: 300000,
-      },
-      {
-        id: 'p2',
-        name: 'Sân 7 - K2 (VIP)',
-        type: 'Sân 7',
-        pricePerHour: 350000,
-      },
-    ],
-    images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuC3Rq8ne4IOVVio5VQy3uaUSlBYmkmgetmT20pt5-fgTOOZgnCBxzUc9RzETSFMsbKADKJZSwChjnHmm_sr-7aKTnl8wkNAZtEcwYF__8UJUJdAzeUDOurOC6k1kWsYiPQVdp31h24McPQ5-4rzObUdgsrTNpsJAA_-3KuLkN342DGPvl8jzGzZshku4eDc86lF7BM8ybPOYP5yojP7TGV8RI_HQAqk0TL_BHfbvXa8h3PlqTTqPEOIVA',
-      ...DEFAULT_IMAGES.slice(1),
-    ],
-    description:
-      'Tọa lạc ngay trung tâm Quận 1, Sân K34 là điểm đến quen thuộc của giới văn phòng và các câu lạc bộ bóng đá phong trào. Mặt sân rộng rãi, vị trí đắc địa thuận tiện di chuyển sau giờ làm việc.',
-    amenities: [
-      { icon: 'Car', label: 'Bãi giữ xe', desc: 'Có người trông giữ 24/7' },
-      { icon: 'Droplets', label: 'Nước uống', desc: 'Trà đá miễn phí' },
-      { icon: 'Wifi', label: 'Wifi', desc: 'Wifi miễn phí' },
-      {
-        icon: 'Lightbulb',
-        label: 'Đèn cao áp',
-        desc: 'Hệ thống đèn LED chiếu sáng ban đêm',
-      },
-    ],
-    rules: [
-      'Giữ gìn tư trang cá nhân cẩn thận.',
-      'Sử dụng đúng trang phục thể thao và giày đinh phù hợp.',
-      'Nghiêm cấm các hành vi bạo lực trên sân.',
-    ],
-    operatingHours: '06:00 - 22:30 hàng ngày',
-    reviews: [
-      {
-        id: 'r1',
-        author: 'Đặng Tuấn Anh',
-        avatar:
-          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
-        date: '3 ngày trước',
-        rating: 5,
-        content:
-          'Vị trí Quận 1 quá tiện cho anh em văn phòng tụ họp buổi tối sau giờ tan làm.',
-        verified: true,
-      },
-    ],
-  },
-};
-
-// Fallback generator cho các ID khác
-function getFieldById(id: string): FieldDetailData {
-  if (FIELDS_DATABASE[id]) {
-    return FIELDS_DATABASE[id];
-  }
-  return {
-    id,
-    name: `Sân Bóng Đá Phú Thọ - Cụm #${id}`,
-    location: '219 Lý Thường Kiệt, Phường 15, Quận 11, TP.HCM',
-    address: '219 Lý Thường Kiệt, Phường 15, Quận 11, TP.HCM',
-    district: 'Quận 11',
-    city: 'TP. Hồ Chí Minh',
-    rating: 4.8,
-    reviewCount: 124,
-    basePricePerHour: 280000,
-    types: ['Sân 5', 'Sân 7', 'Sân 11'],
-    subPitches: [
-      {
-        id: `sp-${id}-1`,
-        name: 'Sân 5 - Cụm A (Cỏ mới)',
-        type: 'Sân 5',
-        pricePerHour: 280000,
-      },
-      {
-        id: `sp-${id}-2`,
-        name: 'Sân 5 - Cụm B (Có mái che)',
-        type: 'Sân 5',
-        pricePerHour: 300000,
-      },
-      {
-        id: `sp-${id}-3`,
-        name: 'Sân 7 - Cụm C (Chuẩn FIFA)',
-        type: 'Sân 7',
-        pricePerHour: 500000,
-      },
-      {
-        id: `sp-${id}-4`,
-        name: 'Sân 11 - Sân Đại (Thi đấu lớn)',
-        type: 'Sân 11',
-        pricePerHour: 950000,
-      },
-    ],
-    images: DEFAULT_IMAGES,
-    description:
-      'Sân Bóng Đá Phú Thọ là một trong những cụm sân bóng đá cỏ nhân tạo đạt chuẩn quốc tế lớn nhất TP.HCM. Với hệ thống chiếu sáng LED hiện đại, mặt cỏ chất lượng cao thường xuyên được bảo dưỡng, sân đáp ứng tốt nhu cầu thi đấu phong trào và các giải đấu lớn. Khu vực đỗ xe rộng rãi, có căn tin phục vụ nước uống và đồ ăn nhẹ.',
-    amenities: [
-      {
-        icon: 'Car',
-        label: 'Bãi giữ xe rộng rãi',
-        desc: 'Có chỗ đỗ ô tô và xe máy miễn phí',
-      },
-      {
-        icon: 'Droplets',
-        label: 'Nước uống miễn phí',
-        desc: 'Bình nước mát lạnh phục vụ tận sân',
-      },
-      {
-        icon: 'Shirt',
-        label: 'Phòng thay đồ & Locker',
-        desc: 'Tủ có khóa an toàn, phòng tắm nóng lạnh',
-      },
-      {
-        icon: 'Wifi',
-        label: 'Wifi tốc độ cao',
-        desc: 'Phủ sóng toàn bộ khuôn viên',
-      },
-      {
-        icon: 'Lightbulb',
-        label: 'Dàn đèn LED chuẩn',
-        desc: 'Độ sáng 500 Lux, không gây chói mắt',
-      },
-      {
-        icon: 'Coffee',
-        label: 'Căn tin giải khát',
-        desc: 'Đa dạng nước ngọt, nước điện giải, đồ ăn nhẹ',
-      },
-    ],
-    rules: [
-      'Vui lòng sử dụng giày đế TF (đinh dăm) hoặc IC (futsal), nghiêm cấm giày đinh sắt SG.',
-      'Đến trước giờ đá 10-15 phút để làm thủ tục nhận sân và khởi động.',
-      'Nghiêm cấm hút thuốc, xả rác và mang chất kích thích vào khuôn viên sân cỏ.',
-      'Hủy sân phải thực hiện trước giờ bắt đầu ít nhất 12 tiếng để được hoàn cọc.',
-    ],
-    operatingHours: '06:00 - 23:00 hàng ngày',
-    reviews: [
-      {
-        id: 'r1',
-        author: 'Nguyễn Văn An',
-        avatar:
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-        date: '2 ngày trước',
-        rating: 5,
-        content:
-          'Sân cỏ mới, rất êm. Đèn chiếu sáng tốt, không bị chói. Chỗ để xe rộng rãi thoải mái. Sẽ tiếp tục đặt sân ở đây dài hạn!',
-        verified: true,
-      },
-      {
-        id: 'r2',
-        author: 'Trần Thị Bích',
-        avatar:
-          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-        date: '1 tuần trước',
-        rating: 5,
-        content:
-          'Sân đẹp, giá cả hợp lý. Dịch vụ cho thuê bóng và áo pitch rất chu đáo.',
-        verified: true,
-      },
-    ],
-  };
-}
+const DEFAULT_RULES = [
+  'Vui lòng sử dụng giày đế TF (đinh dăm) hoặc IC (futsal), nghiêm cấm giày đinh sắt SG.',
+  'Đến trước giờ thi đấu 10-15 phút để chuẩn bị và làm thủ tục nhận sân.',
+  'Nghiêm cấm hút thuốc, xả rác bừa bãi và mang chất dễ cháy nổ vào sân.',
+  'Hủy hoặc thay đổi lịch đặt phải thực hiện trước giờ bắt đầu ít nhất 12 tiếng.',
+];
 
 // Khung giờ 30 phút tiêu chuẩn
 const TIME_INTERVALS = {
@@ -428,11 +150,6 @@ const TIME_INTERVALS = {
   ],
 };
 
-// Khung giờ đã được đặt giả lập
-const BOOKED_SLOTS_MAP: Record<string, string[]> = {
-  default: ['09:00', '09:30', '17:00', '17:30', '18:30', '19:00', '20:00'],
-};
-
 const ALL_TIME_SLOTS = [
   ...TIME_INTERVALS.morning,
   ...TIME_INTERVALS.afternoon,
@@ -456,37 +173,386 @@ export default function FieldDetailPage({
   const fieldId = resolvedParams.id;
   const router = useRouter();
 
-  const field = useMemo(() => getFieldById(fieldId), [fieldId]);
+  // 1. Fetch field by ID
+  const {
+    data: field,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['field', fieldId],
+    queryFn: () => fetchFieldById(fieldId),
+    retry: (failureCount, err: unknown) => {
+      const errorObj = err as { status?: number };
+      if (errorObj?.status === 404) return false;
+      return failureCount < 2;
+    },
+  });
 
-  // Gallery state
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  // 2. Fetch reviews from API
+  const { data: reviewsResponse } = useQuery({
+    queryKey: ['field-reviews', fieldId],
+    queryFn: () => fetchFieldReviews(fieldId, { limit: 5 }),
+    enabled: !!field,
+  });
+
+  // Auth state for review eligibility
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    email?: string;
+  } | null>(null);
+  const [hasCompletedBooking] = useState(false);
+  const [showEligibilityDialog, setShowEligibilityDialog] = useState(false);
+  const [eligibilityReason, setEligibilityReason] = useState<
+    'not_logged_in_booking' | 'not_logged_in_review' | 'no_completed_booking'
+  >('not_logged_in_booking');
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkAuth = async () => {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { data } = await supabase.auth.getUser();
+        if (!isMounted) return;
+        if (data.user) {
+          setCurrentUser({
+            id: data.user.id,
+            email: data.user.email,
+          });
+        } else {
+          setCurrentUser(null);
+        }
+      } catch {
+        if (isMounted) {
+          setCurrentUser(null);
+        }
+      }
+    };
+    void checkAuth();
+    return () => {
+      isMounted = false;
+    };
+  }, [fieldId]);
+
+  // Gallery Modal State
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
   // Favorite state via TanStack Query
   const { data: favoriteData } = useFavoriteStatusQuery(fieldId);
   const toggleFavoriteMutation = useToggleFavoriteMutation(fieldId);
   const isFavorite = Boolean(favoriteData?.is_favorite);
 
-  // Reviews state
-  const [reviewsList, setReviewsList] =
-    useState<Review[]>(INITIAL_MOCK_REVIEWS);
-  const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
+  const handleFavoriteToggle = () => {
+    toggleFavoriteMutation.mutate();
+  };
+
+  // Booking Widget State
+  const [customSubPitchId, setCustomSubPitchId] = useState<string | null>(null);
+  const [customDate, setCustomDate] = useState<string | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState<{
+    code: string;
+    discount: number;
+    discountType: 'PERCENT' | 'FIXED';
+  } | null>(null);
+  const [isValidatingVoucher, setIsValidatingVoucher] = useState(false);
+
+  // Reviews Local State (for interactive additions/edits)
+  const [localReviews, setLocalReviews] = useState<Review[] | null>(null);
+  const [isWriteReviewOpen, setIsWriteReviewOpen] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [deletingReview, setDeletingReview] = useState<Review | null>(null);
 
-  const reviewSummary = useMemo(
-    () => calculateReviewSummary(reviewsList),
-    [reviewsList],
+  // Days list for next 7 days
+  const next7Days = useMemo(() => {
+    const days = [];
+    const today = new Date();
+    const dayNames = [
+      'CN',
+      'Thứ 2',
+      'Thứ 3',
+      'Thứ 4',
+      'Thứ 5',
+      'Thứ 6',
+      'Thứ 7',
+    ];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(today.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayName =
+        i === 0 ? 'Hôm nay' : i === 1 ? 'Ngày mai' : dayNames[d.getDay()];
+      const displayDate = `${String(d.getDate()).padStart(2, '0')}-${String(
+        d.getMonth() + 1,
+      ).padStart(2, '0')}`;
+
+      days.push({
+        dateStr,
+        dayName,
+        displayDate,
+      });
+    }
+    return days;
+  }, []);
+
+  const selectedDate = customDate ?? (next7Days[0]?.dateStr || '');
+
+  const subPitches = useMemo(() => {
+    if (field?.subPitches && field.subPitches.length > 0) {
+      return field.subPitches;
+    }
+    if (field) {
+      const typeLabel = formatFieldTypeName(field.type);
+      return [
+        {
+          id: `${field.id}-1`,
+          name: `${typeLabel} - Sân A1 (Cỏ mới)`,
+          type: typeLabel,
+          pricePerHour: field.base_price_per_hour || 300000,
+        },
+        {
+          id: `${field.id}-2`,
+          name: `${typeLabel} - Sân A2 (Tiêu chuẩn)`,
+          type: typeLabel,
+          pricePerHour: field.base_price_per_hour || 300000,
+        },
+      ];
+    }
+    return [];
+  }, [field]);
+
+  const selectedSubPitchId = customSubPitchId ?? (subPitches[0]?.id || '');
+
+  // Reviews list calculation
+  const reviewsList = useMemo(() => {
+    if (localReviews !== null) return localReviews;
+    if (reviewsResponse?.data && reviewsResponse.data.length > 0) {
+      return reviewsResponse.data;
+    }
+    if (field?.reviews && field.reviews.length > 0) {
+      return field.reviews;
+    }
+    return [];
+  }, [localReviews, reviewsResponse, field]);
+
+  const reviewSummary = useMemo(() => {
+    if (reviewsResponse?.summary && localReviews === null) {
+      return reviewsResponse.summary;
+    }
+    return calculateReviewSummary(reviewsList);
+  }, [reviewsResponse, localReviews, reviewsList]);
+
+  // Images list
+  const fieldImages = useMemo(() => {
+    if (field?.images && field.images.length > 0) {
+      return field.images;
+    }
+    if (field?.image) {
+      return [field.image];
+    }
+    return [
+      'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
+    ];
+  }, [field]);
+
+  // Pricing calculations
+  const currentSubPitch = useMemo(
+    () => subPitches.find((p) => p.id === selectedSubPitchId) || subPitches[0],
+    [subPitches, selectedSubPitchId],
   );
 
+  const pricePerHour =
+    currentSubPitch?.pricePerHour || field?.base_price_per_hour || 300000;
+  const durationHours = selectedSlots.length * 0.5;
+  const originalPrice = Math.round(durationHours * pricePerHour);
+
+  const discountAmount = useMemo(() => {
+    if (!appliedVoucher || originalPrice <= 0) return 0;
+    return appliedVoucher.discount;
+  }, [appliedVoucher, originalPrice]);
+
+  const finalPrice = Math.max(0, originalPrice - discountAmount);
+
+  // Check if slot is disabled (past time for today)
+  const isSlotDisabled = (slot: string) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (selectedDate === todayStr) {
+      const now = new Date();
+      const [slotHour, slotMin] = slot.split(':').map(Number);
+      const currentHour = now.getHours();
+      const currentMin = now.getMinutes();
+
+      if (slotHour < currentHour) return true;
+      if (slotHour === currentHour && slotMin <= currentMin) return true;
+    }
+    return false;
+  };
+
+  // Time slot selection logic (contiguous slots)
+  const handleToggleSlot = (slot: string) => {
+    if (isSlotDisabled(slot)) {
+      toast.error('Khung giờ này đã qua, vui lòng chọn khung giờ sắp tới.');
+      return;
+    }
+
+    if (selectedSlots.includes(slot)) {
+      setSelectedSlots(selectedSlots.filter((s) => s !== slot));
+      return;
+    }
+
+    if (selectedSlots.length === 0) {
+      setSelectedSlots([slot]);
+      return;
+    }
+
+    const sortedSlots = [...selectedSlots, slot].sort(
+      (a, b) => ALL_TIME_SLOTS.indexOf(a) - ALL_TIME_SLOTS.indexOf(b),
+    );
+
+    const firstIdx = ALL_TIME_SLOTS.indexOf(sortedSlots[0]);
+    const lastIdx = ALL_TIME_SLOTS.indexOf(sortedSlots[sortedSlots.length - 1]);
+
+    const contiguousSlots = ALL_TIME_SLOTS.slice(firstIdx, lastIdx + 1);
+    // Check if any slot in the range is disabled
+    const hasDisabledSlot = contiguousSlots.some((s) => isSlotDisabled(s));
+    if (hasDisabledSlot) {
+      toast.error('Khoảng thời gian bạn chọn chứa khung giờ đã qua.');
+      return;
+    }
+    setSelectedSlots(contiguousSlots);
+  };
+
+  // Voucher validation against real API
+  const handleApplyVoucher = async () => {
+    const code = voucherCode.trim().toUpperCase();
+    if (!code) {
+      toast.error('Vui lòng nhập mã giảm giá.');
+      return;
+    }
+
+    if (originalPrice <= 0) {
+      toast.error(
+        'Vui lòng chọn ít nhất 1 khung giờ trước khi áp dụng voucher.',
+      );
+      return;
+    }
+
+    setIsValidatingVoucher(true);
+    try {
+      const result = await validateVoucherApi(code, originalPrice, fieldId);
+      if (result.valid && result.discountAmount !== undefined) {
+        setAppliedVoucher({
+          code: result.code || code,
+          discount: result.discountAmount,
+          discountType: result.discountType || 'FIXED',
+        });
+        toast.success(
+          result.message ||
+            `Đã áp dụng mã ${code}! Giảm ${result.discountAmount.toLocaleString('vi-VN')}đ`,
+        );
+      } else {
+        setAppliedVoucher(null);
+        toast.error(
+          result.message || 'Mã giảm giá không hợp lệ hoặc đã hết hạn.',
+        );
+      }
+    } catch {
+      toast.error('Lỗi khi kiểm tra mã giảm giá. Vui lòng thử lại.');
+    } finally {
+      setIsValidatingVoucher(false);
+    }
+  };
+
+  const handleProceedToCheckout = () => {
+    if (!field) return;
+
+    if (!currentUser) {
+      setEligibilityReason('not_logged_in_booking');
+      setShowEligibilityDialog(true);
+      return;
+    }
+
+    if (!selectedSubPitchId) {
+      toast.error('Vui lòng chọn sân thi đấu.');
+      return;
+    }
+    if (!selectedDate) {
+      toast.error('Vui lòng chọn ngày thi đấu.');
+      return;
+    }
+    if (selectedSlots.length === 0) {
+      toast.error('Vui lòng chọn ít nhất một khung giờ thi đấu.');
+      return;
+    }
+
+    const sortedSlots = [...selectedSlots].sort(
+      (a, b) => ALL_TIME_SLOTS.indexOf(a) - ALL_TIME_SLOTS.indexOf(b),
+    );
+    const startTime = sortedSlots[0];
+    const endTime = getSlotEndTime(sortedSlots[sortedSlots.length - 1]);
+
+    // Format dateDisplay (e.g. "Hôm nay, 24/08/2026")
+    const dateObj = new Date(selectedDate);
+    const dateDisplay = `${dateObj.toLocaleDateString('vi-VN', {
+      weekday: 'long',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })}`;
+
+    const queryParams = new URLSearchParams({
+      fieldId: field.id,
+      fieldName: field.name,
+      fieldAddress: field.address,
+      fieldType: formatFieldTypeName(field.type),
+      courtName: currentSubPitch?.name || 'Sân tiêu chuẩn',
+      date: selectedDate,
+      dateDisplay,
+      startTime,
+      endTime,
+      durationHours: String(durationHours),
+      pricePerHour: String(pricePerHour),
+      fieldImage: fieldImages[0] || '',
+      voucher: appliedVoucher ? appliedVoucher.code : '',
+    });
+
+    router.push(`/checkout?${queryParams.toString()}`);
+  };
+
+  // Review eligibility check
+  const handleOpenWriteReview = () => {
+    if (!currentUser) {
+      setEligibilityReason('not_logged_in_review');
+      setShowEligibilityDialog(true);
+      return;
+    }
+
+    if (!hasCompletedBooking) {
+      setEligibilityReason('no_completed_booking');
+      setShowEligibilityDialog(true);
+      return;
+    }
+
+    setEditingReview(null);
+    setIsWriteReviewOpen(true);
+  };
+
+  // Review actions
   const handleCreateOrUpdateReview = (data: {
     rating: number;
     content: string;
     reviewId?: string;
   }) => {
+    if (!field) return;
+
     if (data.reviewId) {
-      setReviewsList((prev) =>
-        prev.map((r) =>
+      setLocalReviews((prev) => {
+        const base = prev ?? reviewsList;
+        return base.map((r) =>
           r.id === data.reviewId
             ? {
                 ...r,
@@ -495,38 +561,50 @@ export default function FieldDetailPage({
                 updatedAt: new Date().toISOString(),
               }
             : r,
-        ),
-      );
+        );
+      });
       setEditingReview(null);
+      toast.success('Đã cập nhật bài đánh giá.');
     } else {
       const newReview: Review = {
         id: `rev-${Date.now()}`,
-        userId: CURRENT_USER.id,
-        fieldId: fieldId,
+        userId: currentUser?.id || CURRENT_USER.id,
+        fieldId: field.id,
         bookingId: `bk-${Date.now()}`,
         rating: data.rating,
         content: data.content,
         createdAt: new Date().toISOString(),
         verifiedBooking: true,
         isOwner: true,
-        user: CURRENT_USER,
+        user: {
+          id: currentUser?.id || CURRENT_USER.id,
+          fullName: currentUser?.email?.split('@')[0] || 'Tôi',
+          avatarUrl:
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+          role: 'USER',
+        },
         booking: {
           id: `bk-${Date.now()}`,
           code: `KZ-BK-${Math.floor(100 + Math.random() * 900)}`,
           fieldName: field.name,
           matchDate: 'Hôm nay',
           timeSlot: '18:00 - 19:30',
-          fieldTypeName: 'Sân 7 người',
+          fieldTypeName: formatFieldTypeName(field.type),
         },
         comments: [],
       };
-      setReviewsList((prev) => [newReview, ...prev]);
+
+      setLocalReviews((prev) => [newReview, ...(prev ?? reviewsList)]);
+      toast.success('Đã gửi đánh giá thành công!');
     }
   };
 
   const handleConfirmDelete = () => {
     if (!deletingReview) return;
-    setReviewsList((prev) => prev.filter((r) => r.id !== deletingReview.id));
+    setLocalReviews((prev) => {
+      const base = prev ?? reviewsList;
+      return base.filter((r) => r.id !== deletingReview.id);
+    });
     toast.success('Đã xóa bài đánh giá thành công.');
     setDeletingReview(null);
   };
@@ -540,7 +618,7 @@ export default function FieldDetailPage({
     const newComment = {
       id: `comm-${Date.now()}`,
       reviewId,
-      userId: CURRENT_USER.id,
+      userId: currentUser?.id || CURRENT_USER.id,
       parentId: parentId || null,
       replyToUserName: replyToUserName || null,
       content,
@@ -548,8 +626,9 @@ export default function FieldDetailPage({
       user: CURRENT_USER,
     };
 
-    setReviewsList((prev) =>
-      prev.map((rev) => {
+    setLocalReviews((prev) => {
+      const base = prev ?? reviewsList;
+      return base.map((rev) => {
         if (rev.id !== reviewId) return rev;
 
         if (parentId) {
@@ -563,494 +642,516 @@ export default function FieldDetailPage({
         }
 
         return { ...rev, comments: [...rev.comments, newComment] };
-      }),
-    );
+      });
+    });
 
     toast.success('Đã gửi bình luận thành công!');
   };
 
-  // Booking states
-  const [selectedSubPitch, setSelectedSubPitch] = useState(
-    field.subPitches[0]?.id || 'p1',
-  );
-
-  // Next 7 days list
-  const availableDates = useMemo(() => {
-    const dates = [];
-    const today = new Date();
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      const iso = d.toISOString().split('T')[0];
-      const dayName =
-        i === 0
-          ? 'Hôm nay'
-          : i === 1
-            ? 'Ngày mai'
-            : d.toLocaleDateString('vi-VN', { weekday: 'short' });
-      const dayFormatted = d.toLocaleDateString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-      });
-      dates.push({ iso, dayName, dayFormatted });
-    }
-    return dates;
-  }, []);
-
-  const [selectedDate, setSelectedDate] = useState(
-    availableDates[0]?.iso || '',
-  );
-  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
-
-  // Voucher state
-  const [voucherCode, setVoucherCode] = useState('');
-  const [appliedVoucher, setAppliedVoucher] = useState<{
-    code: string;
-    discount: number;
-  } | null>(null);
-
-  // Current Sub Pitch
-  const currentSubPitch = useMemo(
-    () =>
-      field.subPitches.find((p) => p.id === selectedSubPitch) ||
-      field.subPitches[0],
-    [field.subPitches, selectedSubPitch],
-  );
-
-  const handleChangeSubPitch = (subPitchId: string) => {
-    setSelectedSubPitch(subPitchId);
-    setSelectedSlots([]);
-  };
-
-  const handleChangeDate = (date: string) => {
-    setSelectedDate(date);
-    setSelectedSlots([]);
-  };
-
-  // One booking maps to one contiguous start_time/end_time interval.
-  const handleToggleSlot = (time: string) => {
-    if (BOOKED_SLOTS_MAP.default.includes(time)) return;
-
-    const slotIndex = ALL_TIME_SLOTS.indexOf(time);
-    const selectedIndexes = selectedSlots.map((slot) =>
-      ALL_TIME_SLOTS.indexOf(slot),
+  // ----------------------------------------------------
+  // RENDER: LOADING SKELETON
+  // ----------------------------------------------------
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#f8f9fa] pt-6 pb-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="h-4 w-48 bg-[#e1e3e4] rounded animate-pulse mb-6" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div className="space-y-2">
+              <div className="h-8 w-72 bg-[#e1e3e4] rounded-lg animate-pulse" />
+              <div className="h-4 w-96 bg-[#e1e3e4] rounded animate-pulse" />
+            </div>
+            <div className="flex gap-2">
+              <div className="h-10 w-24 bg-[#e1e3e4] rounded-xl animate-pulse" />
+              <div className="h-10 w-24 bg-[#e1e3e4] rounded-xl animate-pulse" />
+            </div>
+          </div>
+          <div className="h-[380px] sm:h-[460px] bg-[#e1e3e4] rounded-3xl animate-pulse mb-10" />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="lg:col-span-8 space-y-6">
+              <div className="h-48 bg-[#e1e3e4] rounded-2xl animate-pulse" />
+              <div className="h-48 bg-[#e1e3e4] rounded-2xl animate-pulse" />
+              <div className="h-64 bg-[#e1e3e4] rounded-2xl animate-pulse" />
+            </div>
+            <div className="lg:col-span-4 h-96 bg-[#e1e3e4] rounded-2xl animate-pulse" />
+          </div>
+        </div>
+      </div>
     );
-    const minimumIndex = Math.min(...selectedIndexes);
-    const maximumIndex = Math.max(...selectedIndexes);
+  }
 
-    if (selectedSlots.includes(time)) {
-      if (
-        selectedSlots.length > 1 &&
-        slotIndex !== minimumIndex &&
-        slotIndex !== maximumIndex
-      ) {
-        toast.error('Chỉ có thể bỏ chọn khung giờ ở đầu hoặc cuối dải.');
-        return;
-      }
+  // ----------------------------------------------------
+  // RENDER: 404 NOT FOUND STATE
+  // ----------------------------------------------------
+  const is404 =
+    (error as { status?: number })?.status === 404 || (isError && !field);
 
-      setSelectedSlots((slots) => slots.filter((slot) => slot !== time));
-      return;
-    }
+  if (is404 || (!isLoading && !field)) {
+    return (
+      <div className="min-h-[75vh] flex items-center justify-center px-4 py-16 bg-[#f8f9fa]">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 sm:p-10 border border-[#bccbb9]/40 shadow-xl text-center">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto mb-5">
+            <AlertCircle className="w-8 h-8 stroke-[1.8]" />
+          </div>
+          <h1 className="font-['Manrope'] text-2xl font-extrabold text-[#191c1d] mb-2">
+            Không tìm thấy sân bóng
+          </h1>
+          <p className="text-xs sm:text-sm text-[#575e70] leading-relaxed mb-6">
+            Sân bóng bạn đang tìm kiếm không tồn tại, đã bị ngừng hoạt động hoặc
+            đường dẫn không hợp lệ.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              href="/fields"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Danh sách sân bóng</span>
+            </Link>
+            <Link
+              href="/"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-[#bccbb9]/60 bg-white hover:bg-[#f8f9fa] text-[#191c1d] text-xs font-semibold transition-all cursor-pointer"
+            >
+              <Home className="w-4 h-4" />
+              <span>Trang chủ</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-    if (
-      selectedSlots.length > 0 &&
-      slotIndex !== minimumIndex - 1 &&
-      slotIndex !== maximumIndex + 1
-    ) {
-      toast.error('Vui lòng chọn các khung giờ liền nhau.');
-      return;
-    }
+  // ----------------------------------------------------
+  // RENDER: GENERIC ERROR STATE
+  // ----------------------------------------------------
+  if (isError) {
+    return (
+      <div className="min-h-[75vh] flex items-center justify-center px-4 py-16 bg-[#f8f9fa]">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 sm:p-10 border border-rose-200 shadow-xl text-center">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto mb-5">
+            <AlertCircle className="w-8 h-8 stroke-[1.8]" />
+          </div>
+          <h1 className="font-['Manrope'] text-2xl font-extrabold text-[#191c1d] mb-2">
+            Đã xảy ra lỗi
+          </h1>
+          <p className="text-xs sm:text-sm text-[#575e70] leading-relaxed mb-6">
+            Không thể tải thông tin sân bóng vào lúc này. Vui lòng kiểm tra kết
+            nối và thử lại.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button
+              onClick={() => refetch()}
+              className="w-full sm:w-auto bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-bold rounded-xl px-5 py-2.5 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Thử lại</span>
+            </Button>
+            <Link
+              href="/fields"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-[#bccbb9]/60 bg-white hover:bg-[#f8f9fa] text-[#191c1d] text-xs font-semibold transition-all cursor-pointer"
+            >
+              <span>Danh sách sân</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-    setSelectedSlots((slots) => [...slots, time].sort());
-  };
+  if (!field) {
+    return null;
+  }
 
-  // Tính toán thời lượng và giá tiền
-  const durationHours = (selectedSlots.length * 30) / 60;
-  const currentRate = currentSubPitch?.pricePerHour || field.basePricePerHour;
-  const originalPrice = Math.round(durationHours * currentRate);
-  const discountAmount = Math.min(appliedVoucher?.discount ?? 0, originalPrice);
-  const finalPrice = Math.max(0, originalPrice - discountAmount);
-
-  // Xử lý áp dụng voucher
-  const handleApplyVoucher = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const clean = voucherCode.trim().toUpperCase();
-    if (!clean) {
-      toast.error('Vui lòng nhập mã giảm giá');
-      return;
-    }
-    if (clean === 'KICKZONE50' || clean === 'KZ50') {
-      setAppliedVoucher({ code: clean, discount: 50000 });
-      toast.success('Đã áp dụng mã giảm giá 50.000đ!');
-    } else if (clean === 'KZ10' || clean === 'KZPRO10') {
-      const discount = Math.round(originalPrice * 0.1);
-      setAppliedVoucher({
-        code: clean,
-        discount: Math.min(discount, originalPrice),
-      });
-      toast.success(
-        `Đã áp dụng giảm 10% (-${discount.toLocaleString('vi-VN')}đ)!`,
-      );
-    } else {
-      toast.error('Mã giảm giá không hợp lệ hoặc đã hết hạn.');
-    }
-  };
-
-  const handleFavoriteToggle = () => {
-    toggleFavoriteMutation.mutate();
-  };
-
-  const handleShare = () => {
-    if (typeof window !== 'undefined') {
-      navigator.clipboard.writeText(window.location.href);
-      toast.success('Đã sao chép liên kết sân bóng vào clipboard!');
-    }
-  };
-
-  const handleProceedBooking = () => {
-    if (selectedSlots.length === 0) {
-      toast.error('Vui lòng chọn ít nhất 1 khung giờ thi đấu.');
-      return;
-    }
-
-    const start = selectedSlots[0];
-    const end = getSlotEndTime(selectedSlots[selectedSlots.length - 1]);
-    // ponytail: sub-pitch is display-only until it has its own database entity.
-
-    const dateObj = availableDates.find((d) => d.iso === selectedDate);
-    const dateDisplay = dateObj?.dayFormatted || selectedDate;
-
-    const params = new URLSearchParams({
-      fieldId: field.id,
-      fieldName: field.name,
-      fieldAddress: field.address,
-      fieldType: currentSubPitch?.type || 'Sân 7 người',
-      courtName: currentSubPitch?.name || 'Sân tiêu chuẩn',
-      date: selectedDate,
-      dateDisplay,
-      startTime: start,
-      endTime: end,
-      durationHours: durationHours.toString(),
-      pricePerHour: currentRate.toString(),
-      fieldImage: field.images[0] || '',
-      voucher: appliedVoucher?.code || '',
-    });
-
-    router.push(`/checkout?${params.toString()}`);
-  };
+  const fieldTypeName = formatFieldTypeName(field.type);
 
   return (
-    <div className="bg-[#f8f9fa] text-[#191c1d] min-h-screen pb-16 font-sans">
-      {/* ==========================================
-          HEADER & BREADCRUMBS
-      ========================================== */}
-      <div className="bg-white border-b border-[#bccbb9]/40 py-4 shadow-sm">
+    <div className="min-h-screen bg-[#f8f9fa] text-[#191c1d] font-sans pb-24">
+      {/* 1. Breadcrumbs */}
+      <div className="bg-white border-b border-[#bccbb9]/30 py-3">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex items-center gap-2 text-xs text-[#575e70] mb-3">
+          <nav
+            aria-label="Breadcrumb"
+            className="flex items-center space-x-2 text-xs text-[#575e70]"
+          >
             <Link href="/" className="hover:text-[#006e2f] transition-colors">
               Trang chủ
             </Link>
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ChevronRight className="w-3.5 h-3.5 text-[#bccbb9]" />
             <Link
               href="/fields"
               className="hover:text-[#006e2f] transition-colors"
             >
-              Tìm sân
+              Danh sách sân
             </Link>
-            <ChevronRight className="w-3.5 h-3.5" />
-            <span className="text-[#191c1d] font-semibold truncate">
+            <ChevronRight className="w-3.5 h-3.5 text-[#bccbb9]" />
+            <span className="font-bold text-[#191c1d] truncate max-w-[200px] sm:max-w-md">
               {field.name}
             </span>
           </nav>
+        </div>
+      </div>
 
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#191c1d] font-['Manrope']">
-                  {field.name}
-                </h1>
-                <span className="bg-[#22c55e]/15 text-[#006e2f] border border-[#22c55e]/30 px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1">
-                  <Award className="w-3.5 h-3.5" /> Đã xác thực
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        {/* 2. Top Header Info */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <div className="flex items-center gap-2.5 flex-wrap mb-1.5">
+              <h1 className="font-['Manrope'] font-extrabold text-2xl sm:text-3xl text-[#191c1d] tracking-tight">
+                {field.name}
+              </h1>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#006e2f]/10 text-[#006e2f] border border-[#006e2f]/20">
+                <Shield className="w-3 h-3" />
+                <span>Đã xác thực</span>
+              </span>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#f1f3f4] text-[#41484d] border border-[#bccbb9]/30">
+                {fieldTypeName}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs text-[#575e70]">
+              <div className="flex items-center gap-1 text-[#3d4a3d]">
+                <MapPin className="w-3.5 h-3.5 text-[#006e2f] shrink-0" />
+                <span>
+                  {field.address}, {field.district ? `${field.district}, ` : ''}
+                  {field.city}
                 </span>
               </div>
-
-              <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs sm:text-sm text-[#575e70]">
-                <div className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4 text-[#006e2f] shrink-0" />
-                  <span>{field.address}</span>
-                </div>
-                <div className="flex items-center gap-1 text-[#006e2f] font-bold">
-                  <Star className="w-4 h-4 fill-[#006e2f] text-[#006e2f]" />
-                  <span>{field.rating}</span>
-                  <span className="text-[#575e70] font-normal">
-                    ({field.reviewCount} đánh giá)
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 text-[#575e70]">
-                  <Clock className="w-4 h-4 text-[#575e70] shrink-0" />
-                  <span>{field.operatingHours}</span>
-                </div>
+              <div className="flex items-center gap-1.5 font-bold text-[#191c1d]">
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                <span>{reviewSummary.averageRating}</span>
+                <span className="font-normal text-[#575e70]">
+                  ({reviewSummary.totalReviews} đánh giá)
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-[#575e70]" />
+                <span>{field.operatingHours || '06:00 - 23:00 hàng ngày'}</span>
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleFavoriteToggle}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-xs font-semibold transition-all ${
-                  isFavorite
-                    ? 'bg-rose-50 border-rose-300 text-rose-600'
-                    : 'bg-white border-[#bccbb9]/60 text-[#575e70] hover:border-rose-400 hover:text-rose-500'
-                }`}
-              >
-                <Heart
-                  className={`w-4 h-4 ${isFavorite ? 'fill-rose-600 text-rose-600' : ''}`}
-                />
-                <span>{isFavorite ? 'Đã lưu' : 'Yêu thích'}</span>
-              </button>
-
-              <button
-                onClick={handleShare}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-[#bccbb9]/60 bg-white text-[#575e70] hover:text-[#006e2f] hover:border-[#006e2f] text-xs font-semibold transition-all"
-              >
-                <Share2 className="w-4 h-4" />
-                <span>Chia sẻ</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ==========================================
-          IMAGE GALLERY SECTION (HERO)
-      ========================================== */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 h-auto lg:h-[430px]">
-          {/* Main Large Image */}
-          <div
-            onClick={() => setIsLightboxOpen(true)}
-            className="lg:col-span-2 relative h-72 sm:h-96 lg:h-full rounded-2xl overflow-hidden shadow-sm border border-[#bccbb9]/40 group cursor-pointer"
-          >
-            <img
-              src={field.images[activeImageIndex] || field.images[0]}
-              alt={field.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-              <span className="text-white text-xs font-medium bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-full">
-                Nhấn để xem toàn màn hình
-              </span>
-            </div>
-            <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-xs px-3 py-1 rounded-full font-medium">
-              Ảnh {activeImageIndex + 1}/{field.images.length}
-            </div>
           </div>
 
-          {/* 2 Middle Thumbnails */}
-          <div className="hidden lg:flex flex-col gap-3 h-full">
-            <div
-              onClick={() => setActiveImageIndex(1 % field.images.length)}
-              className="h-1/2 rounded-xl overflow-hidden border border-[#bccbb9]/40 relative group cursor-pointer"
-            >
-              <img
-                src={field.images[1] || field.images[0]}
-                alt="Phối cảnh sân"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-            </div>
-            <div
-              onClick={() => setActiveImageIndex(2 % field.images.length)}
-              className="h-1/2 rounded-xl overflow-hidden border border-[#bccbb9]/40 relative group cursor-pointer"
-            >
-              <img
-                src={field.images[2] || field.images[0]}
-                alt="Phòng thay đồ"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-            </div>
-          </div>
-
-          {/* Right Thumbnail with "+Ảnh" Overlay */}
-          <div
-            onClick={() => setIsLightboxOpen(true)}
-            className="hidden lg:block h-full rounded-xl overflow-hidden border border-[#bccbb9]/40 relative group cursor-pointer"
-          >
-            <img
-              src={field.images[3] || field.images[0]}
-              alt="Hệ thống đèn chiếu sáng"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-            <div className="absolute inset-0 bg-black/50 group-hover:bg-black/60 transition-colors flex flex-col items-center justify-center text-white">
-              <span className="text-2xl font-bold font-['Manrope']">
-                +{field.images.length}
-              </span>
-              <span className="text-xs font-semibold mt-1">Xem tất cả ảnh</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Horizontal Thumbnail Scroller */}
-        <div className="flex lg:hidden gap-2 mt-3 overflow-x-auto pb-2">
-          {field.images.map((img, idx) => (
-            <button
-              key={idx}
-              onClick={() => setActiveImageIndex(idx)}
-              className={`w-20 h-16 shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
-                activeImageIndex === idx
-                  ? 'border-[#006e2f] ring-2 ring-[#006e2f]/20'
-                  : 'border-transparent opacity-70'
+          {/* Social actions */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleFavoriteToggle}
+              disabled={toggleFavoriteMutation.isPending}
+              className={`rounded-xl px-4 py-2 text-xs font-semibold cursor-pointer transition-all ${
+                isFavorite
+                  ? 'border-rose-300 bg-rose-50 text-rose-600'
+                  : 'border-[#bccbb9]/60 hover:bg-[#f8f9fa] text-[#191c1d]'
               }`}
             >
-              <img
-                src={img}
-                alt={`Thumb ${idx}`}
-                className="w-full h-full object-cover"
+              <Heart
+                className={`w-4 h-4 mr-1.5 ${
+                  isFavorite ? 'fill-rose-500 text-rose-500' : 'text-[#575e70]'
+                }`}
               />
-            </button>
-          ))}
+              <span>{isFavorite ? 'Đã yêu thích' : 'Yêu thích'}</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(window.location.href);
+                  toast.success('Đã sao chép liên kết sân bóng!');
+                }
+              }}
+              className="rounded-xl px-4 py-2 text-xs font-semibold border-[#bccbb9]/60 hover:bg-[#f8f9fa] text-[#191c1d] cursor-pointer"
+            >
+              <Share2 className="w-4 h-4 mr-1.5 text-[#575e70]" />
+              <span>Chia sẻ</span>
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {/* ==========================================
-          MAIN CONTENT (2-COLUMN GRID)
-      ========================================== */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* ==========================================
-              LEFT COLUMN (8 COLS): DETAILS, AMENITIES, REVIEWS
-          ========================================== */}
-          <div className="lg:col-span-7 xl:col-span-8 space-y-6">
-            {/* 1. Giới thiệu sân */}
-            <div className="bg-white rounded-2xl p-6 border border-[#bccbb9]/40 shadow-sm">
-              <h2 className="text-xl font-bold text-[#191c1d] font-['Manrope'] mb-3 flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-[#006e2f]" />
-                Giới thiệu & Thông số sân
-              </h2>
-              <p className="text-[#575e70] text-sm leading-relaxed mb-6">
-                {field.description}
-              </p>
-
-              {/* Loại sân đang hoạt động */}
-              <h3 className="text-xs font-bold text-[#191c1d] uppercase tracking-wider mb-3">
-                Các loại sân tại cơ sở
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                {field.subPitches.map((pitch) => (
-                  <div
-                    key={pitch.id}
-                    className={`p-3.5 rounded-xl border transition-all ${
-                      selectedSubPitch === pitch.id
-                        ? 'border-[#006e2f] bg-[#006e2f]/5 shadow-sm'
-                        : 'border-[#bccbb9]/40 bg-[#f8f9fa] hover:border-[#006e2f]/50'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-white text-[#006e2f] border border-[#bccbb9]/40">
-                          {pitch.type}
-                        </span>
-                        <h4 className="font-bold text-sm text-[#191c1d] mt-2">
-                          {pitch.name}
-                        </h4>
-                      </div>
-                      <span className="font-extrabold text-[#006e2f] text-sm font-['Manrope']">
-                        {pitch.pricePerHour.toLocaleString('vi-VN')}đ
-                        <span className="text-xs font-normal text-[#575e70]">
-                          /h
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                ))}
+        {/* 3. Photo Gallery Layout (Responsive for 1 or multiple images) */}
+        <div className="mb-10">
+          {fieldImages.length === 1 ? (
+            /* Single Hero Image */
+            <div
+              onClick={() => {
+                setSelectedPhotoIndex(0);
+                setIsGalleryOpen(true);
+              }}
+              className="relative h-[340px] sm:h-[440px] w-full rounded-3xl overflow-hidden shadow-sm cursor-pointer group border border-[#bccbb9]/40"
+            >
+              <img
+                src={fieldImages[0]}
+                alt={field.name}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+              <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-black/80 transition-colors">
+                <span>1/1 ảnh • Xem phóng to</span>
+              </div>
+            </div>
+          ) : fieldImages.length === 2 ? (
+            /* 2 Images side by side */
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 h-[320px] sm:h-[400px] rounded-3xl overflow-hidden">
+              {fieldImages.slice(0, 2).map((img, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    setSelectedPhotoIndex(idx);
+                    setIsGalleryOpen(true);
+                  }}
+                  className="relative h-full w-full overflow-hidden cursor-pointer group border border-[#bccbb9]/30"
+                >
+                  <img
+                    src={img}
+                    alt={`${field.name} ${idx + 1}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Multi-image grid (3 or more) */
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 h-[380px] sm:h-[460px] rounded-3xl overflow-hidden shadow-sm">
+              {/* Main Featured Photo */}
+              <div
+                onClick={() => {
+                  setSelectedPhotoIndex(0);
+                  setIsGalleryOpen(true);
+                }}
+                className="lg:col-span-6 h-full relative cursor-pointer group overflow-hidden"
+              >
+                <img
+                  src={fieldImages[0]}
+                  alt={`${field.name} chính`}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80';
+                  }}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1.5 rounded-lg">
+                  Ảnh chính
+                </div>
               </div>
 
-              {/* Tiện ích sân bóng */}
-              <h3 className="text-xs font-bold text-[#191c1d] uppercase tracking-wider mb-3">
-                Tiện ích & Dịch vụ đi kèm
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {field.amenities.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start gap-2.5 p-3 rounded-xl bg-[#f8f9fa] border border-[#bccbb9]/30"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-[#006e2f]/10 text-[#006e2f] flex items-center justify-center shrink-0">
-                      {item.icon === 'Car' && <Car className="w-4 h-4" />}
-                      {item.icon === 'Droplets' && (
-                        <Droplets className="w-4 h-4" />
-                      )}
-                      {item.icon === 'Shirt' && <Shirt className="w-4 h-4" />}
-                      {item.icon === 'Wifi' && <Wifi className="w-4 h-4" />}
-                      {item.icon === 'Lightbulb' && (
-                        <Lightbulb className="w-4 h-4" />
-                      )}
-                      {item.icon === 'Coffee' && <Coffee className="w-4 h-4" />}
+              {/* Middle 2 Stacked Photos */}
+              <div className="hidden sm:grid lg:col-span-3 grid-rows-2 gap-3 h-full">
+                <div
+                  onClick={() => {
+                    setSelectedPhotoIndex(1);
+                    setIsGalleryOpen(true);
+                  }}
+                  className="relative h-full cursor-pointer group overflow-hidden"
+                >
+                  <img
+                    src={fieldImages[1] || fieldImages[0]}
+                    alt={`${field.name} 2`}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80';
+                    }}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+                <div
+                  onClick={() => {
+                    setSelectedPhotoIndex(2);
+                    setIsGalleryOpen(true);
+                  }}
+                  className="relative h-full cursor-pointer group overflow-hidden"
+                >
+                  <img
+                    src={fieldImages[2] || fieldImages[0]}
+                    alt={`${field.name} 3`}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        'https://images.unsplash.com/photo-1577223625816-7546f13df25d?auto=format&fit=crop&w=1200&q=80';
+                    }}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+              </div>
+
+              {/* Right Side Photo with View All Overlay */}
+              <div
+                onClick={() => {
+                  setSelectedPhotoIndex(3 < fieldImages.length ? 3 : 0);
+                  setIsGalleryOpen(true);
+                }}
+                className="hidden lg:block lg:col-span-3 h-full relative cursor-pointer group overflow-hidden"
+              >
+                <img
+                  src={fieldImages[3] || fieldImages[0]}
+                  alt={`${field.name} 4`}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      'https://images.unsplash.com/photo-1551958219-acbc608c6377?auto=format&fit=crop&w=1200&q=80';
+                  }}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-black/45 group-hover:bg-black/55 transition-colors flex flex-col items-center justify-center text-white p-4 text-center">
+                  <span className="font-['Manrope'] text-2xl font-black mb-1">
+                    +{fieldImages.length}
+                  </span>
+                  <span className="text-xs font-bold tracking-wide">
+                    Xem tất cả ảnh
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 4. Main 2-Column Content Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left Column: Details & Specs (8 cols) */}
+          <div className="lg:col-span-8 space-y-8">
+            {/* Section A: Giới thiệu & Thông số sân (No awkward sparkles icon) */}
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#bccbb9]/40 shadow-xs">
+              <h2 className="font-['Manrope'] text-xl font-extrabold text-[#191c1d] mb-3">
+                Giới thiệu & Thông số sân
+              </h2>
+              <p className="text-sm text-[#575e70] leading-relaxed mb-6">
+                {field.description ||
+                  `Khu liên hợp sân bóng đá ${field.name} đạt tiêu chuẩn thi đấu, bề mặt cỏ êm ái, hệ thống thoát nước hiện đại và đèn chiếu sáng LED công suất cao phục vụ tối đa cho các trận cầu đỉnh cao.`}
+              </p>
+
+              {/* Sub-pitch spec pills */}
+              <div className="mb-6">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#575e70] mb-3">
+                  Các loại sân tại cơ sở
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {subPitches.map((pitch) => (
+                    <div
+                      key={pitch.id}
+                      className="p-3.5 rounded-2xl border border-[#bccbb9]/50 bg-[#f8f9fa] flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="text-xs font-bold text-[#191c1d]">
+                          {pitch.name}
+                        </div>
+                        <div className="text-[11px] text-[#575e70]">
+                          Mặt cỏ nhân tạo • Đạt chuẩn thi đấu
+                        </div>
+                      </div>
+                      <span className="text-xs font-extrabold text-[#006e2f]">
+                        {pitch.pricePerHour.toLocaleString('vi-VN')}đ/h
+                      </span>
                     </div>
-                    <div>
-                      <h5 className="font-semibold text-xs text-[#191c1d]">
-                        {item.label}
-                      </h5>
-                      <p className="text-[11px] text-[#575e70] mt-0.5 line-clamp-1">
-                        {item.desc}
-                      </p>
+                  ))}
+                </div>
+              </div>
+
+              {/* Amenities Grid */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#575e70] mb-3">
+                  Tiện ích & Dịch vụ đi kèm
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {DEFAULT_AMENITIES.map((am, i) => (
+                    <div
+                      key={i}
+                      className="flex items-start gap-3 p-3 rounded-2xl border border-[#bccbb9]/30 bg-white"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-[#006e2f]/10 text-[#006e2f] flex items-center justify-center shrink-0">
+                        {am.icon === 'Car' && <Car className="w-4 h-4" />}
+                        {am.icon === 'Droplets' && (
+                          <Droplets className="w-4 h-4" />
+                        )}
+                        {am.icon === 'Shirt' && <Shirt className="w-4 h-4" />}
+                        {am.icon === 'Wifi' && <Wifi className="w-4 h-4" />}
+                        {am.icon === 'Lightbulb' && (
+                          <Lightbulb className="w-4 h-4" />
+                        )}
+                        {am.icon === 'Coffee' && <Coffee className="w-4 h-4" />}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[#191c1d]">
+                          {am.label}
+                        </div>
+                        <div className="text-[11px] text-[#575e70]">
+                          {am.desc}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* 2. Quy định & Nội quy */}
-            <div className="bg-white rounded-2xl p-6 border border-[#bccbb9]/40 shadow-sm">
-              <h2 className="text-lg font-bold text-[#191c1d] font-['Manrope'] mb-4 flex items-center gap-2">
+            {/* Section B: Nội quy & Chính sách */}
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#bccbb9]/40 shadow-xs">
+              <div className="flex items-center gap-2 mb-4">
                 <Shield className="w-5 h-5 text-[#006e2f]" />
-                Nội quy & Chính sách đặt sân
-              </h2>
-              <div className="space-y-2.5">
-                {field.rules.map((rule, idx) => (
-                  <div
+                <h2 className="font-['Manrope'] text-xl font-extrabold text-[#191c1d]">
+                  Nội quy & Chính sách đặt sân
+                </h2>
+              </div>
+              <ul className="space-y-3">
+                {DEFAULT_RULES.map((rule, idx) => (
+                  <li
                     key={idx}
-                    className="flex items-start gap-2.5 text-xs text-[#575e70]"
+                    className="flex items-start gap-2.5 text-xs text-[#575e70] leading-relaxed"
                   >
                     <CheckCircle2 className="w-4 h-4 text-[#006e2f] shrink-0 mt-0.5" />
                     <span>{rule}</span>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
 
-            {/* 3. Vị trí & Bản đồ */}
-            <div className="bg-white rounded-2xl p-6 border border-[#bccbb9]/40 shadow-sm">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-bold text-[#191c1d] font-['Manrope'] flex items-center gap-2">
+            {/* Section C: Vị trí sân bóng (Real Google Maps Embed) */}
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#bccbb9]/40 shadow-xs">
+              <div className="flex items-center justify-between gap-2 mb-4">
+                <div className="flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-[#006e2f]" />
-                  Vị trí sân bóng
-                </h2>
+                  <h2 className="font-['Manrope'] text-xl font-extrabold text-[#191c1d]">
+                    Vị trí sân bóng
+                  </h2>
+                </div>
                 <a
-                  href={`https://maps.google.com/?q=${encodeURIComponent(field.address)}`}
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    `${field.name} ${field.address} TP.HCM`,
+                  )}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-xs font-bold text-[#006e2f] hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-[#006e2f] hover:underline inline-flex items-center gap-1 cursor-pointer"
                 >
-                  Mở Google Maps <ChevronRight className="w-3.5 h-3.5" />
+                  <span>Mở Google Maps</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>
-              <div className="relative h-64 rounded-xl overflow-hidden border border-[#bccbb9]/40 bg-slate-100">
-                <img
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCNLzIiqbuG_U7K5NpJ_ooV6yInwi26CjDmndTE4w50t8EhHWuTSpFqd4ZbAam_zZ4n8W727b6mCGIXNVq1_Dq4XuolgdyYoreK6L4fe9CGvZaEfo3teSKynOWtro_viGEYxePnYB2BzUvWb_xcLcfyGnuxmwZLNQkHS6a79WXWieJLz47PMBfm1dhmHJKZcUXelvQ-_mqlJWhuPDgFVsrSxKiZxPljr7J5O0mS412KPzEGZgqlNbwBuA"
-                  alt="Bản đồ chỉ đường"
-                  className="w-full h-full object-cover"
+
+              {/* Real Interactive Google Maps Iframe */}
+              <div className="relative h-72 rounded-2xl overflow-hidden border border-[#bccbb9]/40 bg-[#f8f9fa] shadow-xs">
+                <iframe
+                  title={`Bản đồ vị trí ${field.name}`}
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                    `${field.name}, ${field.address}, ${field.district ? `${field.district}, ` : ''}TP.HCM`,
+                  )}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                  className="w-full h-full"
                 />
-                <div className="absolute bottom-3 left-3 right-3 bg-white/95 backdrop-blur-sm p-3 rounded-xl border border-[#bccbb9]/40 shadow flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs">
+                <div className="absolute bottom-3 left-3 right-3 bg-white/95 backdrop-blur-xs p-3 rounded-xl border border-[#bccbb9]/40 shadow-xs flex items-center justify-between pointer-events-auto">
+                  <div className="flex items-center gap-2 text-xs truncate mr-2">
                     <MapPin className="w-4 h-4 text-[#006e2f] shrink-0" />
                     <span className="font-medium text-[#191c1d] truncate">
-                      {field.address}
+                      {field.address},{' '}
+                      {field.district ? `${field.district}, ` : ''}
+                      {field.city}
                     </span>
                   </div>
                   <a
-                    href={`https://maps.google.com/?q=${encodeURIComponent(field.address)}`}
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      `${field.name} ${field.address} TP.HCM`,
+                    )}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="shrink-0 ml-2 px-3 py-1 rounded-lg bg-[#006e2f] text-white text-xs font-semibold hover:bg-[#005321] transition-colors"
+                    className="shrink-0 px-3 py-1.5 rounded-lg bg-[#006e2f] text-white text-xs font-semibold hover:bg-[#004b1e] transition-colors"
                   >
                     Chỉ đường
                   </a>
@@ -1058,206 +1159,163 @@ export default function FieldDetailPage({
               </div>
             </div>
 
-            {/* 4. Đánh giá & Nhận xét từ khách hàng (Tích hợp trọn bộ Design System) */}
-            <div className="bg-white rounded-2xl p-6 border border-[#bccbb9]/40 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-[#bccbb9]/30">
+            {/* Section D: Reviews & Ratings Overview */}
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#bccbb9]/40 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#bccbb9]/30">
                 <div>
-                  <h2 className="text-lg font-bold text-[#191c1d] font-['Manrope'] mb-1">
+                  <h2 className="font-['Manrope'] text-xl font-extrabold text-[#191c1d] mb-1">
                     Đánh giá từ cầu thủ & đội bóng
                   </h2>
-                  <p className="text-xs text-[#575e70]">
-                    Đánh giá chân thực từ những người đã hoàn tất đặt sân thực
-                    tế
+                  <p className="text-xs text-[#575e70] flex items-center gap-1.5">
+                    <Lock className="w-3 h-3 text-[#006e2f]" />
+                    <span>
+                      Đánh giá chân thực từ những người đã hoàn tất đặt sân thực
+                      tế
+                    </span>
                   </p>
                 </div>
                 <Button
-                  onClick={() => {
-                    setEditingReview(null);
-                    setIsWriteModalOpen(true);
-                  }}
-                  className="bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-semibold rounded-xl px-4 py-2 self-start sm:self-auto shadow-sm flex items-center gap-1.5"
+                  onClick={handleOpenWriteReview}
+                  className="bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-bold rounded-xl px-4 py-2.5 flex items-center gap-2 cursor-pointer transition-all active:scale-95 shadow-xs"
                 >
-                  <MessageSquarePlus className="w-3.5 h-3.5" />
+                  <MessageSquarePlus className="w-4 h-4" />
                   <span>Viết đánh giá</span>
                 </Button>
               </div>
 
-              {/* Rating summary cards */}
-              <div className="flex flex-col md:flex-row gap-6 mb-6 items-center p-5 bg-[#f8f9fa] rounded-2xl border border-[#bccbb9]/30">
-                <div className="w-full md:w-48 text-center">
-                  <div className="text-4xl sm:text-5xl font-extrabold text-[#006e2f] font-['Manrope'] mb-1">
-                    {reviewSummary.averageRating.toFixed(1)}
+              {/* Rating breakdown summary */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 my-6 p-6 rounded-2xl bg-[#f8f9fa] border border-[#bccbb9]/30 items-center">
+                <div className="sm:col-span-4 text-center sm:border-r border-[#bccbb9]/30 sm:pr-6">
+                  <div className="font-['Manrope'] font-black text-4xl text-[#191c1d] mb-1">
+                    {reviewSummary.averageRating}
                   </div>
                   <div className="flex justify-center mb-1.5">
                     <StarRating
-                      value={reviewSummary.averageRating}
-                      size="sm"
-                      color="pitch"
+                      value={Number(reviewSummary.averageRating)}
+                      size="md"
+                      color="amber"
                     />
                   </div>
-                  <div className="text-xs text-[#575e70] font-medium">
+                  <div className="text-xs text-[#575e70]">
                     Dựa trên {reviewSummary.totalReviews} đánh giá
                   </div>
                 </div>
 
-                <div className="flex-1 w-full space-y-2 text-xs">
-                  {reviewSummary.breakdown.map((row) => (
-                    <div key={row.star} className="flex items-center gap-2">
-                      <span className="w-4 text-right font-bold text-[#575e70]">
-                        {row.star}
-                      </span>
-                      <Star className="w-3.5 h-3.5 fill-[#006e2f] text-[#006e2f]" />
-                      <div className="flex-1 h-2 bg-[#edeeef] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-[#006e2f] rounded-full transition-all duration-500"
-                          style={{ width: `${row.percentage}%` }}
-                        />
+                <div className="sm:col-span-8 space-y-1.5">
+                  {(reviewSummary.breakdown || []).map((item) => {
+                    return (
+                      <div
+                        key={item.star}
+                        className="flex items-center gap-3 text-xs"
+                      >
+                        <div className="w-10 flex items-center gap-1 font-bold text-[#575e70]">
+                          <span>{item.star}</span>
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        </div>
+                        <div className="flex-1 h-2 bg-[#e1e3e4] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-amber-400 rounded-full transition-all duration-300"
+                            style={{ width: `${item.percentage}%` }}
+                          />
+                        </div>
+                        <div className="w-8 text-right text-[11px] text-[#575e70]">
+                          {item.count}
+                        </div>
                       </div>
-                      <span className="w-8 text-right text-[#575e70] font-semibold">
-                        {row.count}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Customer Reviews List (Top 3 with interactive replies) */}
+              {/* Recent Reviews list */}
               {reviewsList.length > 0 ? (
-                <div className="space-y-4 mb-6">
+                <div className="space-y-4">
                   {reviewsList.slice(0, 3).map((rev) => (
                     <ReviewCard
                       key={rev.id}
                       review={rev}
-                      fieldId={fieldId}
+                      fieldId={field.id}
                       onEdit={(r) => {
                         setEditingReview(r);
-                        setIsWriteModalOpen(true);
+                        setIsWriteReviewOpen(true);
                       }}
                       onDelete={(r) => setDeletingReview(r)}
                       onAddComment={handleAddComment}
                     />
                   ))}
+
+                  {reviewsList.length > 3 && (
+                    <div className="pt-4 text-center">
+                      <Link
+                        href={`/fields/${field.id}/reviews`}
+                        className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl border border-[#006e2f] text-[#006e2f] text-xs font-bold hover:bg-[#006e2f]/10 transition-colors cursor-pointer"
+                      >
+                        <span>
+                          Xem tất cả {reviewSummary.totalReviews} đánh giá
+                        </span>
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="bg-[#f8f9fa] p-8 rounded-xl border border-[#bccbb9]/30 text-center flex flex-col items-center justify-center mb-6">
-                  <div className="w-12 h-12 rounded-full bg-white border border-[#bccbb9]/40 flex items-center justify-center mb-2 text-[#575e70]">
-                    <StarOff className="w-6 h-6 stroke-[1.8] text-[#575e70]" />
-                  </div>
-                  <p className="text-xs text-[#575e70]">
-                    Chưa có đánh giá nào cho sân này. Hãy là người đầu tiên đánh
+                <div className="text-center py-10 text-[#575e70]">
+                  <StarOff className="w-8 h-8 text-[#bccbb9] mx-auto mb-2" />
+                  <p className="text-xs">
+                    Chưa có bài đánh giá nào cho sân bóng này.
+                  </p>
+                  <p className="text-[11px] text-[#575e70] mt-1">
+                    Hãy hoàn thành lượt đặt sân để trở thành người đầu tiên đánh
                     giá!
                   </p>
                 </div>
               )}
-
-              {/* Link to All Reviews Page */}
-              <div className="pt-2 text-center border-t border-[#bccbb9]/30">
-                <Link
-                  href={`/fields/${fieldId}/reviews`}
-                  className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-[#006e2f] hover:underline p-2 rounded-xl transition-all"
-                >
-                  <span>
-                    Xem tất cả {reviewsList.length} đánh giá & bình luận
-                  </span>
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              </div>
             </div>
-
-            {/* Modals for Write/Edit/Delete Reviews */}
-            <WriteReviewModal
-              isOpen={isWriteModalOpen}
-              onClose={() => {
-                setIsWriteModalOpen(false);
-                setEditingReview(null);
-              }}
-              onSubmit={handleCreateOrUpdateReview}
-              initialReview={editingReview}
-            />
-
-            <DeleteReviewDialog
-              isOpen={Boolean(deletingReview)}
-              onClose={() => setDeletingReview(null)}
-              onConfirm={handleConfirmDelete}
-            />
           </div>
 
-          {/* ==========================================
-              RIGHT COLUMN (4 COLS): STICKY BOOKING WIDGET
-          ========================================== */}
-          <div className="lg:col-span-5 xl:col-span-4">
-            <div className="sticky top-6 bg-white rounded-2xl p-6 border border-[#bccbb9]/50 shadow-xl space-y-5">
-              {/* Header Widget */}
-              <div className="flex justify-between items-end pb-4 border-b border-[#bccbb9]/40">
+          {/* Right Column: Sticky Booking Widget (4 cols) */}
+          <div className="lg:col-span-4 sticky top-6 space-y-6">
+            <div className="bg-white rounded-3xl p-6 border border-[#bccbb9]/40 shadow-sm">
+              {/* Header Price */}
+              <div className="flex items-baseline justify-between gap-2 pb-4 mb-5 border-b border-[#bccbb9]/30">
                 <div>
-                  <span className="text-xs font-semibold text-[#575e70] uppercase">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#575e70] block">
                     Giá thuê sân
                   </span>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-[#006e2f] font-['Manrope']">
-                    {currentRate.toLocaleString('vi-VN')}đ
-                    <span className="text-xs font-normal text-[#575e70]">
-                      /giờ
+                  <div className="flex items-baseline gap-1">
+                    <span className="font-['Manrope'] text-2xl sm:text-3xl font-black text-[#006e2f]">
+                      {pricePerHour.toLocaleString('vi-VN')}đ
                     </span>
+                    <span className="text-xs text-[#575e70]">/giờ</span>
                   </div>
                 </div>
-                <span className="text-xs px-2.5 py-1 rounded-full bg-[#22c55e]/10 text-[#006e2f] font-bold border border-[#22c55e]/20">
-                  {currentSubPitch?.type || 'Sân 5'}
+                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#006e2f]/10 text-[#006e2f]">
+                  {fieldTypeName}
                 </span>
               </div>
 
-              {/* 1. Chọn Cụm sân / Sub Pitch */}
-              <div>
-                <label
-                  htmlFor="sub-pitch"
-                  className="block text-xs font-bold text-[#191c1d] uppercase tracking-wider mb-2"
-                >
+              {/* Step 1: Chọn sân con */}
+              <div className="mb-5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#191c1d] mb-2.5">
                   1. Chọn sân thi đấu
                 </label>
-                <select
-                  id="sub-pitch"
-                  value={selectedSubPitch}
-                  onChange={(e) => handleChangeSubPitch(e.target.value)}
-                  className="w-full bg-[#f8f9fa] border border-[#bccbb9]/60 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-[#191c1d] outline-none focus:border-[#006e2f] focus:ring-2 focus:ring-[#006e2f]/20 cursor-pointer"
-                >
-                  {field.subPitches.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} — {p.pricePerHour.toLocaleString('vi-VN')}đ/h
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 2. Chọn Ngày (Quick 7 days tabs + Date input) */}
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-xs font-bold text-[#191c1d] uppercase tracking-wider">
-                    2. Chọn ngày đá
-                  </label>
-                  <span className="text-[11px] text-[#575e70] flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" /> 7 ngày tới
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 mb-2">
-                  {availableDates.map((item) => {
-                    const isSelected = selectedDate === item.iso;
+                <div className="space-y-2">
+                  {subPitches.map((p) => {
+                    const isSelected = selectedSubPitchId === p.id;
                     return (
                       <button
-                        key={item.iso}
+                        key={p.id}
                         type="button"
-                        onClick={() => handleChangeDate(item.iso)}
-                        aria-pressed={isSelected}
-                        className={`flex flex-col items-center py-2 px-1 rounded-xl border text-center transition-all ${
+                        onClick={() => setCustomSubPitchId(p.id)}
+                        className={`w-full text-left p-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
                           isSelected
-                            ? 'bg-[#006e2f] text-white border-[#006e2f] shadow-sm font-bold scale-[1.03]'
-                            : 'bg-[#f8f9fa] text-[#575e70] border-[#bccbb9]/40 hover:border-[#006e2f]/40 text-xs'
+                            ? 'border-[#006e2f] bg-[#006e2f]/5 text-[#006e2f] ring-1 ring-[#006e2f]'
+                            : 'border-[#bccbb9]/50 hover:bg-[#f8f9fa] text-[#191c1d]'
                         }`}
                       >
-                        <span className="text-[10px] leading-tight font-medium opacity-90">
-                          {item.dayName}
-                        </span>
-                        <span className="text-xs font-bold mt-0.5">
-                          {item.dayFormatted}
+                        <span>{p.name}</span>
+                        <span className="text-[11px] font-bold">
+                          {p.pricePerHour.toLocaleString('vi-VN')}đ/h
                         </span>
                       </button>
                     );
@@ -1265,118 +1323,135 @@ export default function FieldDetailPage({
                 </div>
               </div>
 
-              {/* 3. Chọn Khung giờ (Interactive 30-min slot picker) */}
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-xs font-bold text-[#191c1d] uppercase tracking-wider">
-                    3. Chọn khung giờ (30p / slot)
+              {/* Step 2: Chọn ngày thi đấu */}
+              <div className="mb-5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#191c1d] mb-2.5">
+                  2. Chọn ngày đặt sân
+                </label>
+                <div className="grid grid-cols-4 sm:grid-cols-4 gap-1.5">
+                  {next7Days.map((day) => {
+                    const isSelected = selectedDate === day.dateStr;
+                    return (
+                      <button
+                        key={day.dateStr}
+                        type="button"
+                        onClick={() => setCustomDate(day.dateStr)}
+                        className={`p-2 rounded-xl text-center transition-all cursor-pointer border ${
+                          isSelected
+                            ? 'bg-[#006e2f] text-white border-[#006e2f] shadow-xs'
+                            : 'bg-white border-[#bccbb9]/40 text-[#191c1d] hover:bg-[#f8f9fa]'
+                        }`}
+                      >
+                        <div className="text-[10px] font-medium opacity-90 truncate">
+                          {day.dayName}
+                        </div>
+                        <div className="text-xs font-bold">
+                          {day.displayDate}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Step 3: Chọn khung giờ 30 phút */}
+              <div className="mb-5">
+                <div className="flex items-center justify-between mb-2.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#191c1d]">
+                    3. Chọn khung giờ (30p/slot)
                   </label>
-                  <div className="flex items-center gap-2 text-[10px] text-[#575e70]">
-                    <span className="flex items-center gap-1">
-                      <span className="w-2.5 h-2.5 rounded-sm bg-white border border-[#bccbb9] block" />{' '}
-                      Trống
+                  {selectedSlots.length > 0 && (
+                    <span className="text-[11px] font-bold text-[#006e2f]">
+                      Đã chọn: {durationHours * 60} phút
                     </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2.5 h-2.5 rounded-sm bg-[#006e2f] block" />{' '}
-                      Đang chọn
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2.5 h-2.5 rounded-sm bg-[#edeeef] line-through block" />{' '}
-                      Đã đặt
-                    </span>
-                  </div>
+                  )}
                 </div>
 
-                {/* Slot groups */}
-                <div className="space-y-2.5 bg-[#f8f9fa] p-3 rounded-xl border border-[#bccbb9]/30">
-                  {/* Buổi tối (Giờ cao điểm) */}
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                  {/* Sáng */}
                   <div>
-                    <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1 mb-1.5">
-                      <Flame className="w-3.5 h-3.5 text-amber-500" /> Tối & Giờ
-                      vàng (17:00 - 23:00)
-                    </span>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {TIME_INTERVALS.evening.map((slot) => {
-                        const isBooked =
-                          BOOKED_SLOTS_MAP.default.includes(slot);
-                        const isSelected = selectedSlots.includes(slot);
-                        return (
-                          <button
-                            key={slot}
-                            type="button"
-                            disabled={isBooked}
-                            aria-pressed={isSelected}
-                            onClick={() => handleToggleSlot(slot)}
-                            className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all ${
-                              isBooked
-                                ? 'bg-[#edeeef] text-[#575e70]/50 cursor-not-allowed line-through'
-                                : isSelected
-                                  ? 'bg-[#006e2f] text-white font-bold shadow-sm'
-                                  : 'bg-white text-[#191c1d] border border-[#bccbb9]/50 hover:border-[#006e2f] hover:text-[#006e2f]'
-                            }`}
-                          >
-                            {slot}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Buổi chiều */}
-                  <div>
-                    <span className="text-[11px] font-bold text-[#575e70] block mb-1.5">
-                      Chiều (12:00 - 17:00)
-                    </span>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {TIME_INTERVALS.afternoon.map((slot) => {
-                        const isBooked =
-                          BOOKED_SLOTS_MAP.default.includes(slot);
-                        const isSelected = selectedSlots.includes(slot);
-                        return (
-                          <button
-                            key={slot}
-                            type="button"
-                            disabled={isBooked}
-                            aria-pressed={isSelected}
-                            onClick={() => handleToggleSlot(slot)}
-                            className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all ${
-                              isBooked
-                                ? 'bg-[#edeeef] text-[#575e70]/50 cursor-not-allowed line-through'
-                                : isSelected
-                                  ? 'bg-[#006e2f] text-white font-bold shadow-sm'
-                                  : 'bg-white text-[#191c1d] border border-[#bccbb9]/50 hover:border-[#006e2f] hover:text-[#006e2f]'
-                            }`}
-                          >
-                            {slot}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Buổi sáng */}
-                  <div>
-                    <span className="text-[11px] font-bold text-[#575e70] block mb-1.5">
-                      Sáng (06:00 - 12:00)
+                    <span className="text-[10px] font-bold text-[#575e70] uppercase block mb-1.5">
+                      Buổi sáng (06:00 - 12:00)
                     </span>
                     <div className="grid grid-cols-4 gap-1.5">
                       {TIME_INTERVALS.morning.map((slot) => {
-                        const isBooked =
-                          BOOKED_SLOTS_MAP.default.includes(slot);
+                        const isPast = isSlotDisabled(slot);
                         const isSelected = selectedSlots.includes(slot);
                         return (
                           <button
                             key={slot}
                             type="button"
-                            disabled={isBooked}
-                            aria-pressed={isSelected}
+                            disabled={isPast}
                             onClick={() => handleToggleSlot(slot)}
-                            className={`py-1.5 px-1 rounded-lg text-xs font-semibold transition-all ${
-                              isBooked
-                                ? 'bg-[#edeeef] text-[#575e70]/50 cursor-not-allowed line-through'
+                            title={isPast ? 'Khung giờ đã qua' : undefined}
+                            className={`py-2 px-1 text-center rounded-lg text-xs font-semibold transition-all ${
+                              isPast
+                                ? 'bg-gray-100/80 text-[#575e70]/40 border border-gray-200 cursor-not-allowed line-through'
                                 : isSelected
-                                  ? 'bg-[#006e2f] text-white font-bold shadow-sm'
-                                  : 'bg-white text-[#191c1d] border border-[#bccbb9]/50 hover:border-[#006e2f] hover:text-[#006e2f]'
+                                  ? 'bg-[#006e2f] text-white shadow-xs cursor-pointer'
+                                  : 'bg-white border border-[#bccbb9]/40 text-[#191c1d] hover:border-[#006e2f] cursor-pointer'
+                            }`}
+                          >
+                            {slot}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Chiều */}
+                  <div>
+                    <span className="text-[10px] font-bold text-[#575e70] uppercase block mb-1.5">
+                      Buổi chiều (12:00 - 17:00)
+                    </span>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {TIME_INTERVALS.afternoon.map((slot) => {
+                        const isPast = isSlotDisabled(slot);
+                        const isSelected = selectedSlots.includes(slot);
+                        return (
+                          <button
+                            key={slot}
+                            type="button"
+                            disabled={isPast}
+                            onClick={() => handleToggleSlot(slot)}
+                            title={isPast ? 'Khung giờ đã qua' : undefined}
+                            className={`py-2 px-1 text-center rounded-lg text-xs font-semibold transition-all ${
+                              isPast
+                                ? 'bg-gray-100/80 text-[#575e70]/40 border border-gray-200 cursor-not-allowed line-through'
+                                : isSelected
+                                  ? 'bg-[#006e2f] text-white shadow-xs cursor-pointer'
+                                  : 'bg-white border border-[#bccbb9]/40 text-[#191c1d] hover:border-[#006e2f] cursor-pointer'
+                            }`}
+                          >
+                            {slot}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Tối */}
+                  <div>
+                    <span className="text-[10px] font-bold text-[#575e70] uppercase block mb-1.5">
+                      Buổi tối (17:00 - 23:00)
+                    </span>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {TIME_INTERVALS.evening.map((slot) => {
+                        const isPast = isSlotDisabled(slot);
+                        const isSelected = selectedSlots.includes(slot);
+                        return (
+                          <button
+                            key={slot}
+                            type="button"
+                            disabled={isPast}
+                            onClick={() => handleToggleSlot(slot)}
+                            title={isPast ? 'Khung giờ đã qua' : undefined}
+                            className={`py-2 px-1 text-center rounded-lg text-xs font-semibold transition-all ${
+                              isPast
+                                ? 'bg-gray-100/80 text-[#575e70]/40 border border-gray-200 cursor-not-allowed line-through'
+                                : isSelected
+                                  ? 'bg-[#006e2f] text-white shadow-xs cursor-pointer'
+                                  : 'bg-white border border-[#bccbb9]/40 text-[#191c1d] hover:border-[#006e2f] cursor-pointer'
                             }`}
                           >
                             {slot}
@@ -1388,275 +1463,291 @@ export default function FieldDetailPage({
                 </div>
               </div>
 
-              {/* 4. Voucher / Mã giảm giá */}
-              <div>
-                <label
-                  htmlFor="voucher-code"
-                  className="block text-xs font-bold text-[#191c1d] uppercase tracking-wider mb-2"
-                >
-                  4. Mã giảm giá
+              {/* Step 4: Voucher Input */}
+              <div className="mb-6 pt-4 border-t border-[#bccbb9]/30">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#191c1d] mb-2">
+                  Mã giảm giá (Voucher)
                 </label>
                 <div className="flex gap-2">
                   <input
-                    id="voucher-code"
                     type="text"
                     value={voucherCode}
-                    onChange={(e) => setVoucherCode(e.target.value)}
-                    placeholder="Ví dụ: KICKZONE50"
-                    className="flex-1 bg-[#f8f9fa] border border-[#bccbb9]/60 rounded-xl px-3 py-2 text-xs uppercase font-bold text-[#191c1d] outline-none focus:border-[#006e2f]"
+                    onChange={(e) =>
+                      setVoucherCode(e.target.value.toUpperCase())
+                    }
+                    placeholder="VD: KICKZONE50, KZ10..."
+                    className="flex-1 px-3.5 py-2 text-xs border border-[#bccbb9]/60 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#006e2f]/20 uppercase"
                   />
                   <Button
                     type="button"
+                    variant="outline"
                     onClick={handleApplyVoucher}
-                    className="bg-[#006e2f] hover:bg-[#005321] text-white text-xs font-bold px-4 rounded-xl"
+                    disabled={isValidatingVoucher}
+                    className="text-xs font-bold border-[#006e2f] text-[#006e2f] hover:bg-[#006e2f]/10 rounded-xl px-4 cursor-pointer"
                   >
-                    Áp dụng
+                    {isValidatingVoucher ? 'Đang kiểm tra...' : 'Áp dụng'}
                   </Button>
                 </div>
-                {/* Gợi ý voucher nhanh */}
-                <div className="flex items-center gap-2 mt-1.5">
-                  <span className="text-[10px] text-[#575e70]">Gợi ý:</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setVoucherCode('KICKZONE50');
-                      setAppliedVoucher({
-                        code: 'KICKZONE50',
-                        discount: 50000,
-                      });
-                      toast.success('Đã áp dụng mã KICKZONE50 (-50.000đ)!');
-                    }}
-                    className="text-[10px] font-bold text-[#006e2f] bg-[#006e2f]/10 px-2 py-0.5 rounded border border-[#006e2f]/20 hover:bg-[#006e2f]/20 transition-colors"
-                  >
-                    KICKZONE50 (-50k)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setVoucherCode('KZ10');
-                      const disc = Math.round(originalPrice * 0.1);
-                      setAppliedVoucher({ code: 'KZ10', discount: disc });
-                      toast.success('Đã áp dụng mã KZ10 (-10%)!');
-                    }}
-                    className="text-[10px] font-bold text-[#006e2f] bg-[#006e2f]/10 px-2 py-0.5 rounded border border-[#006e2f]/20 hover:bg-[#006e2f]/20 transition-colors"
-                  >
-                    KZ10 (-10%)
-                  </button>
-                </div>
+                {appliedVoucher && (
+                  <div className="mt-2 text-xs text-[#006e2f] flex items-center justify-between font-semibold">
+                    <span>
+                      Mã &quot;{appliedVoucher.code}&quot; đã được áp dụng
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppliedVoucher(null);
+                        setVoucherCode('');
+                      }}
+                      className="text-rose-500 hover:underline text-[11px] cursor-pointer"
+                    >
+                      Bỏ mã
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {/* 5. Bảng kê tính giá tự động */}
-              <div className="bg-[#f8f9fa] rounded-xl p-4 border border-[#bccbb9]/40 space-y-2 text-xs">
+              {/* Pricing Breakdown */}
+              <div className="space-y-2 p-4 rounded-2xl bg-[#f8f9fa] border border-[#bccbb9]/30 mb-6 text-xs">
                 <div className="flex justify-between text-[#575e70]">
-                  <span>Thời lượng thi đấu:</span>
+                  <span>Thời lượng:</span>
                   <span className="font-bold text-[#191c1d]">
-                    {selectedSlots.length > 0
-                      ? `${durationHours} giờ (${selectedSlots.length} slot)`
-                      : 'Chưa chọn'}
+                    {durationHours} giờ ({selectedSlots.length} slot)
                   </span>
                 </div>
                 <div className="flex justify-between text-[#575e70]">
-                  <span>Đơn giá sân:</span>
-                  <span className="font-medium">
-                    {currentRate.toLocaleString('vi-VN')}đ/h
-                  </span>
-                </div>
-                <div className="flex justify-between text-[#575e70]">
-                  <span>Tạm tính:</span>
-                  <span className="font-bold text-[#191c1d]">
-                    {originalPrice.toLocaleString('vi-VN')}đ
+                  <span>Đơn giá:</span>
+                  <span className="font-semibold text-[#191c1d]">
+                    {pricePerHour.toLocaleString('vi-VN')}đ/h
                   </span>
                 </div>
                 {appliedVoucher && (
                   <div className="flex justify-between text-[#006e2f] font-semibold">
-                    <span>Voucher ({appliedVoucher.code}):</span>
-                    <span>
-                      -{appliedVoucher.discount.toLocaleString('vi-VN')}đ
-                    </span>
+                    <span>Giảm giá voucher:</span>
+                    <span>-{discountAmount.toLocaleString('vi-VN')}đ</span>
                   </div>
                 )}
-                <div className="flex justify-between text-[#575e70]">
-                  <span>Phí dịch vụ & chiếu sáng:</span>
-                  <span className="text-[#006e2f] font-semibold">
-                    Miễn phí (0đ)
+                <div className="pt-2 border-t border-[#bccbb9]/30 flex justify-between items-baseline">
+                  <span className="font-bold text-[#191c1d] text-sm">
+                    Tổng tạm tính:
                   </span>
-                </div>
-
-                <div className="pt-2 border-t border-[#bccbb9]/40 flex justify-between items-center">
-                  <span className="font-extrabold text-sm text-[#191c1d]">
-                    Tổng thanh toán:
+                  <span className="font-['Manrope'] font-extrabold text-xl text-[#006e2f]">
+                    {finalPrice.toLocaleString('vi-VN')}đ
                   </span>
-                  <div className="text-right">
-                    <span className="text-xl font-extrabold text-[#006e2f] font-['Manrope'] block">
-                      {finalPrice.toLocaleString('vi-VN')}đ
-                    </span>
-                    <span className="text-[10px] text-[#575e70]">
-                      Đã bao gồm VAT
-                    </span>
-                  </div>
                 </div>
               </div>
 
-              {/* Primary CTA */}
+              {/* Submit CTA */}
               <Button
-                onClick={handleProceedBooking}
+                type="button"
+                onClick={handleProceedToCheckout}
                 disabled={selectedSlots.length === 0}
-                className="w-full py-6 rounded-xl text-base font-bold bg-[#006e2f] hover:bg-[#005321] text-white shadow-lg shadow-[#006e2f]/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full bg-[#006e2f] hover:bg-[#004b1e] disabled:bg-[#bccbb9] text-white font-bold py-3 rounded-2xl transition-all active:scale-98 shadow-sm flex items-center justify-center gap-2 cursor-pointer"
               >
-                Đặt sân ngay
+                <span>
+                  {selectedSlots.length === 0
+                    ? 'Vui lòng chọn khung giờ'
+                    : 'Tiến hành đặt sân'}
+                </span>
+                {selectedSlots.length > 0 && <ArrowRight className="w-4 h-4" />}
               </Button>
-
-              <div className="flex items-center justify-center gap-4 text-[11px] text-[#575e70] pt-1">
-                <span className="flex items-center gap-1">
-                  <Shield className="w-3.5 h-3.5 text-[#006e2f]" /> Giữ chỗ tức
-                  thì
-                </span>
-                <span className="flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#006e2f]" /> Hoàn
-                  hủy linh hoạt
-                </span>
-              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ==========================================
-          SIMILAR FIELDS RECOMMENDED (BOTTOM)
-      ========================================== */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h3 className="text-xl font-bold text-[#191c1d] font-['Manrope']">
-              Sân bóng tương tự lân cận
-            </h3>
-            <p className="text-xs text-[#575e70]">
-              Các sân bóng cỏ nhân tạo chất lượng tốt khác trong khu vực
-            </p>
-          </div>
-          <Link
-            href="/fields"
-            className="text-xs font-bold text-[#006e2f] hover:underline flex items-center gap-1"
+      {/* 5. Lightbox Modal Gallery */}
+      {isGalleryOpen && (
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-4">
+          <button
+            type="button"
+            onClick={() => setIsGalleryOpen(false)}
+            className="absolute top-5 right-5 text-white/80 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+            aria-label="Đóng thư viện ảnh"
           >
-            Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
+            <X className="w-6 h-6" />
+          </button>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {[
-            {
-              id: '2',
-              name: 'Sân bóng K34',
-              location: 'Nguyễn Thị Minh Khai, Quận 1',
-              price: 300000,
-              rating: 4.5,
-              image:
-                'https://lh3.googleusercontent.com/aida-public/AB6AXuC3Rq8ne4IOVVio5VQy3uaUSlBYmkmgetmT20pt5-fgTOOZgnCBxzUc9RzETSFMsbKADKJZSwChjnHmm_sr-7aKTnl8wkNAZtEcwYF__8UJUJdAzeUDOurOC6k1kWsYiPQVdp31h24McPQ5-4rzObUdgsrTNpsJAA_-3KuLkN342DGPvl8jzGzZshku4eDc86lF7BM8ybPOYP5yojP7TGV8RI_HQAqk0TL_BHfbvXa8h3PlqTTqPEOIVA',
-            },
-            {
-              id: '3',
-              name: 'Sân ĐH Tôn Đức Thắng',
-              location: 'Nguyễn Hữu Thọ, Quận 7',
-              price: 800000,
-              rating: 4.9,
-              image:
-                'https://lh3.googleusercontent.com/aida-public/AB6AXuA2xE5yic2QHVvAqARF7Bnyi4HqzWmPfrZDHikx8s3unwe_Ge_sVVJ0ClvSMNaoPL8Fe-1xO9NnM19thd8s-h7uSOUkSSCu1gODikd4Gd-P_mza95dVWCZlhwbFlXdhAiY5m1ljnfxxqwx1loSCGMvEs4WOOG9fu5HhvxQR-37aqtHQ76ihT-Yb35-_2J4oT3iJWU8aoPUzGn9eso_QXWawiSKb436K4Lartu7XiFxnF4I08vv9MXyrOA',
-            },
-            {
-              id: '4',
-              name: 'Sân mini Lan Anh',
-              location: 'Cách Mạng Tháng 8, Quận 10',
-              price: 350000,
-              rating: 4.6,
-              image:
-                'https://lh3.googleusercontent.com/aida-public/AB6AXuDrDOm7rj2skKxqydXGm_2fCgpc8cOSpWpfQNWUjSyk-4a8dJ67OgaVYU9_8gXoZ7zVsNGiHktsLNrqgaBE1jMnGFe72lXAoL0bQmZNUNz0h8Wq87FFOo9oVZ2a87dzJkPll6s7TwgQcznmgYmfIyimnqqxY8RK6lLhDcZ4Bit1ySrjYbD52BLS0WIM6cOxPrR_ocu92EJjPiaknq_yREXKh7BKesXc5k_Se9YStukY_4DUzkvKvmPf1Q',
-            },
-          ].map((item) => (
-            <Link key={item.id} href={`/fields/${item.id}`}>
-              <div className="bg-white rounded-2xl border border-[#bccbb9]/40 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col h-full">
-                <div className="h-44 relative overflow-hidden bg-slate-100">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded text-xs font-semibold bg-[#22c55e] text-[#004b1e]">
-                    Còn sân
-                  </div>
-                </div>
-                <div className="p-4 flex-1 flex flex-col justify-between">
-                  <div>
-                    <h4 className="font-bold text-sm text-[#191c1d] group-hover:text-[#006e2f] transition-colors line-clamp-1 mb-1">
-                      {item.name}
-                    </h4>
-                    <div className="flex items-center gap-1 text-[#575e70] text-xs mb-2">
-                      <MapPin className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">{item.location}</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center pt-3 border-t border-[#bccbb9]/30">
-                    <span className="text-sm font-extrabold text-[#006e2f] font-['Manrope']">
-                      {item.price.toLocaleString('vi-VN')}đ
-                      <span className="text-xs font-normal text-[#575e70]">
-                        /h
-                      </span>
-                    </span>
-                    <div className="flex items-center text-xs font-bold text-[#006e2f] gap-0.5">
-                      <Star className="w-3.5 h-3.5 fill-[#006e2f]" />
-                      <span>{item.rating}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* ==========================================
-          MODAL: FULLSCREEN LIGHTBOX IMAGE VIEWER
-      ========================================== */}
-      {isLightboxOpen && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col p-4">
-          <div className="flex justify-between items-center text-white pb-3">
-            <span className="text-sm font-semibold">
-              {field.name} — Ảnh {activeImageIndex + 1}/{field.images.length}
-            </span>
-            <button
-              onClick={() => setIsLightboxOpen(false)}
-              className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-          <div className="flex-1 flex items-center justify-center relative overflow-hidden">
+          <div className="relative max-w-5xl max-h-[75vh] w-full h-full flex items-center justify-center mb-4">
             <img
-              src={field.images[activeImageIndex]}
-              alt="Chi tiết"
-              className="max-h-[80vh] max-w-[90vw] object-contain rounded-xl shadow-2xl"
+              src={fieldImages[selectedPhotoIndex] || fieldImages[0]}
+              alt={`${field.name} ${selectedPhotoIndex + 1}`}
+              className="max-w-full max-h-full object-contain rounded-2xl"
             />
+
+            {fieldImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedPhotoIndex(
+                      (selectedPhotoIndex - 1 + fieldImages.length) %
+                        fieldImages.length,
+                    )
+                  }
+                  className="absolute left-2 sm:left-4 p-3 rounded-full bg-black/60 text-white hover:bg-black/90 transition-all cursor-pointer"
+                  aria-label="Ảnh trước"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedPhotoIndex(
+                      (selectedPhotoIndex + 1) % fieldImages.length,
+                    )
+                  }
+                  className="absolute right-2 sm:right-4 p-3 rounded-full bg-black/60 text-white hover:bg-black/90 transition-all cursor-pointer"
+                  aria-label="Ảnh sau"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
+            )}
           </div>
-          <div className="flex justify-center gap-2 overflow-x-auto py-3">
-            {field.images.map((img, idx) => (
-              <button
-                key={idx}
-                onClick={() => setActiveImageIndex(idx)}
-                className={`w-16 h-12 rounded-lg overflow-hidden border-2 transition-all ${
-                  activeImageIndex === idx
-                    ? 'border-[#22c55e] scale-105'
-                    : 'border-transparent opacity-50'
-                }`}
-              >
-                <img
-                  src={img}
-                  alt={`Thumb ${idx}`}
-                  className="w-full h-full object-cover"
-                />
-              </button>
-            ))}
+
+          {/* Thumbnails row */}
+          {fieldImages.length > 1 && (
+            <div className="flex gap-2 max-w-xl overflow-x-auto pb-2">
+              {fieldImages.map((img, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSelectedPhotoIndex(i)}
+                  className={`w-16 h-12 sm:w-20 sm:h-14 rounded-xl overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
+                    selectedPhotoIndex === i
+                      ? 'border-[#22c55e] scale-105'
+                      : 'border-transparent opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <img
+                    src={img}
+                    alt={`Thumb ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 6. Review Eligibility Dialog */}
+      {showEligibilityDialog && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in-0">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-[#bccbb9]/40 shadow-2xl text-center">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto mb-4">
+              <Info className="w-7 h-7 stroke-[1.8]" />
+            </div>
+
+            {eligibilityReason === 'not_logged_in_booking' ? (
+              <>
+                <h3 className="font-['Manrope'] text-lg font-extrabold text-[#191c1d] mb-2">
+                  Yêu cầu đăng nhập tài khoản
+                </h3>
+                <p className="text-xs text-[#575e70] leading-relaxed mb-6">
+                  Bạn cần đăng nhập tài khoản KickZone để tiếp tục tiến hành đặt
+                  sân tại <strong>{field.name}</strong>.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <Button
+                    onClick={() =>
+                      router.push(`/login?redirect=/fields/${field.id}`)
+                    }
+                    className="flex-1 bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-bold rounded-xl py-2.5 cursor-pointer"
+                  >
+                    Đăng nhập ngay
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowEligibilityDialog(false)}
+                    className="flex-1 border-[#bccbb9]/60 text-xs font-semibold rounded-xl py-2.5 cursor-pointer"
+                  >
+                    Đóng
+                  </Button>
+                </div>
+              </>
+            ) : eligibilityReason === 'not_logged_in_review' ? (
+              <>
+                <h3 className="font-['Manrope'] text-lg font-extrabold text-[#191c1d] mb-2">
+                  Yêu cầu đăng nhập tài khoản
+                </h3>
+                <p className="text-xs text-[#575e70] leading-relaxed mb-6">
+                  Bạn cần đăng nhập tài khoản KickZone và có ít nhất 1 lượt đặt
+                  sân đã hoàn thành tại <strong>{field.name}</strong> để viết
+                  bài đánh giá.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <Button
+                    onClick={() =>
+                      router.push(`/login?redirect=/fields/${field.id}`)
+                    }
+                    className="flex-1 bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-bold rounded-xl py-2.5 cursor-pointer"
+                  >
+                    Đăng nhập ngay
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowEligibilityDialog(false)}
+                    className="flex-1 border-[#bccbb9]/60 text-xs font-semibold rounded-xl py-2.5 cursor-pointer"
+                  >
+                    Đóng
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="font-['Manrope'] text-lg font-extrabold text-[#191c1d] mb-2">
+                  Chưa đủ điều kiện đánh giá
+                </h3>
+                <p className="text-xs text-[#575e70] leading-relaxed mb-6">
+                  Theo quy định của KickZone, chỉ những tài khoản đã từng đặt
+                  sân và hoàn thành trận đấu tại <strong>{field.name}</strong>{' '}
+                  mới có thể gửi đánh giá nhằm đảm bảo tính chân thực và minh
+                  bạch.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <Button
+                    onClick={() => {
+                      setShowEligibilityDialog(false);
+                      window.scrollTo({ top: 400, behavior: 'smooth' });
+                    }}
+                    className="flex-1 bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-bold rounded-xl py-2.5 cursor-pointer"
+                  >
+                    Đặt sân ngay
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowEligibilityDialog(false)}
+                    className="flex-1 border-[#bccbb9]/60 text-xs font-semibold rounded-xl py-2.5 cursor-pointer"
+                  >
+                    Đã hiểu
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
+
+      {/* 7. Write / Edit Review Modal */}
+      <WriteReviewModal
+        isOpen={isWriteReviewOpen}
+        onClose={() => {
+          setIsWriteReviewOpen(false);
+          setEditingReview(null);
+        }}
+        onSubmit={handleCreateOrUpdateReview}
+        initialReview={editingReview}
+      />
+
+      {/* 8. Delete Review Confirmation Dialog */}
+      <DeleteReviewDialog
+        isOpen={Boolean(deletingReview)}
+        onClose={() => setDeletingReview(null)}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }
