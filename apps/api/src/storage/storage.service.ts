@@ -141,4 +141,58 @@ export class StorageService {
       publicUrl: urlData.publicUrl || filePath,
     };
   }
+
+  async uploadAvatar(
+    file: Express.Multer.File,
+    userId: string,
+  ): Promise<UploadResult> {
+    if (!this.supabase) {
+      throw new InternalServerErrorException(
+        'Supabase Storage is not configured',
+      );
+    }
+
+    await this.ensureBucketExists();
+
+    const originalName = file.originalname || 'avatar.jpg';
+    const ext = originalName.includes('.')
+      ? originalName.split('.').pop()
+      : 'jpg';
+    const filePath = `avatars/${userId}/${Date.now()}-${randomUUID()}.${ext}`;
+
+    let { error } = await this.supabase.storage
+      .from(this.defaultBucket)
+      .upload(filePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (error && error.message.toLowerCase().includes('not found')) {
+      this.bucketChecked = false;
+      await this.ensureBucketExists();
+      const retryResult = await this.supabase.storage
+        .from(this.defaultBucket)
+        .upload(filePath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: false,
+        });
+      error = retryResult.error;
+    }
+
+    if (error) {
+      this.logger.error(`Storage avatar upload error: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Lỗi tải lên avatar: ${error.message}`,
+      );
+    }
+
+    const { data: urlData } = this.supabase.storage
+      .from(this.defaultBucket)
+      .getPublicUrl(filePath);
+
+    return {
+      storagePath: urlData.publicUrl || filePath,
+      publicUrl: urlData.publicUrl || filePath,
+    };
+  }
 }

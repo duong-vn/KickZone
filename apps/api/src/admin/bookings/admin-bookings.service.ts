@@ -281,12 +281,22 @@ export class AdminBookingsService {
     return this.findOne(id);
   }
 
-  async getCalendar(from?: string, to?: string) {
+  async getCalendar(from?: string, to?: string, fieldId?: string) {
     const where: Prisma.bookingsWhereInput = {
       status: {
-        in: [booking_status.PENDING, booking_status.CONFIRMED],
+        in: [
+          booking_status.PENDING,
+          booking_status.CONFIRMED,
+          booking_status.COMPLETED,
+          booking_status.REJECTED,
+          booking_status.CANCELLED,
+        ],
       },
     };
+
+    if (fieldId && fieldId !== 'all') {
+      where.field_id = fieldId;
+    }
 
     if (from || to) {
       where.start_time = {};
@@ -298,8 +308,22 @@ export class AdminBookingsService {
       where,
       orderBy: { start_time: 'asc' },
       include: {
-        fields: { select: { id: true, name: true } },
-        profiles: { select: { id: true, full_name: true, phone: true } },
+        fields: {
+          select: {
+            id: true,
+            name: true,
+            field_types: { select: { name: true } },
+          },
+        },
+        profiles: {
+          select: {
+            id: true,
+            full_name: true,
+            phone: true,
+            email: true,
+            avatar_path: true,
+          },
+        },
       },
     });
 
@@ -307,9 +331,12 @@ export class AdminBookingsService {
       id: b.id,
       code: b.code,
       fieldId: b.field_id,
-      fieldName: b.fields.name,
-      customerName: b.profiles.full_name || 'Khách hàng',
-      customerPhone: b.profiles.phone || '',
+      fieldName: b.fields?.name || '',
+      fieldTypeLabel: b.fields?.field_types?.name || 'Sân bóng',
+      customerName: b.profiles?.full_name || 'Khách hàng',
+      customerPhone: b.profiles?.phone || '',
+      customerEmail: b.profiles?.email || '',
+      customerAvatar: b.profiles?.avatar_path || undefined,
       startTime: b.start_time.toISOString(),
       endTime: b.end_time.toISOString(),
       status: b.status,

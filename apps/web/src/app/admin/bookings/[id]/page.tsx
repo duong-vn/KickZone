@@ -179,6 +179,32 @@ export default function AdminBookingDetailPage({
     return new Intl.NumberFormat('vi-VN').format(value) + ' đ';
   };
 
+  const formatDateVN = (dateStr: string) => {
+    if (!dateStr) return '';
+    const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+    const parts = cleanDate.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
+
+  const formatDateTimeVN = (isoStr: string) => {
+    if (!isoStr) return '';
+    try {
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return isoStr;
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${hours}:${minutes} - ${day}/${month}/${year}`;
+    } catch {
+      return isoStr;
+    }
+  };
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
@@ -327,7 +353,7 @@ export default function AdminBookingDetailPage({
           </div>
           <p className="flex items-center gap-1.5 text-xs sm:text-sm text-[#575e70]">
             <Clock className="h-4 w-4" />
-            <span>Tạo lúc: {booking.createdAt}</span>
+            <span>Tạo lúc: {formatDateTimeVN(booking.createdAt)}</span>
           </p>
         </div>
 
@@ -352,11 +378,17 @@ export default function AdminBookingDetailPage({
             </h3>
 
             <div className="flex items-center gap-4 rounded-xl bg-[#f8f9fa] p-4 border border-[#bccbb9]/40">
-              <img
-                src={booking.user.avatarUrl}
-                alt={booking.user.fullName}
-                className="h-16 w-16 shrink-0 rounded-full border border-[#bccbb9] object-cover"
-              />
+              {booking.user.avatarUrl ? (
+                <img
+                  src={booking.user.avatarUrl}
+                  alt={booking.user.fullName}
+                  className="h-16 w-16 shrink-0 rounded-full border border-[#bccbb9] object-cover"
+                />
+              ) : (
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#dce2f3] text-xl font-bold text-[#151c27]">
+                  {booking.user.fullName.charAt(0)}
+                </div>
+              )}
               <div className="flex-1 space-y-1">
                 <p className="font-(family-name:--font-manrope) text-base sm:text-lg font-bold text-[#191c1d]">
                   {booking.user.fullName}
@@ -419,7 +451,7 @@ export default function AdminBookingDetailPage({
                   Ngày đá
                 </p>
                 <p className="font-(family-name:--font-manrope) text-base font-bold text-[#191c1d]">
-                  {booking.bookingDate}
+                  {formatDateVN(booking.bookingDate)}
                 </p>
               </div>
 

@@ -29,8 +29,12 @@ export class AdminBookingsController {
   }
 
   @Get('calendar')
-  getCalendar(@Query('from') from?: string, @Query('to') to?: string) {
-    return this.bookingsService.getCalendar(from, to);
+  getCalendar(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('fieldId') fieldId?: string,
+  ) {
+    return this.bookingsService.getCalendar(from, to, fieldId);
   }
 
   @Get(':id')

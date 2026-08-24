@@ -14,8 +14,14 @@ import { StorageModule } from './storage/storage.module';
 import { AdminModule } from './admin/admin.module';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), AuthModule, FavoritesModule],
+  imports: [
+    ScheduleModule.forRoot(),
+    AuthModule,
+    FavoritesModule,
+    StorageModule,
+    AdminModule,
+  ],
   controllers: [AppController, FieldsController, VouchersController],
   providers: [AppService, FieldsService, VouchersService, PrismaService],
 })
-export class AppModule { }
+export class AppModule {}

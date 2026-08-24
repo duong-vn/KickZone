@@ -13,10 +13,13 @@ import {
   LogOut,
   Bell,
   ChevronDown,
+  LayoutDashboard,
+  Shield,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { getSupabaseBrowserClient } from '@/lib/supabase';
+import { fetchCurrentUserProfile } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
@@ -38,6 +41,7 @@ export function SiteHeader() {
     email?: string;
     fullName?: string;
     avatarUrl?: string;
+    role?: string;
   } | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
@@ -49,45 +53,60 @@ export function SiteHeader() {
         setIsAuthLoading(false);
       };
 
+      const syncProfile = async (authUser: { email?: string; user_metadata?: Record<string, unknown> } | null) => {
+        if (!authUser) {
+          setCurrentUser(null);
+          return;
+        }
+
+        const metadata = authUser.user_metadata || {};
+        const fallbackUser = {
+          email: authUser.email,
+          fullName:
+            typeof metadata.full_name === 'string'
+              ? metadata.full_name
+              : (metadata.name as string | undefined),
+          avatarUrl:
+            typeof metadata.avatar_url === 'string'
+              ? metadata.avatar_url
+              : undefined,
+          role: (metadata.role as string) || (authUser.email?.toLowerCase().startsWith('admin') ? 'ADMIN' : 'USER'),
+        };
+
+        try {
+          const profile = await fetchCurrentUserProfile();
+          if (profile?.status === 'INACTIVE') {
+            await supabase.auth.signOut();
+            setCurrentUser(null);
+            return;
+          }
+
+          if (profile) {
+            setCurrentUser({
+              email: profile.email || fallbackUser.email,
+              fullName: profile.fullName || fallbackUser.fullName,
+              avatarUrl: profile.avatarUrl || fallbackUser.avatarUrl,
+              role: profile.role || fallbackUser.role,
+            });
+            return;
+          }
+        } catch {
+          // fallback to auth session metadata
+        }
+
+        setCurrentUser(fallbackUser);
+      };
+
       void supabase.auth.getUser().then(({ data, error }) => {
         if (error || !data.user) {
           setCurrentUser(null);
           return;
         }
-
-        const metadata = data.user.user_metadata;
-        setCurrentUser({
-          email: data.user.email,
-          fullName:
-            typeof metadata.full_name === 'string'
-              ? metadata.full_name
-              : undefined,
-          avatarUrl:
-            typeof metadata.avatar_url === 'string'
-              ? metadata.avatar_url
-              : undefined,
-        });
+        void syncProfile(data.user);
       });
 
       const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-        const currentUser = session?.user;
-        if (!currentUser) {
-          setCurrentUser(null);
-          return;
-        }
-
-        const metadata = currentUser.user_metadata;
-        setCurrentUser({
-          email: currentUser.email,
-          fullName:
-            typeof metadata.full_name === 'string'
-              ? metadata.full_name
-              : undefined,
-          avatarUrl:
-            typeof metadata.avatar_url === 'string'
-              ? metadata.avatar_url
-              : undefined,
-        });
+        void syncProfile(session?.user || null);
       });
 
       return () => data.subscription.unsubscribe();
@@ -235,11 +254,17 @@ export function SiteHeader() {
                   >
                     {/* Header info */}
                     <div className="px-3 py-2.5 border-b border-[#bccbb9]/30 mb-1">
-                      <div className="font-bold text-xs text-[#191c1d] flex items-center gap-1.5">
-                        <span>{displayName}</span>
-                        <span className="text-[10px] bg-[#22c55e]/15 text-[#006e2f] px-1.5 py-0.2 rounded font-bold">
-                          USER
-                        </span>
+                      <div className="font-bold text-xs text-[#191c1d] flex items-center justify-between gap-1.5">
+                        <span className="truncate">{displayName}</span>
+                        {user?.role === 'ADMIN' ? (
+                          <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded font-bold shrink-0">
+                            ADMIN
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-[#22c55e]/15 text-[#006e2f] border border-[#22c55e]/30 px-1.5 py-0.5 rounded font-bold shrink-0">
+                            USER
+                          </span>
+                        )}
                       </div>
                       <div className="text-[11px] text-[#575e70] truncate mt-0.5">
                         {user?.email}
@@ -248,6 +273,17 @@ export function SiteHeader() {
 
                     {/* Menu links */}
                     <div className="space-y-0.5 text-xs">
+                      {user?.role === 'ADMIN' && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-[#006e2f] bg-[#006e2f]/10 hover:bg-[#006e2f]/20 font-bold transition-colors mb-1"
+                        >
+                          <LayoutDashboard className="w-4 h-4 text-[#006e2f]" />
+                          <span>Trang Quản trị (Admin)</span>
+                        </Link>
+                      )}
+
                       <Link
                         href="/profile"
                         onClick={() => setDropdownOpen(false)}

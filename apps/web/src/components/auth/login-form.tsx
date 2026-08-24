@@ -12,11 +12,21 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
+import { fetchCurrentUserProfile } from '@/lib/api';
 
 type OAuthProvider = 'google' | 'facebook';
 
 function getLoginErrorMessage(message: string) {
   const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes('banned') ||
+    normalizedMessage.includes('disabled') ||
+    normalizedMessage.includes('vô hiệu hóa') ||
+    normalizedMessage.includes('khóa')
+  ) {
+    return 'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được kích hoạt lại.';
+  }
 
   if (normalizedMessage.includes('invalid login credentials')) {
     return 'Email hoặc mật khẩu không chính xác.';
@@ -57,6 +67,31 @@ export function LoginForm() {
       if (error) {
         setErrorMessage(getLoginErrorMessage(error.message));
         return;
+      }
+
+      // Check if account status in database is INACTIVE
+      try {
+        const profile = await fetchCurrentUserProfile();
+        if (profile && profile.status === 'INACTIVE') {
+          await supabase.auth.signOut();
+          setErrorMessage(
+            'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được kích hoạt lại.',
+          );
+          return;
+        }
+      } catch (err: unknown) {
+        const anyErr = err as { response?: { status?: number; data?: { message?: string } }; message?: string };
+        if (
+          anyErr?.response?.status === 403 ||
+          anyErr?.response?.data?.message?.includes('vô hiệu hóa') ||
+          anyErr?.response?.data?.message?.includes('khóa')
+        ) {
+          await supabase.auth.signOut();
+          setErrorMessage(
+            'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được kích hoạt lại.',
+          );
+          return;
+        }
       }
 
       toast.success('Đăng nhập thành công');

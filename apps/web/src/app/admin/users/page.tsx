@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchAdminUsers,
-  createAdminUser,
   updateAdminUserStatus,
 } from '@/lib/api';
 import {
@@ -83,18 +82,7 @@ export default function AdminUsersPage() {
 
   // Modal states
   const [viewingUser, setViewingUser] = useState<AdminUserItem | null>(null);
-  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // New user form state
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    phone: '',
-    role: 'USER' as UserRole,
-    status: 'ACTIVE' as UserStatus,
-  });
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -207,43 +195,6 @@ export default function AdminUsersPage() {
       showToast(`Đã duyệt kích hoạt tài khoản cho ${target.fullName}!`);
     } catch (err) {
       showToast(`Lỗi cập nhật: ${(err as Error).message}`);
-    }
-  };
-
-  // Add User submit
-  const handleAddUserSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.fullName.trim() || !formData.email.trim()) {
-      alert('Vui lòng nhập họ tên và email.');
-      return;
-    }
-
-    try {
-      await createAdminUser({
-        fullName: formData.fullName,
-        email: formData.email,
-        password: formData.password || 'KickZone@2026',
-        phone: formData.phone || undefined,
-        role: formData.role === 'ADMIN' ? 'ADMIN' : 'USER',
-        status: formData.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
-      });
-
-      await refetch();
-      showToast(`Đã thêm người dùng mới "${formData.fullName}" thành công!`);
-      setIsAddUserModalOpen(false);
-      setFormData({
-        fullName: '',
-        email: '',
-        password: '',
-        phone: '',
-        role: 'USER',
-        status: 'ACTIVE',
-      });
-    } catch (err: unknown) {
-      const errorMsg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || 'Có lỗi xảy ra khi tạo người dùng';
-      alert(errorMsg);
     }
   };
 
@@ -369,14 +320,13 @@ export default function AdminUsersPage() {
           </div>
 
           {/* Add User Button */}
-          <button
-            type="button"
-            onClick={() => setIsAddUserModalOpen(true)}
+          <Link
+            href="/admin/users/new"
             className="flex w-full md:w-auto items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[#006e2f] px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm transition-all hover:bg-[#004b1e] active:scale-95"
           >
             <UserPlus className="h-4 w-4" />
             <span>Thêm người dùng</span>
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -685,141 +635,6 @@ export default function AdminUsersPage() {
                 Đóng
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add User Modal */}
-      {isAddUserModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#191c1d]/40 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl border border-[#bccbb9] bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="flex items-start justify-between border-b border-[#bccbb9]/60 pb-3">
-              <div>
-                <h4 className="font-(family-name:--font-manrope) text-lg font-bold text-[#191c1d]">
-                  Thêm người dùng mới
-                </h4>
-                <p className="text-xs text-[#575e70]">
-                  Tạo hồ sơ người dùng trong hệ thống KickZone.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsAddUserModalOpen(false)}
-                className="rounded-lg p-1.5 text-[#575e70] hover:bg-[#e7e8e9]"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form
-              onSubmit={handleAddUserSubmit}
-              className="my-4 space-y-3.5 text-xs sm:text-sm"
-            >
-              <div>
-                <label className="mb-1 block font-semibold text-[#191c1d]">
-                  Họ và tên <span className="text-[#ba1a1a]">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.fullName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, fullName: e.target.value })
-                  }
-                  placeholder="Ví dụ: Nguyễn Văn A"
-                  className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block font-semibold text-[#191c1d]">
-                  Email <span className="text-[#ba1a1a]">*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  placeholder="name@example.com"
-                  className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block font-semibold text-[#191c1d]">
-                  Số điện thoại
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  placeholder="0901 234 567"
-                  className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block font-semibold text-[#191c1d]">
-                    Vai trò
-                  </label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        role: e.target.value as UserRole,
-                      })
-                    }
-                    className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none"
-                  >
-                    <option value="USER">Khách hàng</option>
-                    <option value="MANAGER">Chủ sân</option>
-                    <option value="ADMIN">Quản trị viên</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block font-semibold text-[#191c1d]">
-                    Trạng thái
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        status: e.target.value as UserStatus,
-                      })
-                    }
-                    className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none"
-                  >
-                    <option value="ACTIVE">Hoạt động</option>
-                    <option value="INACTIVE">Vô hiệu hóa</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddUserModalOpen(false)}
-                  className="rounded-xl border border-[#bccbb9] px-4 py-2 text-xs font-semibold text-[#575e70] hover:bg-[#e7e8e9]"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="flex items-center gap-1.5 rounded-xl bg-[#006e2f] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#004b1e]"
-                >
-                  <Check className="h-4 w-4" />
-                  <span>Lưu người dùng</span>
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

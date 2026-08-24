@@ -70,4 +70,9 @@ export class CreateUserDto {
     message: 'Trạng thái chỉ có thể là ACTIVE hoặc INACTIVE',
   })
   status?: 'ACTIVE' | 'INACTIVE';
+
+  @ApiPropertyOptional({ example: 'https://example.com/avatar.jpg' })
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string;
 }

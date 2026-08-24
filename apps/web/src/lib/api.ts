@@ -331,6 +331,14 @@ export async function updateAdminField(
   return res.data;
 }
 
+export async function fetchCurrentUserProfile() {
+  const token = await getAuthToken();
+  const res = await api.get('/users/me', {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
 export async function updateAdminUserStatus(
   id: string,
   status: 'ACTIVE' | 'INACTIVE',
@@ -353,6 +361,17 @@ export async function updateAdminUser(
   const token = await getAuthToken();
   const res = await api.patch(`/admin/users/${id}`, data, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
+export async function uploadAdminUserAvatar(userId: string, formData: FormData) {
+  const token = await getAuthToken();
+  const res = await api.post(`/admin/users/${userId}/avatar`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
   });
   return res.data;
 }
@@ -472,13 +491,14 @@ export async function rejectAdminBooking(id: string, reason?: string) {
 }
 
 export async function fetchAdminBookingCalendar(
-  fromOrParams?: { from?: string; to?: string } | string,
+  fromOrParams?: { from?: string; to?: string; fieldId?: string } | string,
   to?: string,
+  fieldId?: string,
 ) {
   const token = await getAuthToken();
   const params =
     typeof fromOrParams === 'string'
-      ? { from: fromOrParams, to }
+      ? { from: fromOrParams, to, ...(fieldId && { fieldId }) }
       : fromOrParams;
 
   const res = await api.get('/admin/bookings/calendar', {

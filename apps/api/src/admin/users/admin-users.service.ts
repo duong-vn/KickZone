@@ -9,6 +9,7 @@ import {
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { StorageService } from '../../storage/storage.service';
 import { CreateUserDto } from './dto/create-user.dto';
 
 @Injectable()
@@ -16,7 +17,10 @@ export class AdminUsersService {
   private readonly logger = new Logger(AdminUsersService.name);
   private supabase: SupabaseClient | null = null;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
+  ) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -176,8 +180,11 @@ export class AdminUsersService {
         email_confirm: true,
         user_metadata: {
           full_name: dto.fullName,
+          name: dto.fullName,
           phone: dto.phone || null,
+          ...(dto.avatarUrl && { avatar_url: dto.avatarUrl }),
         },
+        ...(dto.status === 'INACTIVE' && { ban_duration: '876000h' }),
       });
 
     if (authError) {
@@ -208,6 +215,7 @@ export class AdminUsersService {
         email: dto.email,
         full_name: dto.fullName,
         phone: dto.phone || null,
+        avatar_path: dto.avatarUrl || null,
         role: dto.role || 'USER',
         status: dto.status || 'ACTIVE',
       },
@@ -219,6 +227,7 @@ export class AdminUsersService {
       email: profile.email,
       fullName: profile.full_name,
       phone: profile.phone,
+      avatarUrl: profile.avatar_path,
       role: profile.role,
       status: profile.status,
       createdAt: profile.created_at.toISOString(),
@@ -232,10 +241,30 @@ export class AdminUsersService {
       throw new NotFoundException('Người dùng không tồn tại');
     }
 
-    return this.prisma.profiles.update({
+    const updated = await this.prisma.profiles.update({
       where: { id },
       data: { status },
     });
+
+    if (this.supabase && profile.auth_user_id) {
+      try {
+        if (status === 'INACTIVE') {
+          await this.supabase.auth.admin.updateUserById(profile.auth_user_id, {
+            ban_duration: '876000h',
+          });
+        } else {
+          await this.supabase.auth.admin.updateUserById(profile.auth_user_id, {
+            ban_duration: 'none',
+          });
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Could not sync ban status to Supabase Auth: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    return updated;
   }
 
   async updateUser(
@@ -245,6 +274,8 @@ export class AdminUsersService {
       phone?: string;
       role?: 'USER' | 'ADMIN';
       status?: 'ACTIVE' | 'INACTIVE';
+      avatarPath?: string;
+      avatarUrl?: string;
     },
   ) {
     const profile = await this.prisma.profiles.findUnique({ where: { id } });
@@ -252,14 +283,79 @@ export class AdminUsersService {
       throw new NotFoundException('Người dùng không tồn tại');
     }
 
-    return this.prisma.profiles.update({
+    const avatar = data.avatarPath || data.avatarUrl;
+
+    const updated = await this.prisma.profiles.update({
       where: { id },
       data: {
-        ...(data.fullName && { full_name: data.fullName }),
+        ...(data.fullName !== undefined && { full_name: data.fullName }),
         ...(data.phone !== undefined && { phone: data.phone }),
-        ...(data.role && { role: data.role }),
-        ...(data.status && { status: data.status }),
+        ...(data.role !== undefined && { role: data.role }),
+        ...(data.status !== undefined && { status: data.status }),
+        ...(avatar !== undefined && { avatar_path: avatar }),
       },
     });
+
+    if (this.supabase && profile.auth_user_id) {
+      try {
+        const updatePayload: {
+          user_metadata?: Record<string, unknown>;
+          ban_duration?: string;
+        } = {};
+
+        if (avatar) {
+          updatePayload.user_metadata = { avatar_url: avatar };
+        }
+        if (data.status === 'INACTIVE') {
+          updatePayload.ban_duration = '876000h';
+        } else if (data.status === 'ACTIVE') {
+          updatePayload.ban_duration = 'none';
+        }
+
+        if (Object.keys(updatePayload).length > 0) {
+          await this.supabase.auth.admin.updateUserById(
+            profile.auth_user_id,
+            updatePayload,
+          );
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Could not sync user changes to Supabase Auth: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    return updated;
+  }
+
+  async uploadAvatar(id: string, file: Express.Multer.File) {
+    const profile = await this.prisma.profiles.findUnique({ where: { id } });
+    if (!profile) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    const { publicUrl } = await this.storageService.uploadAvatar(file, id);
+
+    const updated = await this.prisma.profiles.update({
+      where: { id },
+      data: { avatar_path: publicUrl },
+    });
+
+    if (this.supabase && profile.auth_user_id) {
+      try {
+        await this.supabase.auth.admin.updateUserById(profile.auth_user_id, {
+          user_metadata: { avatar_url: publicUrl },
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Could not sync avatar to Supabase Auth: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    return {
+      avatarUrl: publicUrl,
+      profile: updated,
+    };
   }
 }

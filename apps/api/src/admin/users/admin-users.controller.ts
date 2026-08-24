@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -6,9 +7,12 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '../../auth/auth.guard';
 import { Roles } from '../../auth/roles.decorator';
 import { RolesGuard } from '../../auth/roles.guard';
@@ -55,6 +59,20 @@ export class AdminUsersController {
     return this.adminUsersService.createUser(dto);
   }
 
+  @Post(':id/avatar')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Admin: Upload avatar for user' })
+  uploadAvatar(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Vui lòng chọn file ảnh hợp lệ');
+    }
+    return this.adminUsersService.uploadAvatar(id, file);
+  }
+
   @Patch(':id/status')
   @ApiOperation({ summary: 'Admin: Update user active/inactive status' })
   updateStatus(
@@ -74,6 +92,8 @@ export class AdminUsersController {
       phone?: string;
       role?: 'USER' | 'ADMIN';
       status?: 'ACTIVE' | 'INACTIVE';
+      avatarUrl?: string;
+      avatarPath?: string;
     },
   ) {
     return this.adminUsersService.updateUser(id, body);

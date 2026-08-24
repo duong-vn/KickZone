@@ -38,6 +38,7 @@ export interface AdminBookingItem {
     fullName: string;
     phone: string;
     email: string;
+    avatarUrl?: string;
   };
   field: {
     id: string;
@@ -57,12 +58,53 @@ export interface AdminBookingItem {
   cancellationReason?: string;
 }
 
+const START_TIME_OPTIONS = [
+  { label: 'Tất cả giờ bắt đầu', value: '' },
+  { label: '05:00', value: '05:00' },
+  { label: '05:30', value: '05:30' },
+  { label: '06:00', value: '06:00' },
+  { label: '06:30', value: '06:30' },
+  { label: '07:00', value: '07:00' },
+  { label: '07:30', value: '07:30' },
+  { label: '08:00', value: '08:00' },
+  { label: '08:30', value: '08:30' },
+  { label: '09:00', value: '09:00' },
+  { label: '09:30', value: '09:30' },
+  { label: '10:00', value: '10:00' },
+  { label: '10:30', value: '10:30' },
+  { label: '11:00', value: '11:00' },
+  { label: '11:30', value: '11:30' },
+  { label: '12:00', value: '12:00' },
+  { label: '12:30', value: '12:30' },
+  { label: '13:00', value: '13:00' },
+  { label: '13:30', value: '13:30' },
+  { label: '14:00', value: '14:00' },
+  { label: '14:30', value: '14:30' },
+  { label: '15:00', value: '15:00' },
+  { label: '15:30', value: '15:30' },
+  { label: '16:00', value: '16:00' },
+  { label: '16:30', value: '16:30' },
+  { label: '17:00', value: '17:00' },
+  { label: '17:30', value: '17:30' },
+  { label: '18:00', value: '18:00' },
+  { label: '18:30', value: '18:30' },
+  { label: '19:00', value: '19:00' },
+  { label: '19:30', value: '19:30' },
+  { label: '20:00', value: '20:00' },
+  { label: '20:30', value: '20:30' },
+  { label: '21:00', value: '21:00' },
+  { label: '21:30', value: '21:30' },
+  { label: '22:00', value: '22:00' },
+  { label: '22:30', value: '22:30' },
+  { label: '23:00', value: '23:00' },
+];
+
 export default function AdminBookingsPage() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [bookingDateFilter, setBookingDateFilter] = useState('');
-  const [createdDateFilter, setCreatedDateFilter] = useState('');
+  const [startTimeFilter, setStartTimeFilter] = useState('');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -103,6 +145,7 @@ export default function AdminBookingsPage() {
           customerName: string;
           customerPhone: string;
           customerEmail: string;
+          customerAvatar?: string;
           fieldId: string;
           fieldName: string;
           fieldTypeLabel?: string;
@@ -124,6 +167,7 @@ export default function AdminBookingsPage() {
             fullName: item.customerName,
             phone: item.customerPhone,
             email: item.customerEmail,
+            avatarUrl: item.customerAvatar,
           },
           field: {
             id: item.fieldId,
@@ -148,7 +192,11 @@ export default function AdminBookingsPage() {
     return [];
   }, [apiResponse]);
 
-  const filteredBookings = bookings;
+  const filteredBookings = useMemo(() => {
+    if (!startTimeFilter) return bookings;
+    return bookings.filter((b) => b.startTime === startTimeFilter);
+  }, [bookings, startTimeFilter]);
+
   const totalRecords = apiResponse?.meta?.total ?? filteredBookings.length ?? 0;
   const totalPages =
     apiResponse?.meta?.totalPages ??
@@ -171,7 +219,8 @@ export default function AdminBookingsPage() {
 
   const formatDateVN = (dateStr: string) => {
     if (!dateStr) return '';
-    const parts = dateStr.split('-');
+    const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+    const parts = cleanDate.split('-');
     if (parts.length === 3) {
       return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
@@ -188,7 +237,7 @@ export default function AdminBookingsPage() {
     setSearchQuery('');
     setStatusFilter('');
     setBookingDateFilter('');
-    setCreatedDateFilter('');
+    setStartTimeFilter('');
     setCurrentPage(1);
   };
 
@@ -376,10 +425,51 @@ export default function AdminBookingsPage() {
           {/* Booking Date Range */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-[#575e70]">
-              Khoảng ngày đặt
+              Ngày đặt
             </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-[#575e70]" />
+            <div
+              onClick={(e) => {
+                const input = e.currentTarget.querySelector(
+                  'input[type="date"]',
+                ) as HTMLInputElement;
+                if (input) {
+                  if ('showPicker' in HTMLInputElement.prototype) {
+                    input.showPicker();
+                  } else {
+                    input.focus();
+                  }
+                }
+              }}
+              className="relative flex items-center justify-between rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-9 pr-3 text-xs sm:text-sm text-[#191c1d] transition-all hover:border-[#006e2f] focus-within:border-[#006e2f] focus-within:bg-white focus-within:ring-1 focus-within:ring-[#006e2f] cursor-pointer select-none"
+            >
+              <Calendar className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-[#575e70]" />
+              <span
+                className={
+                  bookingDateFilter
+                    ? 'text-[#191c1d] font-medium'
+                    : 'text-[#575e70]'
+                }
+              >
+                {bookingDateFilter
+                  ? formatDateVN(bookingDateFilter)
+                  : 'dd/mm/yyyy'}
+              </span>
+              <div className="flex items-center gap-1">
+                {bookingDateFilter && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBookingDateFilter('');
+                      setCurrentPage(1);
+                    }}
+                    className="z-10 rounded p-0.5 text-[#575e70] hover:bg-[#e7e8e9] hover:text-[#191c1d]"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <Calendar className="h-4 w-4 text-[#575e70] shrink-0 pointer-events-none" />
+              </div>
               <input
                 type="date"
                 value={bookingDateFilter}
@@ -387,27 +477,33 @@ export default function AdminBookingsPage() {
                   setBookingDateFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-9 pr-4 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
               />
             </div>
           </div>
 
-          {/* Created Date Range */}
+          {/* Start Time Select */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-[#575e70]">
-              Khoảng ngày tạo
+              Thời gian bắt đầu
             </label>
             <div className="relative">
-              <CalendarDays className="absolute left-3 top-2.5 h-4 w-4 text-[#575e70]" />
-              <input
-                type="date"
-                value={createdDateFilter}
+              <Clock className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-[#575e70]" />
+              <select
+                value={startTimeFilter}
                 onChange={(e) => {
-                  setCreatedDateFilter(e.target.value);
+                  setStartTimeFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-9 pr-4 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-              />
+                className="w-full appearance-none rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-9 pr-8 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
+              >
+                {START_TIME_OPTIONS.map((slot) => (
+                  <option key={slot.value} value={slot.value}>
+                    {slot.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronRight className="pointer-events-none absolute right-3 top-3 h-4 w-4 rotate-90 text-[#575e70]" />
             </div>
           </div>
         </div>
@@ -488,9 +584,17 @@ export default function AdminBookingsPage() {
                     {/* Khách hàng */}
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#dce2f3] text-xs font-bold text-[#151c27]">
-                          {booking.user.fullName.charAt(0)}
-                        </div>
+                        {booking.user.avatarUrl ? (
+                          <img
+                            src={booking.user.avatarUrl}
+                            alt={booking.user.fullName}
+                            className="h-8 w-8 shrink-0 rounded-full border border-[#bccbb9] object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#dce2f3] text-xs font-bold text-[#151c27]">
+                            {booking.user.fullName.charAt(0)}
+                          </div>
+                        )}
                         <div>
                           <p className="font-semibold text-[#191c1d]">
                             {booking.user.fullName}
@@ -608,11 +712,10 @@ export default function AdminBookingsPage() {
                   key={`page-${pageNum}`}
                   type="button"
                   onClick={() => setCurrentPage(Number(pageNum))}
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
-                    currentPage === pageNum
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${currentPage === pageNum
                       ? 'bg-[#006e2f] text-white shadow-sm'
                       : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
-                  }`}
+                    }`}
                 >
                   {pageNum}
                 </button>
@@ -657,26 +760,35 @@ export default function AdminBookingsPage() {
             <div className="my-4 space-y-4 text-xs sm:text-sm">
               {/* Customer Box */}
               <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-3.5">
-                <p className="mb-2 font-bold text-[#191c1d]">
+                <p className="mb-2.5 font-bold text-[#191c1d]">
                   Thông tin khách hàng
                 </p>
-                <div className="space-y-1.5 text-[#575e70]">
-                  <div className="flex justify-between">
-                    <span>Họ và tên:</span>
-                    <span className="font-semibold text-[#191c1d]">
+                <div className="flex items-center gap-3 mb-3 pb-3 border-b border-[#bccbb9]/40">
+                  {selectedBooking.user.avatarUrl ? (
+                    <img
+                      src={selectedBooking.user.avatarUrl}
+                      alt={selectedBooking.user.fullName}
+                      className="h-10 w-10 shrink-0 rounded-full border border-[#bccbb9] object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dce2f3] text-sm font-bold text-[#151c27]">
+                      {selectedBooking.user.fullName.charAt(0)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-sm text-[#191c1d] truncate">
                       {selectedBooking.user.fullName}
-                    </span>
+                    </p>
+                    <p className="text-xs text-[#575e70] truncate">
+                      {selectedBooking.user.email}
+                    </p>
                   </div>
+                </div>
+                <div className="space-y-1.5 text-[#575e70]">
                   <div className="flex justify-between">
                     <span>Số điện thoại:</span>
                     <span className="font-medium text-[#191c1d]">
-                      {selectedBooking.user.phone}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Email:</span>
-                    <span className="font-medium text-[#191c1d]">
-                      {selectedBooking.user.email}
+                      {selectedBooking.user.phone || 'Chưa cập nhật'}
                     </span>
                   </div>
                 </div>
