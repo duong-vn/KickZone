@@ -9,13 +9,13 @@ import {
   MapPin,
   Calendar,
   Clock,
-  Star,
   ArrowRight,
   CheckCircle2,
   Zap,
   ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { FieldCard } from '@/components/fields/field-card';
 
 // Helper format YYYY-MM-DD -> DD/MM/YYYY
 function formatDateDisplay(isoDate: string) {
@@ -244,64 +244,33 @@ export default function HomePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {FEATURED_FIELDS.map((field) => (
-            <div
+            <FieldCard
               key={field.id}
-              className="bg-white border border-[#bccbb9]/40 rounded-xl overflow-hidden shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] hover:shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1)] transition-shadow group flex flex-col p-2"
-            >
-              <div className="relative h-48 overflow-hidden rounded-lg bg-slate-100">
-                <img
-                  src={field.image}
-                  alt={field.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute top-2.5 right-2.5 px-2.5 py-1 rounded text-[#004b1e] bg-[#22c55e] text-xs font-semibold flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Còn trống
-                </div>
-              </div>
-
-              <div className="p-4 flex flex-col flex-grow justify-between space-y-4">
-                <div>
-                  <h3 className="font-bold text-base text-[#191c1d] font-['Manrope'] mb-1.5 line-clamp-1">
-                    {field.name}
-                  </h3>
-                  <div className="flex items-center gap-1 text-[#575e70] text-xs mb-3">
-                    <MapPin className="w-3.5 h-3.5 shrink-0" />
-                    <span>{field.location}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="bg-[#f3f4f5] px-2 py-1 rounded text-xs text-[#191c1d]">
-                      {field.type}
-                    </span>
-                    <div className="flex items-center gap-1 text-xs text-[#575e70]">
-                      <Star className="w-3.5 h-3.5 fill-[#22c55e] text-[#22c55e]" />
-                      <span className="font-bold text-[#191c1d]">
-                        {field.rating}
-                      </span>{' '}
-                      ({field.reviewsCount} đánh giá)
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-[#e1e3e4] flex justify-between items-center">
-                  <div className="text-lg font-bold text-[#006e2f] font-['Manrope']">
-                    {field.pricePerHour.toLocaleString('vi-VN')}đ
-                    <span className="text-xs font-normal text-[#575e70]">
-                      /giờ
-                    </span>
-                  </div>
-                  <Link href={`/fields/${field.id}`}>
-                    <Button
-                      variant="outline"
-                      className="text-xs text-[#006e2f] border-[#bccbb9]/60 rounded-lg hover:bg-[#f3f4f5]"
-                    >
-                      Xem chi tiết
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
+              field={{
+                id: field.id,
+                name: field.name,
+                slug: field.name,
+                address: field.location,
+                location: field.location,
+                city: 'TP.HCM',
+                district: field.location.split(',')[0].trim(),
+                base_price_per_hour: field.pricePerHour,
+                pricePerHour: field.pricePerHour,
+                status: 'ACTIVE',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                field_type_id: '1',
+                types: [field.type],
+                type: field.type,
+                rating: field.rating,
+                rating_avg: field.rating,
+                reviews_count: field.reviewsCount,
+                image: field.image,
+                primary_image_url: field.image,
+                available: true,
+                is_available_today: true,
+              }}
+            />
           ))}
         </div>
       </section>
