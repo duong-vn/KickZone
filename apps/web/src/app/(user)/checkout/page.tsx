@@ -43,7 +43,9 @@ function getMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
-function parseCheckoutDraft(searchParams: URLSearchParams): CheckoutDraft | null {
+function parseCheckoutDraft(
+  searchParams: URLSearchParams,
+): CheckoutDraft | null {
   const fieldId = searchParams.get('fieldId')?.trim() ?? '';
   const fieldName = searchParams.get('fieldName')?.trim() ?? '';
   const fieldAddress = searchParams.get('fieldAddress')?.trim() ?? '';
@@ -56,7 +58,8 @@ function parseCheckoutDraft(searchParams: URLSearchParams): CheckoutDraft | null
   const durationHours = Number(searchParams.get('durationHours'));
   const pricePerHour = Number(searchParams.get('pricePerHour'));
   const fieldImage = searchParams.get('fieldImage')?.trim() ?? '';
-  const initialVoucher = searchParams.get('voucher')?.trim().toUpperCase() ?? '';
+  const initialVoucher =
+    searchParams.get('voucher')?.trim().toUpperCase() ?? '';
   const durationMinutes = durationHours * 60;
 
   if (
@@ -99,19 +102,20 @@ function parseCheckoutDraft(searchParams: URLSearchParams): CheckoutDraft | null
   };
 }
 
-function getVoucherDiscount(code: string, originalPrice: number): number | null {
+function getVoucherDiscount(
+  code: string,
+  originalPrice: number,
+): number | null {
   if (code === 'KICKZONE50' || code === 'KZ50') return 50000;
-  if (code === 'KZ10' || code === 'KZPRO10') return Math.round(originalPrice * 0.1);
+  if (code === 'KZ10' || code === 'KZPRO10')
+    return Math.round(originalPrice * 0.1);
   return null;
 }
 
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const draft = useMemo(
-    () => parseCheckoutDraft(searchParams),
-    [searchParams],
-  );
+  const draft = useMemo(() => parseCheckoutDraft(searchParams), [searchParams]);
 
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -126,9 +130,18 @@ function CheckoutContent() {
     return (
       <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center p-4">
         <div className="max-w-md rounded-2xl border border-[#bccbb9]/40 bg-white p-8 text-center space-y-4">
-          <h1 className="text-lg font-bold text-[#191c1d]">Thông tin đặt sân không hợp lệ</h1>
-          <p className="text-xs text-[#575e70]">Hãy chọn lại sân và khung giờ trước khi tiếp tục.</p>
-          <Button onClick={() => router.back()} className="bg-[#006e2f] hover:bg-[#005321] text-white">Quay lại chọn sân</Button>
+          <h1 className="text-lg font-bold text-[#191c1d]">
+            Thông tin đặt sân không hợp lệ
+          </h1>
+          <p className="text-xs text-[#575e70]">
+            Hãy chọn lại sân và khung giờ trước khi tiếp tục.
+          </p>
+          <Button
+            onClick={() => router.back()}
+            className="bg-[#006e2f] hover:bg-[#005321] text-white"
+          >
+            Quay lại chọn sân
+          </Button>
         </div>
       </div>
     );

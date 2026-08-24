@@ -419,7 +419,10 @@ export default function MyBookingsPage() {
             className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[#bccbb9]/40 animate-in fade-in zoom-in-95 duration-200"
           >
             <div className="flex justify-between items-center pb-4 border-b border-[#bccbb9]/30">
-              <h3 id="cancel-booking-title" className="text-lg font-bold text-[#191c1d] font-['Manrope'] flex items-center gap-2">
+              <h3
+                id="cancel-booking-title"
+                className="text-lg font-bold text-[#191c1d] font-['Manrope'] flex items-center gap-2"
+              >
                 <AlertTriangle className="w-5 h-5 text-rose-600" />
                 Xác nhận hủy đơn đặt sân
               </h3>
@@ -470,7 +473,10 @@ export default function MyBookingsPage() {
 
               {/* Reason Input */}
               <div className="space-y-1.5">
-                <label htmlFor="cancel-reason" className="block text-xs font-bold text-[#191c1d]">
+                <label
+                  htmlFor="cancel-reason"
+                  className="block text-xs font-bold text-[#191c1d]"
+                >
                   Lý do hủy đơn (Không bắt buộc)
                 </label>
                 <textarea

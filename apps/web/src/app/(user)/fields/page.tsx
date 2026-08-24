@@ -393,11 +393,10 @@ function FieldsContent() {
                         key={t}
                         type="button"
                         onClick={() => toggleType(t)}
-                        className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${
-                          isChecked
+                        className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${isChecked
                             ? 'bg-[#22c55e] text-[#004b1e] border-[#006e2f]'
                             : 'bg-white text-[#191c1d] border-[#bccbb9]/60 hover:bg-[#f3f4f5]'
-                        }`}
+                          }`}
                       >
                         {t}
                       </button>
@@ -561,11 +560,10 @@ function FieldsContent() {
                       key={pageNumber}
                       onClick={() => handlePageChange(pageNumber)}
                       disabled={isFetching}
-                      className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors ${
-                        isCurrent
+                      className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors ${isCurrent
                           ? 'bg-[#006e2f] text-white shadow-sm'
                           : 'border border-[#bccbb9]/60 text-[#575e70] hover:bg-[#e7e8e9]'
-                      }`}
+                        }`}
                     >
                       {pageNumber}
                     </button>
