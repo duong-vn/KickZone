@@ -40,6 +40,27 @@ interface FieldItem {
   image: string;
 }
 
+interface RawApiField {
+  id: string;
+  name?: string;
+  location?: string;
+  address?: string;
+  city?: string;
+  district?: string;
+  types?: string[];
+  type?: string;
+  field_types?: { name?: string };
+  field_type?: { name?: string };
+  rating?: number;
+  rating_avg?: number;
+  pricePerHour?: number;
+  base_price_per_hour?: number;
+  available?: boolean;
+  image?: string;
+  primary_image_url?: string;
+  field_images?: { storage_path?: string } | Array<{ storage_path?: string }>;
+}
+
 const MOCK_FIELDS: FieldItem[] = [
   {
     id: '1',
@@ -276,8 +297,66 @@ function FieldsContent() {
     return result;
   }, [debouncedSearch, district, selectedTypes, maxPrice, sortBy]);
 
+  const normalizedApiData = useMemo(() => {
+    if (!apiData?.data || !Array.isArray(apiData.data)) return null;
+    return apiData.data.map((item: RawApiField) => {
+      const price =
+        typeof item.pricePerHour === 'number'
+          ? item.pricePerHour
+          : typeof item.base_price_per_hour === 'number'
+            ? item.base_price_per_hour
+            : 0;
+
+      const location =
+        item.location ||
+        item.address ||
+        (item.district ? `${item.district}, ${item.city || 'TP.HCM'}` : 'TP.HCM');
+
+      const types = Array.isArray(item.types)
+        ? item.types
+        : item.type
+          ? [item.type]
+          : item.field_types?.name
+            ? [item.field_types.name]
+            : item.field_type?.name
+              ? [item.field_type.name]
+              : ['Sân bóng'];
+
+      const rating =
+        typeof item.rating === 'number'
+          ? item.rating
+          : typeof item.rating_avg === 'number'
+            ? item.rating_avg
+            : 4.8;
+
+      const fieldImage = Array.isArray(item.field_images)
+        ? item.field_images[0]?.storage_path
+        : item.field_images?.storage_path;
+
+      const image =
+        item.image ||
+        item.primary_image_url ||
+        fieldImage ||
+        'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&auto=format&fit=crop&q=80';
+
+      return {
+        id: item.id,
+        name: item.name || 'Sân bóng',
+        location,
+        district: item.district,
+        types,
+        rating,
+        pricePerHour: price,
+        available: item.available ?? true,
+        image,
+      } as FieldItem;
+    });
+  }, [apiData]);
+
   const displayFields =
-    apiData?.data && apiData.data.length > 0 ? apiData.data : filteredMockData;
+    normalizedApiData && normalizedApiData.length > 0
+      ? normalizedApiData
+      : filteredMockData;
   const totalResults = apiData?.meta?.total ?? displayFields.length;
 
   const toggleType = (t: string) => {
@@ -535,7 +614,10 @@ function FieldsContent() {
                     >
                       <div className="h-48 relative overflow-hidden bg-slate-100">
                         <img
-                          src={field.image}
+                          src={
+                            field.image ||
+                            'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&auto=format&fit=crop&q=80'
+                          }
                           alt={field.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
@@ -557,28 +639,36 @@ function FieldsContent() {
                           </h3>
                           <div className="flex items-center gap-1 text-[#575e70] text-xs mb-3">
                             <MapPin className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">{field.location}</span>
+                            <span className="truncate">
+                              {field.location || 'TP. Hồ Chí Minh'}
+                            </span>
                           </div>
 
                           <div className="flex items-center gap-1.5">
-                            {field.types?.map((t: string) => (
-                              <span
-                                key={t}
-                                className="bg-[#f3f4f5] text-[#575e70] px-2 py-0.5 rounded text-xs"
-                              >
-                                {t}
+                            {field.types && field.types.length > 0 ? (
+                              field.types.map((t: string) => (
+                                <span
+                                  key={t}
+                                  className="bg-[#f3f4f5] text-[#575e70] px-2 py-0.5 rounded text-xs"
+                                >
+                                  {t}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="bg-[#f3f4f5] text-[#575e70] px-2 py-0.5 rounded text-xs">
+                                Sân bóng
                               </span>
-                            ))}
+                            )}
                             <div className="flex items-center text-[#006e2f] ml-auto gap-0.5 font-bold text-xs">
                               <Star className="w-3.5 h-3.5 fill-[#006e2f] text-[#006e2f]" />
-                              <span>{field.rating}</span>
+                              <span>{field.rating ?? 4.8}</span>
                             </div>
                           </div>
                         </div>
 
                         <div className="mt-auto pt-3 border-t border-[#bccbb9]/30 flex justify-between items-center">
                           <div className="font-bold text-lg text-[#006e2f] font-['Manrope']">
-                            {field.pricePerHour.toLocaleString('vi-VN')}đ
+                            {(field.pricePerHour ?? 0).toLocaleString('vi-VN')}đ
                             <span className="text-xs font-normal text-[#575e70]">
                               /h
                             </span>
