@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { FieldsService } from './fields.service';
 
 type MockDbField = {
@@ -18,12 +18,12 @@ type MockDbField = {
   updated_at: Date;
   field_type_id: string;
   field_types: { id: string; name: string; description: string | null };
-  field_images: {
+  field_images: Array<{
     id: string;
     storage_path: string;
     alt_text: string | null;
     is_primary: boolean;
-  } | null;
+  }>;
   reviews: { rating: number }[];
 };
 
@@ -34,11 +34,11 @@ describe('FieldsService', () => {
     mockFields: Partial<MockDbField>[] = [],
     mockTotal = 0,
     options?: {
-      fieldFindFirst?: any;
-      fieldImagesFindMany?: any[];
-      reviewsFindMany?: any[];
+      fieldFindFirst?: unknown;
+      fieldImagesFindMany?: unknown[];
+      reviewsFindMany?: unknown[];
       reviewsCount?: number;
-      allFieldReviews?: any[];
+      allFieldReviews?: unknown[];
     },
   ) => {
     const findMany = jest.fn().mockResolvedValue(mockFields);
@@ -187,12 +187,14 @@ describe('FieldsService', () => {
           name: 'Sân 7',
           description: 'Sân 7 người',
         },
-        field_images: {
-          id: 'img-1',
-          storage_path: 'https://example.com/field.jpg',
-          alt_text: 'Sân bóng A',
-          is_primary: true,
-        },
+        field_images: [
+          {
+            id: 'img-1',
+            storage_path: 'https://example.com/field.jpg',
+            alt_text: 'Sân bóng A',
+            is_primary: true,
+          },
+        ],
         reviews: [{ rating: 4 }, { rating: 5 }],
       };
 
@@ -379,5 +381,44 @@ describe('FieldsService', () => {
         ]),
       );
     });
+  });
+
+  it('queries only PENDING and CONFIRMED bookings for availability to ensure CANCELLED slots are free', async () => {
+    const findFirst = jest.fn().mockResolvedValue({
+      id: 'field-1',
+      base_price_per_hour: 200000,
+      field_operating_hours: [
+        {
+          day_of_week: 1,
+          open_time: new Date('1970-01-01T06:00:00.000Z'),
+          close_time: new Date('1970-01-01T22:00:00.000Z'),
+          is_closed: false,
+        },
+      ],
+      price_rules: [],
+    });
+    interface BookingWhereArgs {
+      where: {
+        field_id: string;
+        status: { in: string[] };
+      };
+    }
+    const findManyBookings = jest
+      .fn<Promise<unknown[]>, [BookingWhereArgs]>()
+      .mockResolvedValue([]);
+    const prisma = {
+      fields: { findFirst },
+      bookings: { findMany: findManyBookings },
+    } as unknown as PrismaService;
+
+    const service = new FieldsService(prisma);
+    await service.getAvailability('field-1', '2026-08-31');
+
+    expect(findManyBookings).toHaveBeenCalledTimes(1);
+    const calledArgs = findManyBookings.mock.calls[0] as unknown as [
+      { where: { field_id: string; status: { in: string[] } } },
+    ];
+    expect(calledArgs[0].where.field_id).toBe('field-1');
+    expect(calledArgs[0].where.status.in).toEqual(['PENDING', 'CONFIRMED']);
   });
 });

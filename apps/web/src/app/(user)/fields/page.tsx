@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { FieldCard } from '@/components/fields/field-card';
 import { useDebounce } from '@/hooks/use-debounce';
 import { fetchFields } from '@/lib/api';
-import { Field } from '@/types/field';
+import type { Field } from '@/types/field';
 
 // Helper format YYYY-MM-DD -> DD/MM/YYYY
 function formatDateDisplay(isoDate: string) {

@@ -10,27 +10,42 @@ export interface FieldType {
 
 export interface FieldImage {
   id: string;
-  field_id: string;
-  storage_path: string;
+  field_id?: string;
+  storagePath?: string;
+  storage_path?: string;
+  altText?: string | null;
   alt_text?: string | null;
-  sort_order: number;
-  is_primary: boolean;
+  sortOrder?: number;
+  sort_order?: number;
+  isPrimary?: boolean;
+  is_primary?: boolean;
   created_at?: string;
+}
+
+export interface OperatingHours {
+  dayOfWeek?: number;
+  day_of_week?: number;
+  openTime?: string | null;
+  open_time?: string | null;
+  closeTime?: string | null;
+  close_time?: string | null;
+  isClosed?: boolean;
+  is_closed?: boolean;
 }
 
 export interface FieldOperatingHours {
   id: string;
   field_id: string;
-  day_of_week: number; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  open_time: string | null; // HH:mm or ISO
-  close_time: string | null; // HH:mm or ISO
+  day_of_week: number;
+  open_time: string | null;
+  close_time: string | null;
   is_closed: boolean;
 }
 
 export interface PriceRule {
   id: string;
   field_id: string;
-  name: string;
+  name?: string | null;
   day_of_week?: number | null;
   start_time: string;
   end_time: string;
@@ -56,48 +71,72 @@ export interface Amenity {
 
 export interface Field {
   id: string;
-  field_type_id: string;
+  field_type_id?: string;
   name: string;
-  slug: string;
+  slug?: string;
   description?: string | null;
   address: string;
-  city: string;
-  district: string;
-  latitude?: number | null;
-  longitude?: number | null;
-  base_price_per_hour: number;
-  status: FieldStatus;
+  city?: string;
+  district?: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  basePricePerHour?: number;
+  base_price_per_hour?: number;
+  status?: FieldStatus;
   deleted_at?: string | null;
-  created_at: string;
-  updated_at: string;
-
-  // Relations
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+  type?: FieldType | string | null;
+  types?: string[];
   field_type?: FieldType;
   field_types?: FieldType;
+  image?: string;
+  images?: string[] | FieldImage[];
+  primary_image_url?: string;
   field_images?: FieldImage[];
-  field_operating_hours?: FieldOperatingHours[];
+  field_operating_hours?: OperatingHours[];
+  operatingHours?: string | OperatingHours[];
   price_rules?: PriceRule[];
-
-  // Frontend & UI computed helpers
+  rating?: number;
   rating_avg?: number;
   reviews_count?: number;
   reviewCount?: number;
   is_available_today?: boolean;
-  primary_image_url?: string;
   supported_types?: string[];
   location?: string;
   pricePerHour?: number;
-  image?: string;
-  images?: string[];
-  rating?: number;
   available?: boolean;
-  type?: string;
-  types?: string[];
-  operatingHours?: string;
   amenities?: Amenity[];
   rules?: string[];
   subPitches?: SubPitch[];
   reviews?: Review[];
+}
+
+export interface FieldDetail extends Field {
+  basePricePerHour: number;
+  base_price_per_hour: number;
+  images: string[] | FieldImage[];
+}
+
+export interface AvailabilitySlot {
+  startTime: string;
+  endTime: string;
+  available: boolean;
+  price: number;
+}
+
+export interface AvailabilityResponse {
+  fieldId: string;
+  date: string;
+  timeZone: string;
+  slots: AvailabilitySlot[];
+}
+
+export interface Paginated<T> {
+  data: T[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
 }
 
 export interface FieldsMeta {

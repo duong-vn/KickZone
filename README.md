@@ -105,13 +105,17 @@ DIRECT_URL=
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 FRONTEND_URL=http://localhost:3000
-RESEND_API_KEY=
-EMAIL_FROM=
+EMAIL_HOST=
+EMAIL_AUTH_USER=
+EMAIL_AUTH_PASS=
+EMAIL_PREVIEW=false
 ```
 
 - `DATABASE_URL`: connection string dùng khi NestJS chạy.
 - `DIRECT_URL`: connection string của role `prisma`, chỉ Database Owner cần khi introspect/migrate. Có thể bỏ hẳn biến này trên máy thành viên; Prisma sẽ dùng `DATABASE_URL`.
 - `SUPABASE_SERVICE_ROLE_KEY`: chỉ tồn tại ở backend và secret manager của môi trường deploy.
+- Email dùng SMTP port `587` với STARTTLS. `EMAIL_AUTH_USER` đồng thời là địa chỉ gửi.
+- `EMAIL_PREVIEW=true`: ở môi trường development, gửi mail và mở thêm bản HTML tạm trong trình duyệt; luôn để `false` ở production.
 
 Giá trị thật được chia sẻ qua password manager hoặc kênh secret của nhóm, không gửi trong issue, PR, chat công khai hoặc screenshot.
 

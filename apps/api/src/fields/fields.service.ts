@@ -1,6 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { Prisma } from '../generated/prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import {
+  Prisma,
+  field_status,
+  booking_status,
+} from '../generated/prisma/client';
+import {
+  getSegments,
+  getSqlTimeMinutes,
+  makeLocalDateTime,
+  parseAvailabilityDate,
+  type BookingInterval,
+  type PriceRuleInput,
+} from '../bookings/booking-rules';
 import { GetFieldReviewsQueryDto } from './dto/get-field-reviews-query.dto';
 import { GetFieldsQueryDto } from './dto/get-fields-query.dto';
 
@@ -10,6 +22,11 @@ const MAX_LIMIT = 100;
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const PUBLIC_FIELD_WHERE = {
+  status: field_status.ACTIVE,
+  deleted_at: null,
+} satisfies Prisma.fieldsWhereInput;
 
 @Injectable()
 export class FieldsService {
@@ -29,7 +46,6 @@ export class FieldsService {
         ? Number(query.limit)
         : DEFAULT_LIMIT;
     const limit = Math.min(rawLimit, MAX_LIMIT);
-    const skip = (page - 1) * limit;
 
     const where: Prisma.fieldsWhereInput = {
       status: 'ACTIVE',
@@ -86,23 +102,10 @@ export class FieldsService {
       };
     }
 
-    const minPrice =
-      query.minPrice !== undefined &&
-      Number.isFinite(Number(query.minPrice)) &&
-      Number(query.minPrice) >= 0
-        ? Number(query.minPrice)
-        : undefined;
-    const maxPrice =
-      query.maxPrice !== undefined &&
-      Number.isFinite(Number(query.maxPrice)) &&
-      Number(query.maxPrice) >= 0
-        ? Number(query.maxPrice)
-        : undefined;
-
-    if (minPrice !== undefined || maxPrice !== undefined) {
+    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
       where.base_price_per_hour = {
-        ...(minPrice !== undefined && { gte: minPrice }),
-        ...(maxPrice !== undefined && { lte: maxPrice }),
+        ...(query.minPrice !== undefined && { gte: Number(query.minPrice) }),
+        ...(query.maxPrice !== undefined && { lte: Number(query.maxPrice) }),
       };
     }
 
@@ -158,7 +161,7 @@ export class FieldsService {
     const [fields, total] = await Promise.all([
       this.prisma.fields.findMany({
         where,
-        skip,
+        skip: (page - 1) * limit,
         take: limit,
         orderBy,
         include: {
@@ -167,6 +170,15 @@ export class FieldsService {
               id: true,
               name: true,
               description: true,
+            },
+          },
+          field_images: {
+            orderBy: { sort_order: 'asc' },
+            select: {
+              id: true,
+              storage_path: true,
+              alt_text: true,
+              is_primary: true,
             },
           },
           reviews: {
@@ -179,40 +191,17 @@ export class FieldsService {
       this.prisma.fields.count({ where }),
     ]);
 
-    const fieldIds = fields.map((f) => f.id);
-    const allImages =
-      fieldIds.length > 0
-        ? await this.prisma.field_images.findMany({
-            where: { field_id: { in: fieldIds } },
-            orderBy: [
-              { is_primary: 'desc' },
-              { sort_order: 'asc' },
-              { created_at: 'asc' },
-            ],
-            select: {
-              id: true,
-              field_id: true,
-              storage_path: true,
-              alt_text: true,
-              is_primary: true,
-            },
-          })
-        : [];
-
-    const primaryImageMap = new Map<
-      string,
-      {
-        id: string;
-        storage_path: string;
-        alt_text: string | null;
-        is_primary: boolean;
-      }
-    >();
-    for (const img of allImages) {
-      if (!primaryImageMap.has(img.field_id)) {
-        primaryImageMap.set(img.field_id, img);
-      }
-    }
+    const formatFieldTypeName = (name?: string | null): string => {
+      if (!name) return 'Sân 7 người';
+      const clean = name.toLowerCase().trim();
+      if (clean === '5-a-side' || clean === '5' || clean.includes('5'))
+        return 'Sân 5 người';
+      if (clean === '7-a-side' || clean === '7' || clean.includes('7'))
+        return 'Sân 7 người';
+      if (clean === '11-a-side' || clean === '11' || clean.includes('11'))
+        return 'Sân 11 người';
+      return name;
+    };
 
     const transformedData = fields.map((field) => {
       const reviews = field.reviews ?? [];
@@ -226,20 +215,11 @@ export class FieldsService {
             )
           : 5.0;
 
-      const formatFieldTypeName = (name?: string | null): string => {
-        if (!name) return 'Sân 7 người';
-        const clean = name.toLowerCase().trim();
-        if (clean === '5-a-side' || clean === '5' || clean.includes('5'))
-          return 'Sân 5 người';
-        if (clean === '7-a-side' || clean === '7' || clean.includes('7'))
-          return 'Sân 7 người';
-        if (clean === '11-a-side' || clean === '11' || clean.includes('11'))
-          return 'Sân 11 người';
-        return name;
-      };
       const rawTypeName = field.field_types?.name ?? '7-a-side';
       const fieldTypeName = formatFieldTypeName(rawTypeName);
-      const primaryImg = primaryImageMap.get(field.id);
+      const primaryImg =
+        field.field_images?.find((img) => img.is_primary) ??
+        field.field_images?.[0];
       const imageUrl =
         primaryImg?.storage_path ||
         'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80';
@@ -267,7 +247,7 @@ export class FieldsService {
         types: [fieldTypeName],
         image: imageUrl,
         primary_image_url: imageUrl,
-        field_images: primaryImg ? [primaryImg] : [],
+        field_images: field.field_images ?? [],
         rating: ratingAvg,
         rating_avg: ratingAvg,
         reviews_count: reviewsCount,
@@ -281,12 +261,7 @@ export class FieldsService {
 
     return {
       data: transformedData,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: total > 0 ? Math.ceil(total / limit) : 0,
-      },
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
@@ -578,6 +553,71 @@ export class FieldsService {
       rules,
       subPitches,
       reviews: mappedReviews,
+    };
+  }
+
+  async getAvailability(id: string, dateValue: string) {
+    const { date, weekday } = parseAvailabilityDate(dateValue);
+    const field = await this.prisma.fields.findFirst({
+      where: { ...PUBLIC_FIELD_WHERE, id },
+      include: {
+        field_operating_hours: { where: { day_of_week: weekday } },
+        price_rules: { where: { is_active: true } },
+      },
+    });
+    if (!field) {
+      throw new NotFoundException({
+        code: 'FIELD_NOT_FOUND',
+        message: 'Field was not found.',
+      });
+    }
+
+    const hours = field.field_operating_hours[0];
+    if (!hours || hours.is_closed || !hours.open_time || !hours.close_time) {
+      return {
+        data: { fieldId: id, date, timeZone: 'Asia/Ho_Chi_Minh', slots: [] },
+      };
+    }
+
+    const start = makeLocalDateTime(date, getSqlTimeMinutes(hours.open_time));
+    const end = makeLocalDateTime(date, getSqlTimeMinutes(hours.close_time));
+    const interval = {
+      start,
+      end,
+      localDate: date,
+      weekday,
+    } satisfies BookingInterval;
+    const bookings = await this.prisma.bookings.findMany({
+      where: {
+        field_id: id,
+        status: { in: [booking_status.PENDING, booking_status.CONFIRMED] },
+        start_time: { lt: end },
+        end_time: { gt: start },
+      },
+      select: { start_time: true, end_time: true },
+    });
+    const rules = field.price_rules as PriceRuleInput[];
+    const segments = getSegments(interval, rules, field.base_price_per_hour);
+    const now = new Date();
+
+    return {
+      data: {
+        fieldId: id,
+        date,
+        timeZone: 'Asia/Ho_Chi_Minh',
+        slots: segments.map((segment) => ({
+          startTime: segment.start.toISOString(),
+          endTime: segment.end.toISOString(),
+          available:
+            segment.start > now &&
+            !bookings.some(
+              (booking) =>
+                segment.start < booking.end_time &&
+                segment.end > booking.start_time,
+            ),
+          price: segment.price,
+        })),
+      },
     };
   }
 
