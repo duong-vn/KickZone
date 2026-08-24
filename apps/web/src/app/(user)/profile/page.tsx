@@ -122,7 +122,9 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSavePassword = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSavePassword = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
     event.preventDefault();
     if (!validatePassword(newPassword)) {
       toast.error('Mật khẩu cần ít nhất 8 ký tự và đạt 3/4 nhóm bảo mật.');
@@ -136,7 +138,9 @@ export default function ProfilePage() {
     setIsSavingPass(true);
     try {
       const supabase = getSupabaseBrowserClient();
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
       if (error) {
         toast.error('Không thể cập nhật mật khẩu. Vui lòng thử lại.');
         return;
@@ -171,15 +175,29 @@ export default function ProfilePage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <nav className="flex items-center gap-2 text-xs text-[#575e70] mb-2">
-                <Link href="/" className="hover:text-[#006e2f] transition-colors">Trang chủ</Link>
+                <Link
+                  href="/"
+                  className="hover:text-[#006e2f] transition-colors"
+                >
+                  Trang chủ
+                </Link>
                 <ChevronRight className="w-3.5 h-3.5" />
-                <span className="text-[#191c1d] font-semibold">Hồ sơ cá nhân</span>
+                <span className="text-[#191c1d] font-semibold">
+                  Hồ sơ cá nhân
+                </span>
               </nav>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#191c1d] font-['Manrope']">Hồ sơ cá nhân</h1>
-              <p className="text-xs text-[#575e70] mt-1">Quản lý thông tin tài khoản, liên hệ và bảo mật cá nhân.</p>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#191c1d] font-['Manrope']">
+                Hồ sơ cá nhân
+              </h1>
+              <p className="text-xs text-[#575e70] mt-1">
+                Quản lý thông tin tài khoản, liên hệ và bảo mật cá nhân.
+              </p>
             </div>
             <Link href="/profile/activity">
-              <Button variant="outline" className="bg-[#f8f9fa] border-[#bccbb9]/60 hover:border-[#006e2f] hover:text-[#006e2f] text-xs font-bold py-2.5 px-4 rounded-xl flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="bg-[#f8f9fa] border-[#bccbb9]/60 hover:border-[#006e2f] hover:text-[#006e2f] text-xs font-bold py-2.5 px-4 rounded-xl flex items-center gap-2"
+              >
                 <History className="w-4 h-4 text-[#006e2f]" /> Hoạt động của tôi
               </Button>
             </Link>
@@ -194,11 +212,17 @@ export default function ProfilePage() {
               <div className="flex flex-col sm:flex-row gap-8 items-start">
                 <div className="flex flex-col items-center space-y-3 shrink-0 self-center sm:self-start">
                   <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-md group bg-slate-100">
-                    <img src={avatarUrl || defaultAvatar} alt={`Ảnh đại diện của ${displayName}`} className="w-full h-full object-cover" />
+                    <img
+                      src={avatarUrl || defaultAvatar}
+                      alt={`Ảnh đại diện của ${displayName}`}
+                      className="w-full h-full object-cover"
+                    />
                     <button
                       type="button"
                       aria-label="Đổi ảnh đại diện"
-                      onClick={() => toast.info('Tính năng đổi ảnh đại diện chưa khả dụng.')}
+                      onClick={() =>
+                        toast.info('Tính năng đổi ảnh đại diện chưa khả dụng.')
+                      }
                       className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white"
                     >
                       <Camera className="w-6 h-6" />
@@ -209,22 +233,71 @@ export default function ProfilePage() {
                   </span>
                 </div>
 
-                <form onSubmit={handleSaveInfo} className="flex-1 w-full space-y-5">
-                  <h2 className="text-lg font-bold text-[#191c1d] font-['Manrope'] pb-3 border-b border-[#bccbb9]/30 flex items-center gap-2"><User className="w-5 h-5 text-[#006e2f]" />Thông tin cơ bản</h2>
+                <form
+                  onSubmit={handleSaveInfo}
+                  className="flex-1 w-full space-y-5"
+                >
+                  <h2 className="text-lg font-bold text-[#191c1d] font-['Manrope'] pb-3 border-b border-[#bccbb9]/30 flex items-center gap-2">
+                    <User className="w-5 h-5 text-[#006e2f]" />
+                    Thông tin cơ bản
+                  </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <ProfileField id="profile-full-name" label="Họ và tên *" icon={<User className="w-4 h-4" />}>
-                      <input id="profile-full-name" type="text" autoComplete="name" required value={fullName} onChange={(event) => setFullName(event.target.value)} className="profile-input" />
+                    <ProfileField
+                      id="profile-full-name"
+                      label="Họ và tên *"
+                      icon={<User className="w-4 h-4" />}
+                    >
+                      <input
+                        id="profile-full-name"
+                        type="text"
+                        autoComplete="name"
+                        required
+                        value={fullName}
+                        onChange={(event) => setFullName(event.target.value)}
+                        className="profile-input"
+                      />
                     </ProfileField>
-                    <ProfileField id="profile-phone" label="Số điện thoại *" icon={<Phone className="w-4 h-4" />}>
-                      <input id="profile-phone" type="tel" autoComplete="tel" inputMode="tel" required value={phone} onChange={(event) => setPhone(event.target.value)} className="profile-input" />
+                    <ProfileField
+                      id="profile-phone"
+                      label="Số điện thoại *"
+                      icon={<Phone className="w-4 h-4" />}
+                    >
+                      <input
+                        id="profile-phone"
+                        type="tel"
+                        autoComplete="tel"
+                        inputMode="tel"
+                        required
+                        value={phone}
+                        onChange={(event) => setPhone(event.target.value)}
+                        className="profile-input"
+                      />
                     </ProfileField>
                     <div className="space-y-1.5">
-                      <label htmlFor="profile-email" className="block text-xs font-bold text-[#191c1d]">Địa chỉ Email (Đăng nhập)</label>
-                      <input id="profile-email" type="email" autoComplete="email" disabled value={email} className="w-full bg-slate-100 border border-[#bccbb9]/40 rounded-xl px-3.5 py-2.5 text-xs text-[#575e70] font-medium cursor-not-allowed" />
+                      <label
+                        htmlFor="profile-email"
+                        className="block text-xs font-bold text-[#191c1d]"
+                      >
+                        Địa chỉ Email (Đăng nhập)
+                      </label>
+                      <input
+                        id="profile-email"
+                        type="email"
+                        autoComplete="email"
+                        disabled
+                        value={email}
+                        className="w-full bg-slate-100 border border-[#bccbb9]/40 rounded-xl px-3.5 py-2.5 text-xs text-[#575e70] font-medium cursor-not-allowed"
+                      />
                     </div>
                   </div>
                   <div className="pt-2 flex justify-end">
-                    <Button type="submit" disabled={isSavingInfo} className="bg-[#006e2f] hover:bg-[#005321] text-white text-xs font-bold px-6 py-2.5 rounded-xl">{isSavingInfo ? 'Đang lưu...' : 'Lưu thay đổi'}</Button>
+                    <Button
+                      type="submit"
+                      disabled={isSavingInfo}
+                      className="bg-[#006e2f] hover:bg-[#005321] text-white text-xs font-bold px-6 py-2.5 rounded-xl"
+                    >
+                      {isSavingInfo ? 'Đang lưu...' : 'Lưu thay đổi'}
+                    </Button>
                   </div>
                 </form>
               </div>
@@ -234,14 +307,46 @@ export default function ProfilePage() {
           <div className="lg:col-span-5 xl:col-span-4">
             <section className="bg-white border border-[#bccbb9]/40 rounded-2xl shadow-sm p-6 sm:p-8">
               <form onSubmit={handleSavePassword} className="space-y-4">
-                <div className="flex items-center gap-2 pb-3 border-b border-[#bccbb9]/30"><Lock className="w-5 h-5 text-[#006e2f]" /><h2 className="text-lg font-bold text-[#191c1d] font-['Manrope']">Đổi mật khẩu</h2></div>
-                <PasswordField id="profile-new-password" label="Mật khẩu mới *" value={newPassword} onChange={setNewPassword} visible={showNew} onToggle={() => setShowNew((value) => !value)} />
-                <PasswordField id="profile-confirm-password" label="Xác nhận mật khẩu mới *" value={confirmPassword} onChange={setConfirmPassword} visible={showConfirm} onToggle={() => setShowConfirm((value) => !value)} />
-                <div className="bg-[#f8f9fa] p-3.5 rounded-xl border border-[#bccbb9]/40 space-y-1.5 text-[11px] text-[#575e70]">
-                  <span className="font-bold text-[#191c1d] flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5 text-[#006e2f]" />Quy tắc bảo mật mật khẩu:</span>
-                  <p>Ít nhất 8 ký tự và đạt 3/4 nhóm: chữ thường, chữ hoa, số, ký tự đặc biệt.</p>
+                <div className="flex items-center gap-2 pb-3 border-b border-[#bccbb9]/30">
+                  <Lock className="w-5 h-5 text-[#006e2f]" />
+                  <h2 className="text-lg font-bold text-[#191c1d] font-['Manrope']">
+                    Đổi mật khẩu
+                  </h2>
                 </div>
-                <Button type="submit" disabled={isSavingPass} className="w-full bg-white border border-[#bccbb9]/60 hover:bg-[#006e2f]/5 text-[#191c1d] hover:text-[#006e2f] text-xs font-bold py-5 rounded-xl"><Key className="w-4 h-4 text-[#006e2f]" />{isSavingPass ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}</Button>
+                <PasswordField
+                  id="profile-new-password"
+                  label="Mật khẩu mới *"
+                  value={newPassword}
+                  onChange={setNewPassword}
+                  visible={showNew}
+                  onToggle={() => setShowNew((value) => !value)}
+                />
+                <PasswordField
+                  id="profile-confirm-password"
+                  label="Xác nhận mật khẩu mới *"
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  visible={showConfirm}
+                  onToggle={() => setShowConfirm((value) => !value)}
+                />
+                <div className="bg-[#f8f9fa] p-3.5 rounded-xl border border-[#bccbb9]/40 space-y-1.5 text-[11px] text-[#575e70]">
+                  <span className="font-bold text-[#191c1d] flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#006e2f]" />
+                    Quy tắc bảo mật mật khẩu:
+                  </span>
+                  <p>
+                    Ít nhất 8 ký tự và đạt 3/4 nhóm: chữ thường, chữ hoa, số, ký
+                    tự đặc biệt.
+                  </p>
+                </div>
+                <Button
+                  type="submit"
+                  disabled={isSavingPass}
+                  className="w-full bg-white border border-[#bccbb9]/60 hover:bg-[#006e2f]/5 text-[#191c1d] hover:text-[#006e2f] text-xs font-bold py-5 rounded-xl"
+                >
+                  <Key className="w-4 h-4 text-[#006e2f]" />
+                  {isSavingPass ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
+                </Button>
               </form>
             </section>
           </div>
@@ -251,26 +356,79 @@ export default function ProfilePage() {
   );
 }
 
-function ProfileField({ id, label, icon, children }: { id: string; label: string; icon: React.ReactNode; children: React.ReactNode }) {
+function ProfileField({
+  id,
+  label,
+  icon,
+  children,
+}: {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-xs font-bold text-[#191c1d]">{label}</label>
+      <label htmlFor={id} className="block text-xs font-bold text-[#191c1d]">
+        {label}
+      </label>
       <div className="relative">
-        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#575e70]">{icon}</span>
+        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#575e70]">
+          {icon}
+        </span>
         {children}
       </div>
     </div>
   );
 }
 
-function PasswordField({ id, label, value, onChange, visible, onToggle }: { id: string; label: string; value: string; onChange: (value: string) => void; visible: boolean; onToggle: () => void }) {
+function PasswordField({
+  id,
+  label,
+  value,
+  onChange,
+  visible,
+  onToggle,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  visible: boolean;
+  onToggle: () => void;
+}) {
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-xs font-bold text-[#191c1d]">{label}</label>
+      <label htmlFor={id} className="block text-xs font-bold text-[#191c1d]">
+        {label}
+      </label>
       <div className="relative">
-        <input id={id} type={visible ? 'text' : 'password'} autoComplete="new-password" required minLength={8} value={value} onChange={(event) => onChange(event.target.value)} placeholder="••••••••" className="w-full bg-[#f8f9fa] border border-[#bccbb9]/60 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-[#191c1d] outline-none focus:border-[#006e2f]" />
-        <button type="button" onClick={onToggle} aria-label={visible ? `Ẩn ${label.toLowerCase()}` : `Hiện ${label.toLowerCase()}`} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#575e70] hover:text-[#006e2f]">
-          {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        <input
+          id={id}
+          type={visible ? 'text' : 'password'}
+          autoComplete="new-password"
+          required
+          minLength={8}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="••••••••"
+          className="w-full bg-[#f8f9fa] border border-[#bccbb9]/60 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-[#191c1d] outline-none focus:border-[#006e2f]"
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={
+            visible
+              ? `Ẩn ${label.toLowerCase()}`
+              : `Hiện ${label.toLowerCase()}`
+          }
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#575e70] hover:text-[#006e2f]"
+        >
+          {visible ? (
+            <EyeOff className="w-4 h-4" />
+          ) : (
+            <Eye className="w-4 h-4" />
+          )}
         </button>
       </div>
     </div>

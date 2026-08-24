@@ -1,9 +1,5 @@
 export type BookingStatus =
-  | 'PENDING'
-  | 'CONFIRMED'
-  | 'COMPLETED'
-  | 'CANCELLED'
-  | 'REJECTED';
+  'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'REJECTED';
 
 export interface BookingItem {
   id: string;

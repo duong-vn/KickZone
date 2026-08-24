@@ -37,6 +37,10 @@ import {
   calculateReviewSummary,
 } from '@/data/mock-reviews';
 import {
+  useFavoriteStatusQuery,
+  useToggleFavoriteMutation,
+} from '@/hooks/use-favorites';
+import {
   StarRating,
   ReviewCard,
   WriteReviewModal,
@@ -457,7 +461,11 @@ export default function FieldDetailPage({
   // Gallery state
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
+
+  // Favorite state via TanStack Query
+  const { data: favoriteData } = useFavoriteStatusQuery(fieldId);
+  const toggleFavoriteMutation = useToggleFavoriteMutation(fieldId);
+  const isFavorite = Boolean(favoriteData?.is_favorite);
 
   // Reviews state
   const [reviewsList, setReviewsList] =
@@ -624,7 +632,9 @@ export default function FieldDetailPage({
     if (BOOKED_SLOTS_MAP.default.includes(time)) return;
 
     const slotIndex = ALL_TIME_SLOTS.indexOf(time);
-    const selectedIndexes = selectedSlots.map((slot) => ALL_TIME_SLOTS.indexOf(slot));
+    const selectedIndexes = selectedSlots.map((slot) =>
+      ALL_TIME_SLOTS.indexOf(slot),
+    );
     const minimumIndex = Math.min(...selectedIndexes);
     const maximumIndex = Math.max(...selectedIndexes);
 
@@ -641,7 +651,6 @@ export default function FieldDetailPage({
       setSelectedSlots((slots) => slots.filter((slot) => slot !== time));
       return;
     }
-
 
     if (
       selectedSlots.length > 0 &&
@@ -675,7 +684,10 @@ export default function FieldDetailPage({
       toast.success('Đã áp dụng mã giảm giá 50.000đ!');
     } else if (clean === 'KZ10' || clean === 'KZPRO10') {
       const discount = Math.round(originalPrice * 0.1);
-      setAppliedVoucher({ code: clean, discount: Math.min(discount, originalPrice) });
+      setAppliedVoucher({
+        code: clean,
+        discount: Math.min(discount, originalPrice),
+      });
       toast.success(
         `Đã áp dụng giảm 10% (-${discount.toLocaleString('vi-VN')}đ)!`,
       );
@@ -685,12 +697,7 @@ export default function FieldDetailPage({
   };
 
   const handleFavoriteToggle = () => {
-    setIsFavorite(!isFavorite);
-    if (!isFavorite) {
-      toast.success('Đã thêm sân vào danh sách yêu thích!');
-    } else {
-      toast.info('Đã xóa khỏi danh sách yêu thích.');
-    }
+    toggleFavoriteMutation.mutate();
   };
 
   const handleShare = () => {

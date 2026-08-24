@@ -59,9 +59,13 @@ export function SiteHeader() {
         setCurrentUser({
           email: data.user.email,
           fullName:
-            typeof metadata.full_name === 'string' ? metadata.full_name : undefined,
+            typeof metadata.full_name === 'string'
+              ? metadata.full_name
+              : undefined,
           avatarUrl:
-            typeof metadata.avatar_url === 'string' ? metadata.avatar_url : undefined,
+            typeof metadata.avatar_url === 'string'
+              ? metadata.avatar_url
+              : undefined,
         });
       });
 
@@ -76,9 +80,13 @@ export function SiteHeader() {
         setCurrentUser({
           email: currentUser.email,
           fullName:
-            typeof metadata.full_name === 'string' ? metadata.full_name : undefined,
+            typeof metadata.full_name === 'string'
+              ? metadata.full_name
+              : undefined,
           avatarUrl:
-            typeof metadata.avatar_url === 'string' ? metadata.avatar_url : undefined,
+            typeof metadata.avatar_url === 'string'
+              ? metadata.avatar_url
+              : undefined,
         });
       });
 
@@ -139,7 +147,9 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-[#bccbb9]/40 bg-[#f8f9fa]/95 backdrop-blur-md shadow-sm">
       <div className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        {isAuthLoading && <span className="sr-only">Đang kiểm tra phiên đăng nhập</span>}
+        {isAuthLoading && (
+          <span className="sr-only">Đang kiểm tra phiên đăng nhập</span>
+        )}
         {/* Brand */}
         <Link
           href="/"
@@ -172,7 +182,10 @@ export function SiteHeader() {
         {/* Desktop Right Actions */}
         <div className="hidden items-center gap-4 md:flex">
           {isAuthLoading ? (
-            <div className="h-10 w-24 rounded-lg bg-[#edeeef]" aria-hidden="true" />
+            <div
+              className="h-10 w-24 rounded-lg bg-[#edeeef]"
+              aria-hidden="true"
+            />
           ) : isLoggedIn ? (
             <div className="flex items-center gap-3">
               {/* Notification Button */}
