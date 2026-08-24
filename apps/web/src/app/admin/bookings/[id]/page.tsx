@@ -23,11 +23,7 @@ import {
 
 // Types aligned with database/init.sql
 export type BookingStatus =
-  | 'PENDING'
-  | 'CONFIRMED'
-  | 'REJECTED'
-  | 'CANCELLED'
-  | 'COMPLETED';
+  'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED';
 
 export interface BookingDetailData {
   id: string;
@@ -295,28 +291,36 @@ export default function AdminBookingDetailPage({
 
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-4 text-center">
-                <p className="mb-1 text-xs font-semibold text-[#575e70]">Ngày đá</p>
+                <p className="mb-1 text-xs font-semibold text-[#575e70]">
+                  Ngày đá
+                </p>
                 <p className="font-(family-name:--font-manrope) text-base font-bold text-[#191c1d]">
                   {booking.bookingDate}
                 </p>
               </div>
 
               <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-4 text-center">
-                <p className="mb-1 text-xs font-semibold text-[#575e70]">Bắt đầu</p>
+                <p className="mb-1 text-xs font-semibold text-[#575e70]">
+                  Bắt đầu
+                </p>
                 <p className="font-(family-name:--font-manrope) text-base font-bold text-[#006e2f]">
                   {booking.startTime}
                 </p>
               </div>
 
               <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-4 text-center">
-                <p className="mb-1 text-xs font-semibold text-[#575e70]">Kết thúc</p>
+                <p className="mb-1 text-xs font-semibold text-[#575e70]">
+                  Kết thúc
+                </p>
                 <p className="font-(family-name:--font-manrope) text-base font-bold text-[#ba1a1a]">
                   {booking.endTime}
                 </p>
               </div>
 
               <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-4 text-center">
-                <p className="mb-1 text-xs font-semibold text-[#575e70]">Thời lượng</p>
+                <p className="mb-1 text-xs font-semibold text-[#575e70]">
+                  Thời lượng
+                </p>
                 <p className="font-(family-name:--font-manrope) text-base font-bold text-[#191c1d]">
                   {booking.durationMinutes} phút
                 </p>
@@ -328,7 +332,9 @@ export default function AdminBookingDetailPage({
           {(booking.rejectionReason || booking.cancellationReason) && (
             <div className="rounded-xl border border-[#ba1a1a]/30 bg-[#ffdad6]/30 p-4 text-xs sm:text-sm text-[#93000a]">
               <p className="font-bold">
-                {booking.status === 'REJECTED' ? 'Lý do từ chối:' : 'Lý do hủy đơn:'}
+                {booking.status === 'REJECTED'
+                  ? 'Lý do từ chối:'
+                  : 'Lý do hủy đơn:'}
               </p>
               <p className="mt-1">
                 {booking.rejectionReason || booking.cancellationReason}
@@ -427,7 +433,10 @@ export default function AdminBookingDetailPage({
             </h3>
             <p className="text-xs sm:text-sm text-[#575e70] mb-6 leading-relaxed">
               Hệ thống sẽ gửi thông báo xác nhận thành công đến khách hàng{' '}
-              <strong className="text-[#191c1d]">{booking.user.fullName}</strong> cho đơn đặt sân{' '}
+              <strong className="text-[#191c1d]">
+                {booking.user.fullName}
+              </strong>{' '}
+              cho đơn đặt sân{' '}
               <strong className="text-[#006e2f]">{booking.code}</strong>.
             </p>
 
@@ -464,7 +473,10 @@ export default function AdminBookingDetailPage({
 
             <p className="mt-3 text-xs sm:text-sm text-[#575e70]">
               Bạn có chắc chắn muốn từ chối yêu cầu đặt sân của khách hàng{' '}
-              <strong className="text-[#191c1d]">{booking.user.fullName}</strong>?
+              <strong className="text-[#191c1d]">
+                {booking.user.fullName}
+              </strong>
+              ?
             </p>
 
             <div className="mt-4 space-y-1.5">

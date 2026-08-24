@@ -92,7 +92,8 @@ const DAY_OPTIONS = [
 ];
 
 export default function AdminFieldPricingPage() {
-  const [fieldData, setFieldData] = useState<FieldPricingData>(MOCK_FIELD_PRICING);
+  const [fieldData, setFieldData] =
+    useState<FieldPricingData>(MOCK_FIELD_PRICING);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<PriceRuleItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -148,7 +149,9 @@ export default function AdminFieldPricingPage() {
 
   const toggleDay = (dayVal: number) => {
     setSelectedDays((prev) =>
-      prev.includes(dayVal) ? prev.filter((d) => d !== dayVal) : [...prev, dayVal]
+      prev.includes(dayVal)
+        ? prev.filter((d) => d !== dayVal)
+        : [...prev, dayVal],
     );
   };
 
@@ -197,7 +200,7 @@ export default function AdminFieldPricingPage() {
                 pricePerHour: priceNumber,
                 isActive,
               }
-            : r
+            : r,
         ),
       }));
       showToast(`Đã cập nhật mức giá "${ruleName}" thành công!`);
@@ -245,11 +248,17 @@ export default function AdminFieldPricingPage() {
 
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-xs sm:text-sm text-[#575e70]">
-        <Link href="/admin/fields" className="transition-colors hover:text-[#006e2f]">
+        <Link
+          href="/admin/fields"
+          className="transition-colors hover:text-[#006e2f]"
+        >
           Sân bóng
         </Link>
         <ChevronRight className="h-4 w-4 text-[#bccbb9]" />
-        <Link href="/admin/fields" className="transition-colors hover:text-[#006e2f]">
+        <Link
+          href="/admin/fields"
+          className="transition-colors hover:text-[#006e2f]"
+        >
           {fieldData.name}
         </Link>
         <ChevronRight className="h-4 w-4 text-[#bccbb9]" />
@@ -309,19 +318,26 @@ export default function AdminFieldPricingPage() {
                 <th className="px-6 py-4 whitespace-nowrap">Tên mức giá</th>
                 <th className="px-6 py-4 whitespace-nowrap">Ngày áp dụng</th>
                 <th className="px-6 py-4 whitespace-nowrap">Khung giờ</th>
-                <th className="px-6 py-4 whitespace-nowrap text-right">Giá/giờ</th>
-                <th className="px-6 py-4 whitespace-nowrap text-center">Trạng thái</th>
-                <th className="px-6 py-4 whitespace-nowrap text-right">Hành động</th>
+                <th className="px-6 py-4 whitespace-nowrap text-right">
+                  Giá/giờ
+                </th>
+                <th className="px-6 py-4 whitespace-nowrap text-center">
+                  Trạng thái
+                </th>
+                <th className="px-6 py-4 whitespace-nowrap text-right">
+                  Hành động
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#bccbb9]/40 text-[#191c1d]">
-                {fieldData.priceRules.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-[#575e70]">
-                      Chưa có mức giá nào được thiết lập. Hãy bấm &ldquo;+ Thêm mức giá mới&rdquo;.
-                    </td>
-                  </tr>
-                ) : (
+              {fieldData.priceRules.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-[#575e70]">
+                    Chưa có mức giá nào được thiết lập. Hãy bấm &ldquo;+ Thêm
+                    mức giá mới&rdquo;.
+                  </td>
+                </tr>
+              ) : (
                 fieldData.priceRules.map((rule) => (
                   <tr
                     key={rule.id}
@@ -402,7 +418,10 @@ export default function AdminFieldPricingPage() {
             </div>
 
             {/* Modal Form Body */}
-            <form onSubmit={handleSaveRule} className="p-6 space-y-5 text-xs sm:text-sm">
+            <form
+              onSubmit={handleSaveRule}
+              className="p-6 space-y-5 text-xs sm:text-sm"
+            >
               {/* Tên mức giá */}
               <div>
                 <label className="mb-1.5 block font-semibold text-[#191c1d]">

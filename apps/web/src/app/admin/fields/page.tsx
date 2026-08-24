@@ -151,13 +151,16 @@ export default function AdminFieldsPage() {
       if (typeFilter) {
         if (typeFilter === '5' && field.fieldType !== '5-a-side') return false;
         if (typeFilter === '7' && field.fieldType !== '7-a-side') return false;
-        if (typeFilter === '11' && field.fieldType !== '11-a-side') return false;
+        if (typeFilter === '11' && field.fieldType !== '11-a-side')
+          return false;
       }
 
       // Status filter
       if (statusFilter) {
-        if (statusFilter === 'active' && field.status !== 'ACTIVE') return false;
-        if (statusFilter === 'disabled' && field.status !== 'INACTIVE') return false;
+        if (statusFilter === 'active' && field.status !== 'ACTIVE')
+          return false;
+        if (statusFilter === 'disabled' && field.status !== 'INACTIVE')
+          return false;
       }
 
       return true;
@@ -169,16 +172,17 @@ export default function AdminFieldsPage() {
     setFields((prev) =>
       prev.map((f) => {
         if (f.id === fieldId) {
-          const nextStatus: FieldStatus = f.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+          const nextStatus: FieldStatus =
+            f.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
           showToast(
             nextStatus === 'ACTIVE'
               ? `Đã kích hoạt hoạt động cho ${f.name}!`
-              : `Đã chuyển ${f.name} sang trạng thái Vô hiệu hóa.`
+              : `Đã chuyển ${f.name} sang trạng thái Vô hiệu hóa.`,
           );
           return { ...f, status: nextStatus };
         }
         return f;
-      })
+      }),
     );
   };
 
@@ -229,8 +233,8 @@ export default function AdminFieldsPage() {
                 description: formData.description,
                 status: formData.status,
               }
-            : f
-        )
+            : f,
+        ),
       );
       showToast(`Đã cập nhật thông tin ${formData.name} thành công!`);
     } else {
@@ -359,7 +363,10 @@ export default function AdminFieldsPage() {
             <tbody className="divide-y divide-[#bccbb9]/50 text-xs sm:text-sm text-[#191c1d]">
               {filteredFields.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-sm text-[#575e70]">
+                  <td
+                    colSpan={8}
+                    className="py-12 text-center text-sm text-[#575e70]"
+                  >
                     Không tìm thấy sân bóng nào phù hợp với bộ lọc.
                   </td>
                 </tr>
@@ -565,7 +572,9 @@ export default function AdminFieldsPage() {
           <div className="w-full max-w-lg rounded-2xl border border-[#bccbb9] bg-white p-6 shadow-xl animate-in zoom-in-95 duration-150">
             <div className="flex items-start justify-between border-b border-[#bccbb9]/60 pb-3">
               <div>
-                <span className="text-xs font-semibold text-[#575e70]">Thông tin sân bóng</span>
+                <span className="text-xs font-semibold text-[#575e70]">
+                  Thông tin sân bóng
+                </span>
                 <h4 className="font-(family-name:--font-manrope) text-xl font-extrabold text-[#006e2f]">
                   {viewingField.name}
                 </h4>
@@ -679,7 +688,9 @@ export default function AdminFieldsPage() {
             <div className="flex items-start justify-between border-b border-[#bccbb9]/60 pb-3">
               <div>
                 <h4 className="font-(family-name:--font-manrope) text-lg font-bold text-[#191c1d]">
-                  {editingField ? `Chỉnh sửa: ${editingField.name}` : 'Thêm sân bóng mới'}
+                  {editingField
+                    ? `Chỉnh sửa: ${editingField.name}`
+                    : 'Thêm sân bóng mới'}
                 </h4>
                 <p className="text-xs text-[#575e70]">
                   Khớp dữ liệu với bảng fields trong cơ sở dữ liệu KickZone.
@@ -694,14 +705,21 @@ export default function AdminFieldsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveField} className="my-4 space-y-3.5 text-xs sm:text-sm">
+            <form
+              onSubmit={handleSaveField}
+              className="my-4 space-y-3.5 text-xs sm:text-sm"
+            >
               <div className="space-y-1">
-                <label className="font-semibold text-[#191c1d]">Tên sân bóng *</label>
+                <label className="font-semibold text-[#191c1d]">
+                  Tên sân bóng *
+                </label>
                 <input
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   placeholder="Ví dụ: Sân Chảo Lửa 3"
                   className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
                 />
@@ -709,13 +727,16 @@ export default function AdminFieldsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-semibold text-[#191c1d]">Loại sân</label>
+                  <label className="font-semibold text-[#191c1d]">
+                    Loại sân
+                  </label>
                   <select
                     value={formData.fieldType}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        fieldType: e.target.value as '5-a-side' | '7-a-side' | '11-a-side',
+                        fieldType: e.target.value as
+                          '5-a-side' | '7-a-side' | '11-a-side',
                       })
                     }
                     className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
@@ -727,7 +748,9 @@ export default function AdminFieldsPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-semibold text-[#191c1d]">Giá thuê / giờ (VND) *</label>
+                  <label className="font-semibold text-[#191c1d]">
+                    Giá thuê / giờ (VND) *
+                  </label>
                   <input
                     type="number"
                     step="10000"
@@ -746,12 +769,16 @@ export default function AdminFieldsPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="font-semibold text-[#191c1d]">Địa chỉ chi tiết *</label>
+                <label className="font-semibold text-[#191c1d]">
+                  Địa chỉ chi tiết *
+                </label>
                 <input
                   type="text"
                   required
                   value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, address: e.target.value })
+                  }
                   placeholder="Ví dụ: 30 Phan Thúc Duyện"
                   className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
                 />
@@ -759,31 +786,43 @@ export default function AdminFieldsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-semibold text-[#191c1d]">Quận / Huyện</label>
+                  <label className="font-semibold text-[#191c1d]">
+                    Quận / Huyện
+                  </label>
                   <input
                     type="text"
                     value={formData.district}
-                    onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, district: e.target.value })
+                    }
                     className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d]"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-semibold text-[#191c1d]">Tỉnh / Thành phố</label>
+                  <label className="font-semibold text-[#191c1d]">
+                    Tỉnh / Thành phố
+                  </label>
                   <input
                     type="text"
                     value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, city: e.target.value })
+                    }
                     className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d]"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="font-semibold text-[#191c1d]">Mô tả sân</label>
+                <label className="font-semibold text-[#191c1d]">
+                  Mô tả sân
+                </label>
                 <textarea
                   rows={2}
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                   placeholder="Thông tin tiện ích, loại cỏ, đèn chiếu sáng..."
                   className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none"
                 />
