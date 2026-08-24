@@ -30,19 +30,19 @@ const PUBLIC_FIELD_WHERE = {
 
 @Injectable()
 export class FieldsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query: GetFieldsQueryDto) {
     const page =
       query.page &&
-        Number.isInteger(Number(query.page)) &&
-        Number(query.page) >= 1
+      Number.isInteger(Number(query.page)) &&
+      Number(query.page) >= 1
         ? Number(query.page)
         : DEFAULT_PAGE;
     const rawLimit =
       query.limit &&
-        Number.isInteger(Number(query.limit)) &&
-        Number(query.limit) >= 1
+      Number.isInteger(Number(query.limit)) &&
+      Number(query.limit) >= 1
         ? Number(query.limit)
         : DEFAULT_LIMIT;
     const limit = Math.min(rawLimit, MAX_LIMIT);
@@ -104,14 +104,14 @@ export class FieldsService {
 
     const minPrice =
       query.minPrice !== undefined &&
-        Number.isFinite(Number(query.minPrice)) &&
-        Number(query.minPrice) >= 0
+      Number.isFinite(Number(query.minPrice)) &&
+      Number(query.minPrice) >= 0
         ? Number(query.minPrice)
         : undefined;
     const maxPrice =
       query.maxPrice !== undefined &&
-        Number.isFinite(Number(query.maxPrice)) &&
-        Number(query.maxPrice) >= 0
+      Number.isFinite(Number(query.maxPrice)) &&
+      Number(query.maxPrice) >= 0
         ? Number(query.maxPrice)
         : undefined;
 
@@ -222,10 +222,10 @@ export class FieldsService {
       const ratingAvg =
         reviewsCount > 0
           ? Number(
-            (
-              reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount
-            ).toFixed(1),
-          )
+              (
+                reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount
+              ).toFixed(1),
+            )
           : 5.0;
 
       const rawTypeName = field.field_types?.name ?? '7-a-side';
@@ -389,10 +389,10 @@ export class FieldsService {
     const ratingAvg =
       reviewsCount > 0
         ? Number(
-          (
-            reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount
-          ).toFixed(1),
-        )
+            (
+              reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount
+            ).toFixed(1),
+          )
         : 5.0;
 
     const formatFieldTypeName = (name?: string | null): string => {
@@ -514,18 +514,18 @@ export class FieldsService {
       },
       booking: r.bookings
         ? {
-          id: r.bookings.id,
-          code: r.bookings.code,
-          fieldName: field.name,
-          matchDate: r.bookings.start_time
-            ? new Date(r.bookings.start_time).toISOString().split('T')[0]
-            : '',
-          timeSlot:
-            r.bookings.start_time && r.bookings.end_time
-              ? `${new Date(r.bookings.start_time).toISOString().substring(11, 16)} - ${new Date(r.bookings.end_time).toISOString().substring(11, 16)}`
+            id: r.bookings.id,
+            code: r.bookings.code,
+            fieldName: field.name,
+            matchDate: r.bookings.start_time
+              ? new Date(r.bookings.start_time).toISOString().split('T')[0]
               : '',
-          fieldTypeName,
-        }
+            timeSlot:
+              r.bookings.start_time && r.bookings.end_time
+                ? `${new Date(r.bookings.start_time).toISOString().substring(11, 16)} - ${new Date(r.bookings.end_time).toISOString().substring(11, 16)}`
+                : '',
+            fieldTypeName,
+          }
         : undefined,
     }));
 
@@ -711,11 +711,11 @@ export class FieldsService {
     const averageRating =
       totalAllReviews > 0
         ? Number(
-          (
-            allFieldReviews.reduce((sum, r) => sum + r.rating, 0) /
-            totalAllReviews
-          ).toFixed(1),
-        )
+            (
+              allFieldReviews.reduce((sum, r) => sum + r.rating, 0) /
+              totalAllReviews
+            ).toFixed(1),
+          )
         : 5.0;
 
     const breakdown = [5, 4, 3, 2, 1].map((star) => {
@@ -746,18 +746,18 @@ export class FieldsService {
       },
       booking: r.bookings
         ? {
-          id: r.bookings.id,
-          code: r.bookings.code,
-          fieldName: field.name,
-          matchDate: r.bookings.start_time
-            ? new Date(r.bookings.start_time).toISOString().split('T')[0]
-            : '',
-          timeSlot:
-            r.bookings.start_time && r.bookings.end_time
-              ? `${new Date(r.bookings.start_time).toISOString().substring(11, 16)} - ${new Date(r.bookings.end_time).toISOString().substring(11, 16)}`
+            id: r.bookings.id,
+            code: r.bookings.code,
+            fieldName: field.name,
+            matchDate: r.bookings.start_time
+              ? new Date(r.bookings.start_time).toISOString().split('T')[0]
               : '',
-          fieldTypeName: field.field_types?.name || 'Sân bóng đá',
-        }
+            timeSlot:
+              r.bookings.start_time && r.bookings.end_time
+                ? `${new Date(r.bookings.start_time).toISOString().substring(11, 16)} - ${new Date(r.bookings.end_time).toISOString().substring(11, 16)}`
+                : '',
+            fieldTypeName: field.field_types?.name || 'Sân bóng đá',
+          }
         : undefined,
       comments: [],
       verifiedBooking: true,

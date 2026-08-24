@@ -448,7 +448,10 @@ export async function updateAdminUser(
   return res.data;
 }
 
-export async function uploadAdminUserAvatar(userId: string, formData: FormData) {
+export async function uploadAdminUserAvatar(
+  userId: string,
+  formData: FormData,
+) {
   const token = await getAuthToken();
   const res = await api.post(`/admin/users/${userId}/avatar`, formData, {
     headers: {

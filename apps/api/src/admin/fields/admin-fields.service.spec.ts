@@ -1,7 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { StorageService } from '../../storage/storage.service';
-import { AdminFieldsService } from './admin-fields.service';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { StorageService } from '../../storage/storage.service.js';
+import { AdminFieldsService } from './admin-fields.service.js';
 
 describe('AdminFieldsService', () => {
   const createService = () => {

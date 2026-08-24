@@ -4,10 +4,7 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  fetchAdminUsers,
-  updateAdminUserStatus,
-} from '@/lib/api';
+import { fetchAdminUsers, updateAdminUserStatus } from '@/lib/api';
 import {
   Search,
   UserPlus,

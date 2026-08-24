@@ -37,7 +37,6 @@ export default function AdminLayout({
   const pathname = rawPathname.replace(/\/$/, '') || '/admin';
 
   const checkAdminAuth = useCallback(async () => {
-    setIsAuthChecking(true);
     try {
       const supabase = getSupabaseBrowserClient();
       const { data, error } = await supabase.auth.getUser();
@@ -133,16 +132,15 @@ export default function AdminLayout({
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void checkAdminAuth();
 
     try {
       const supabase = getSupabaseBrowserClient();
-      const { data: authListener } = supabase.auth.onAuthStateChange(
-        (_event, _session) => {
-          // Re-verify strictly whenever auth state changes (e.g. login/logout in another tab)
-          void checkAdminAuth();
-        },
-      );
+      const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+        // Re-verify strictly whenever auth state changes (e.g. login/logout in another tab)
+        void checkAdminAuth();
+      });
 
       return () => authListener.subscription.unsubscribe();
     } catch {
@@ -303,11 +301,7 @@ export default function AdminLayout({
               />
             ) : (
               <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#bccbb9] bg-[#e7e8e9] font-bold text-[#006e2f]">
-                {(
-                  adminUser?.fullName ||
-                  adminUser?.email ||
-                  'A'
-                )
+                {(adminUser?.fullName || adminUser?.email || 'A')
                   .charAt(0)
                   .toUpperCase()}
               </div>

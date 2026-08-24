@@ -19,11 +19,7 @@ import {
 } from 'lucide-react';
 
 export type BookingStatus =
-  | 'PENDING'
-  | 'CONFIRMED'
-  | 'COMPLETED'
-  | 'REJECTED'
-  | 'CANCELLED';
+  'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'REJECTED' | 'CANCELLED';
 
 export interface ScheduleCourt {
   id: string;
@@ -267,7 +263,8 @@ export default function AdminSchedulePage() {
       fetchAdminBookingCalendar({
         from: fromISO,
         to: toISO,
-        fieldId: selectedCourtFilter !== 'all' ? selectedCourtFilter : undefined,
+        fieldId:
+          selectedCourtFilter !== 'all' ? selectedCourtFilter : undefined,
       }),
     retry: false,
   });
@@ -463,9 +460,7 @@ export default function AdminSchedulePage() {
             <select
               value={viewMode}
               onChange={(e) =>
-                setViewMode(
-                  e.target.value as 'week' | 'day' | 'month' | 'year',
-                )
+                setViewMode(e.target.value as 'week' | 'day' | 'month' | 'year')
               }
               className="w-full appearance-none rounded-lg border border-[#dadce0] bg-white py-2 pl-3.5 pr-8 text-sm font-medium text-[#006e2f] shadow-2xs transition-all hover:bg-[#f8f9fa] focus:border-[#006e2f] focus:outline-none"
             >
@@ -734,8 +729,8 @@ export default function AdminSchedulePage() {
                           day.isToday
                             ? 'bg-[#006e2f] text-white'
                             : day.isCurrentMonth
-                            ? 'text-[#3c4043]'
-                            : 'text-[#70757a]/50'
+                              ? 'text-[#3c4043]'
+                              : 'text-[#70757a]/50'
                         }`}
                       >
                         {day.dayNumber}
@@ -848,8 +843,8 @@ export default function AdminSchedulePage() {
                             isToday
                               ? 'bg-[#006e2f] text-white font-bold'
                               : hasBooking
-                              ? 'bg-[#006e2f]/15 text-[#004b1e] font-bold'
-                              : 'text-[#3c4043]'
+                                ? 'bg-[#006e2f]/15 text-[#004b1e] font-bold'
+                                : 'text-[#3c4043]'
                           }`}
                         >
                           {dayNum}

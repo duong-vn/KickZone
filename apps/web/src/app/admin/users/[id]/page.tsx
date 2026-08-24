@@ -635,7 +635,9 @@ export default function AdminUserDetailPage({
                       <span className="text-[#575e70]">Đăng nhập</span>
                       <span className="flex items-center gap-1.5 font-bold text-[#191c1d]">
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-blue-600 font-bold text-[10px]">
-                          {user.loginProvider ? user.loginProvider.charAt(0) : 'E'}
+                          {user.loginProvider
+                            ? user.loginProvider.charAt(0)
+                            : 'E'}
                         </span>
                         {user.loginProvider || 'Email/Password'}
                       </span>

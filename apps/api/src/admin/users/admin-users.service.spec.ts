@@ -1,6 +1,7 @@
 import { ConflictException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { AdminUsersService } from './admin-users.service';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { StorageService } from '../../storage/storage.service.js';
+import { AdminUsersService } from './admin-users.service.js';
 
 describe('AdminUsersService', () => {
   const createService = () => {
@@ -14,6 +15,8 @@ describe('AdminUsersService', () => {
       },
     } as unknown as PrismaService;
 
+    const storageService = {} as unknown as StorageService;
+
     const createUserInAuth = jest.fn();
     const supabaseMock = {
       auth: {
@@ -23,7 +26,7 @@ describe('AdminUsersService', () => {
       },
     };
 
-    const service = new AdminUsersService(prisma);
+    const service = new AdminUsersService(prisma, storageService);
     // Inject mock supabase
     (service as unknown as { supabase: typeof supabaseMock }).supabase =
       supabaseMock;
@@ -94,6 +97,7 @@ describe('AdminUsersService', () => {
         email_confirm: true,
         user_metadata: {
           full_name: 'Nguyễn Văn A',
+          name: 'Nguyễn Văn A',
           phone: '0901234567',
         },
       });
@@ -103,6 +107,7 @@ describe('AdminUsersService', () => {
           email: 'newuser@example.com',
           full_name: 'Nguyễn Văn A',
           phone: '0901234567',
+          avatar_path: null,
           role: 'USER',
           status: 'ACTIVE',
         },

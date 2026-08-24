@@ -555,7 +555,7 @@ export default function FieldDetailPage({
         });
         toast.success(
           result.message ||
-          `Đã áp dụng mã ${code}! Giảm ${result.discountAmount.toLocaleString('vi-VN')}đ`,
+            `Đã áp dụng mã ${code}! Giảm ${result.discountAmount.toLocaleString('vi-VN')}đ`,
         );
       } else {
         setAppliedVoucher(null);
@@ -647,11 +647,11 @@ export default function FieldDetailPage({
         return base.map((r) =>
           r.id === data.reviewId
             ? {
-              ...r,
-              rating: data.rating,
-              content: data.content,
-              updatedAt: new Date().toISOString(),
-            }
+                ...r,
+                rating: data.rating,
+                content: data.content,
+                updatedAt: new Date().toISOString(),
+              }
             : r,
         );
       });
@@ -1538,7 +1538,7 @@ export default function FieldDetailPage({
                   onClick={() =>
                     setSelectedPhotoIndex(
                       (selectedPhotoIndex - 1 + fieldImages.length) %
-                      fieldImages.length,
+                        fieldImages.length,
                     )
                   }
                   className="absolute left-2 sm:left-4 p-3 rounded-full bg-black/60 text-white hover:bg-black/90 transition-all cursor-pointer"
@@ -1571,10 +1571,11 @@ export default function FieldDetailPage({
                   key={i}
                   type="button"
                   onClick={() => setSelectedPhotoIndex(i)}
-                  className={`w-16 h-12 sm:w-20 sm:h-14 rounded-xl overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${selectedPhotoIndex === i
+                  className={`w-16 h-12 sm:w-20 sm:h-14 rounded-xl overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
+                    selectedPhotoIndex === i
                       ? 'border-[#22c55e] scale-105'
                       : 'border-transparent opacity-60 hover:opacity-100'
-                    }`}
+                  }`}
                 >
                   <img
                     src={img}

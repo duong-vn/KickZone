@@ -252,9 +252,7 @@ export default function AdminNewUserPage() {
                 <div className="flex justify-between items-center">
                   <span className="text-[#575e70]">Vai trò:</span>
                   <span className="font-bold text-[#191c1d]">
-                    {formData.role === 'ADMIN'
-                      ? 'Quản trị viên'
-                      : 'Khách hàng'}
+                    {formData.role === 'ADMIN' ? 'Quản trị viên' : 'Khách hàng'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -434,9 +432,7 @@ export default function AdminNewUserPage() {
                   ) : (
                     <Check className="h-4 w-4" />
                   )}
-                  <span>
-                    {isSubmitting ? 'Đang tạo...' : 'Tạo người dùng'}
-                  </span>
+                  <span>{isSubmitting ? 'Đang tạo...' : 'Tạo người dùng'}</span>
                 </button>
               </div>
             </div>

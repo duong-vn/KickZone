@@ -80,7 +80,10 @@ export function LoginForm() {
           return;
         }
       } catch (err: unknown) {
-        const anyErr = err as { response?: { status?: number; data?: { message?: string } }; message?: string };
+        const anyErr = err as {
+          response?: { status?: number; data?: { message?: string } };
+          message?: string;
+        };
         if (
           anyErr?.response?.status === 403 ||
           anyErr?.response?.data?.message?.includes('vô hiệu hóa') ||

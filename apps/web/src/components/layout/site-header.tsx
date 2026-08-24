@@ -53,7 +53,12 @@ export function SiteHeader() {
         setIsAuthLoading(false);
       };
 
-      const syncProfile = async (authUser: { email?: string; user_metadata?: Record<string, unknown> } | null) => {
+      const syncProfile = async (
+        authUser: {
+          email?: string;
+          user_metadata?: Record<string, unknown>;
+        } | null,
+      ) => {
         if (!authUser) {
           setCurrentUser(null);
           return;
@@ -70,7 +75,11 @@ export function SiteHeader() {
             typeof metadata.avatar_url === 'string'
               ? metadata.avatar_url
               : undefined,
-          role: (metadata.role as string) || (authUser.email?.toLowerCase().startsWith('admin') ? 'ADMIN' : 'USER'),
+          role:
+            (metadata.role as string) ||
+            (authUser.email?.toLowerCase().startsWith('admin')
+              ? 'ADMIN'
+              : 'USER'),
         };
 
         try {

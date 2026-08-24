@@ -146,9 +146,7 @@ export class AdminBookingsService {
       );
 
     const booking = await this.prisma.bookings.findFirst({
-      where: isUuid
-        ? { id }
-        : { code: { equals: id, mode: 'insensitive' } },
+      where: isUuid ? { id } : { code: { equals: id, mode: 'insensitive' } },
       include: {
         profiles: true,
         fields: {

@@ -201,8 +201,7 @@ export default function AdminBookingsPage() {
   const totalPages =
     apiResponse?.meta?.totalPages ??
     Math.max(1, Math.ceil(totalRecords / pageSize));
-  const startRecord =
-    totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const startRecord = totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRecord = Math.min(currentPage * pageSize, totalRecords);
 
   // Selected booking for detailed view/actions
@@ -712,10 +711,11 @@ export default function AdminBookingsPage() {
                   key={`page-${pageNum}`}
                   type="button"
                   onClick={() => setCurrentPage(Number(pageNum))}
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${currentPage === pageNum
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                    currentPage === pageNum
                       ? 'bg-[#006e2f] text-white shadow-sm'
                       : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
-                    }`}
+                  }`}
                 >
                   {pageNum}
                 </button>
@@ -845,18 +845,18 @@ export default function AdminBookingsPage() {
               {/* Reason notice if rejected or cancelled */}
               {(selectedBooking.rejectionReason ||
                 selectedBooking.cancellationReason) && (
-                  <div className="rounded-xl border border-[#ba1a1a]/30 bg-[#ffdad6]/30 p-3 text-xs text-[#93000a]">
-                    <p className="font-bold">
-                      {selectedBooking.status === 'REJECTED'
-                        ? 'Lý do từ chối:'
-                        : 'Lý do hủy đơn:'}
-                    </p>
-                    <p className="mt-1">
-                      {selectedBooking.rejectionReason ||
-                        selectedBooking.cancellationReason}
-                    </p>
-                  </div>
-                )}
+                <div className="rounded-xl border border-[#ba1a1a]/30 bg-[#ffdad6]/30 p-3 text-xs text-[#93000a]">
+                  <p className="font-bold">
+                    {selectedBooking.status === 'REJECTED'
+                      ? 'Lý do từ chối:'
+                      : 'Lý do hủy đơn:'}
+                  </p>
+                  <p className="mt-1">
+                    {selectedBooking.rejectionReason ||
+                      selectedBooking.cancellationReason}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Action buttons inside modal if PENDING */}

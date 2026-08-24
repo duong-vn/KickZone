@@ -13,7 +13,7 @@ export class AvailabilityQueryDto {
 @ApiTags('fields')
 @Controller('fields')
 export class FieldsController {
-  constructor(private readonly fieldsService: FieldsService) { }
+  constructor(private readonly fieldsService: FieldsService) {}
 
   @Get()
   @ApiOperation({
