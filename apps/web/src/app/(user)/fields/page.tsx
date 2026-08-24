@@ -27,94 +27,6 @@ function formatDateDisplay(isoDate: string) {
   return `${day}/${month}/${year}`;
 }
 
-interface FieldItem {
-  id: string;
-  name: string;
-  location: string;
-  district?: string;
-  types?: string[];
-  type?: string;
-  rating: number;
-  pricePerHour: number;
-  available?: boolean;
-  image: string;
-}
-
-const MOCK_FIELDS: FieldItem[] = [
-  {
-    id: '1',
-    name: 'Sân Chảo Lửa',
-    location: '30 Phan Thúc Duyện, Tân Bình',
-    district: 'Tân Bình',
-    types: ['Sân 5', 'Sân 7'],
-    rating: 4.8,
-    pricePerHour: 250000,
-    available: true,
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDrDOm7rj2skKxqydXGm_2fCgpc8cOSpWpfQNWUjSyk-4a8dJ67OgaVYU9_8gXoZ7zVsNGiHktsLNrqgaBE1jMnGFe72lXAoL0bQmZNUNz0h8Wq87FFOo9oVZ2a87dzJkPll6s7TwgQcznmgYmfIyimnqqxY8RK6lLhDcZ4Bit1ySrjYbD52BLS0WIM6cOxPrR_ocu92EJjPiaknq_yREXKh7BKesXc5k_Se9YStukY_4DUzkvKvmPf1Q',
-  },
-  {
-    id: '2',
-    name: 'Sân K34',
-    location: 'Nguyễn Thị Minh Khai, Quận 1',
-    district: 'Quận 1',
-    types: ['Sân 7'],
-    rating: 4.5,
-    pricePerHour: 300000,
-    available: false,
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuC3Rq8ne4IOVVio5VQy3uaUSlBYmkmgetmT20pt5-fgTOOZgnCBxzUc9RzETSFMsbKADKJZSwChjnHmm_sr-7aKTnl8wkNAZtEcwYF__8UJUJdAzeUDOurOC6k1kWsYiPQVdp31h24McPQ5-4rzObUdgsrTNpsJAA_-3KuLkN342DGPvl8jzGzZshku4eDc86lF7BM8ybPOYP5yojP7TGV8RI_HQAqk0TL_BHfbvXa8h3PlqTTqPEOIVA',
-  },
-  {
-    id: '3',
-    name: 'Sân ĐH Tôn Đức Thắng',
-    location: 'Nguyễn Hữu Thọ, Quận 7',
-    district: 'Quận 7',
-    types: ['Sân 11'],
-    rating: 4.9,
-    pricePerHour: 800000,
-    available: true,
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuA2xE5yic2QHVvAqARF7Bnyi4HqzWmPfrZDHikx8s3unwe_Ge_sVVJ0ClvSMNaoPL8Fe-1xO9NnM19thd8s-h7uSOUkSSCu1gODikd4Gd-P_mza95dVWCZlhwbFlXdhAiY5m1ljnfxxqwx1loSCGMvEs4WOOG9fu5HhvxQR-37aqtHQ76ihT-Yb35-_2J4oT3iJWU8aoPUzGn9eso_QXWawiSKb436K4Lartu7XiFxnF4I08vv9MXyrOA',
-  },
-  {
-    id: '4',
-    name: 'Sân bóng mini Lan Anh',
-    location: 'Cách Mạng Tháng 8, Quận 10',
-    district: 'Quận 10',
-    types: ['Sân 5', 'Sân 7'],
-    rating: 4.6,
-    pricePerHour: 350000,
-    available: true,
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDrDOm7rj2skKxqydXGm_2fCgpc8cOSpWpfQNWUjSyk-4a8dJ67OgaVYU9_8gXoZ7zVsNGiHktsLNrqgaBE1jMnGFe72lXAoL0bQmZNUNz0h8Wq87FFOo9oVZ2a87dzJkPll6s7TwgQcznmgYmfIyimnqqxY8RK6lLhDcZ4Bit1ySrjYbD52BLS0WIM6cOxPrR_ocu92EJjPiaknq_yREXKh7BKesXc5k_Se9YStukY_4DUzkvKvmPf1Q',
-  },
-  {
-    id: '5',
-    name: 'Sân bóng đá Thảo Điền',
-    location: 'Nguyễn Văn Hưởng, TP. Thủ Đức',
-    district: 'TP. Thủ Đức',
-    types: ['Sân 7', 'Sân 11'],
-    rating: 4.7,
-    pricePerHour: 600000,
-    available: true,
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuA2xE5yic2QHVvAqARF7Bnyi4HqzWmPfrZDHikx8s3unwe_Ge_sVVJ0ClvSMNaoPL8Fe-1xO9NnM19thd8s-h7uSOUkSSCu1gODikd4Gd-P_mza95dVWCZlhwbFlXdhAiY5m1ljnfxxqwx1loSCGMvEs4WOOG9fu5HhvxQR-37aqtHQ76ihT-Yb35-_2J4oT3iJWU8aoPUzGn9eso_QXWawiSKb436K4Lartu7XiFxnF4I08vv9MXyrOA',
-  },
-  {
-    id: '6',
-    name: 'Sân vận động Gia Định',
-    location: 'Hoàng Minh Giám, Gò Vấp',
-    district: 'Gò Vấp',
-    types: ['Sân 5'],
-    rating: 4.4,
-    pricePerHour: 220000,
-    available: false,
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuC3Rq8ne4IOVVio5VQy3uaUSlBYmkmgetmT20pt5-fgTOOZgnCBxzUc9RzETSFMsbKADKJZSwChjnHmm_sr-7aKTnl8wkNAZtEcwYF__8UJUJdAzeUDOurOC6k1kWsYiPQVdp31h24McPQ5-4rzObUdgsrTNpsJAA_-3KuLkN342DGPvl8jzGzZshku4eDc86lF7BM8ybPOYP5yojP7TGV8RI_HQAqk0TL_BHfbvXa8h3PlqTTqPEOIVA',
-  },
-];
-
 const DISTRICTS = [
   'Tất cả quận/huyện',
   'Quận 1',
@@ -295,57 +207,14 @@ function FieldsContent() {
         maxPrice: maxPrice < 1000000 ? maxPrice : undefined,
         sortBy: sortBy !== 'featured' ? sortBy : undefined,
         page,
+        limit: 9,
       }),
-    retry: false,
   });
 
-  const filteredMockData = useMemo(() => {
-    let result = [...MOCK_FIELDS];
-
-    if (debouncedSearch.trim()) {
-      const keyword = debouncedSearch.trim().toLowerCase();
-      result = result.filter(
-        (f) =>
-          f.name.toLowerCase().includes(keyword) ||
-          f.location.toLowerCase().includes(keyword),
-      );
-    }
-
-    if (district && district !== 'Tất cả quận/huyện') {
-      result = result.filter((f) => {
-        if (f.district) {
-          return f.district.toLowerCase() === district.toLowerCase();
-        }
-        const regex = new RegExp(
-          `(^|\\b|[,\\s])${district}($|\\b|[,\\s])`,
-          'i',
-        );
-        return regex.test(f.location);
-      });
-    }
-
-    if (selectedTypes.length > 0) {
-      result = result.filter((f) =>
-        selectedTypes.every((t) => f.types?.includes(t) ?? false),
-      );
-    }
-
-    result = result.filter((f) => f.pricePerHour <= maxPrice);
-
-    if (sortBy === 'price-asc') {
-      result.sort((a, b) => a.pricePerHour - b.pricePerHour);
-    } else if (sortBy === 'price-desc') {
-      result.sort((a, b) => b.pricePerHour - a.pricePerHour);
-    } else if (sortBy === 'rating') {
-      result.sort((a, b) => b.rating - a.rating);
-    }
-
-    return result;
-  }, [debouncedSearch, district, selectedTypes, maxPrice, sortBy]);
-
-  const displayFields =
-    apiData?.data && apiData.data.length > 0 ? apiData.data : filteredMockData;
-  const totalResults = apiData?.meta?.total ?? displayFields.length;
+  const fieldsList = apiData?.data ?? [];
+  const meta = apiData?.meta ?? { total: 0, page: 1, limit: 9, totalPages: 0 };
+  const totalResults = meta.total;
+  const totalPages = meta.totalPages;
 
   const toggleType = (t: string) => {
     const nextTypes = selectedTypes.includes(t)
@@ -653,77 +522,9 @@ function FieldsContent() {
             ) : (
               /* FIELD GRID LIST */
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {displayFields.map((field: FieldItem) => {
-                  const isAvailable = field.available ?? true;
-                  return (
-                    <div
-                      key={field.id}
-                      className="bg-white border border-[#bccbb9]/40 rounded-xl overflow-hidden shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] hover:shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1)] transition-shadow duration-300 flex flex-col group"
-                    >
-                      <div className="h-48 relative overflow-hidden bg-slate-100">
-                        <img
-                          src={field.image}
-                          alt={field.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                        <div
-                          className={`absolute top-2.5 right-2.5 px-2 py-0.5 rounded text-xs font-semibold ${isAvailable
-                              ? 'bg-[#22c55e] text-[#004b1e]'
-                              : 'bg-[#ffdad6] text-[#93000a]'
-                            }`}
-                        >
-                          {isAvailable ? 'Còn sân' : 'Đã đặt'}
-                        </div>
-                      </div>
-
-                      <div className="p-4 flex flex-col flex-grow justify-between space-y-3">
-                        <div>
-                          <h3 className="font-bold text-base text-[#191c1d] line-clamp-1 font-['Manrope'] mb-1">
-                            {field.name}
-                          </h3>
-                          <div className="flex items-center gap-1 text-[#575e70] text-xs mb-3">
-                            <MapPin className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">{field.location}</span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            {field.types?.map((t: string) => (
-                              <span
-                                key={t}
-                                className="bg-[#f3f4f5] text-[#575e70] px-2 py-0.5 rounded text-xs"
-                              >
-                                {t}
-                              </span>
-                            ))}
-                            <div className="flex items-center text-[#006e2f] ml-auto gap-0.5 font-bold text-xs">
-                              <Star className="w-3.5 h-3.5 fill-[#006e2f] text-[#006e2f]" />
-                              <span>{field.rating}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-auto pt-3 border-t border-[#bccbb9]/30 flex justify-between items-center">
-                          <div className="font-bold text-lg text-[#006e2f] font-['Manrope']">
-                            {field.pricePerHour.toLocaleString('vi-VN')}đ
-                            <span className="text-xs font-normal text-[#575e70]">
-                              /h
-                            </span>
-                          </div>
-                          <Link href={`/fields/${field.id}`}>
-                            <button
-                              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-[#bccbb9]/60 transition-colors ${isAvailable
-                                  ? 'bg-[#edeeef] text-[#191c1d] hover:bg-[#006e2f] hover:text-white hover:border-[#006e2f]'
-                                  : 'bg-[#edeeef] text-[#575e70] hover:bg-slate-200'
-                                }`}
-                            >
-                              {isAvailable ? 'Đặt ngay' : 'Chi tiết'}
-                            </button>
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {fieldsList.map((field: Field) => (
+                  <FieldCard key={field.id} field={field} />
+                ))}
               </div>
             )}
 
