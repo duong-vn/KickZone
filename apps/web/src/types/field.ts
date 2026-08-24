@@ -68,4 +68,24 @@ export interface Field {
   is_available_today?: boolean;
   primary_image_url?: string;
   supported_types?: string[];
+  location?: string;
+  pricePerHour?: number;
+  image?: string;
+  rating?: number;
+  available?: boolean;
+  type?: string;
+  types?: string[];
 }
+
+export interface FieldsMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface FieldsResponse {
+  data: Field[];
+  meta: FieldsMeta;
+}
+
