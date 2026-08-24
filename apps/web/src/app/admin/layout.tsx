@@ -19,7 +19,10 @@ export default function AdminLayout({
     currentTitle = 'Quản lý đơn đặt sân';
   } else if (pathname.startsWith('/admin/bookings/')) {
     currentTitle = 'Chi tiết đơn đặt sân';
-  } else if (pathname === '/admin/fields/new' || pathname.startsWith('/admin/fields/new')) {
+  } else if (
+    pathname === '/admin/fields/new' ||
+    pathname.startsWith('/admin/fields/new')
+  ) {
     currentTitle = 'Thêm sân bóng mới';
   } else if (pathname === '/admin/fields') {
     currentTitle = 'Quản lý sân bóng';

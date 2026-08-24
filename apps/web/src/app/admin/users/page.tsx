@@ -148,14 +148,20 @@ export default function AdminUsersPage() {
       // Status
       if (statusFilter !== 'all') {
         if (statusFilter === 'active' && user.status !== 'ACTIVE') return false;
-        if (statusFilter === 'disabled' && user.status !== 'INACTIVE') return false;
-        if (statusFilter === 'pending' && user.status !== 'PENDING') return false;
+        if (statusFilter === 'disabled' && user.status !== 'INACTIVE')
+          return false;
+        if (statusFilter === 'pending' && user.status !== 'PENDING')
+          return false;
       }
 
       // Role
       if (roleFilter !== 'all') {
         if (roleFilter === 'customer' && user.role !== 'USER') return false;
-        if (roleFilter === 'manager' && user.role !== 'MANAGER' && user.role !== 'ADMIN')
+        if (
+          roleFilter === 'manager' &&
+          user.role !== 'MANAGER' &&
+          user.role !== 'ADMIN'
+        )
           return false;
       }
 
@@ -173,12 +179,12 @@ export default function AdminUsersPage() {
           showToast(
             nextStatus === 'ACTIVE'
               ? `Đã kích hoạt tài khoản cho ${u.fullName}!`
-              : `Đã vô hiệu hóa tài khoản của ${u.fullName}.`
+              : `Đã vô hiệu hóa tài khoản của ${u.fullName}.`,
           );
           return { ...u, status: nextStatus };
         }
         return u;
-      })
+      }),
     );
   };
 
@@ -191,7 +197,7 @@ export default function AdminUsersPage() {
           return { ...u, status: 'ACTIVE' };
         }
         return u;
-      })
+      }),
     );
   };
 
@@ -373,18 +379,25 @@ export default function AdminUsersPage() {
           <table className="w-full border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-[#bccbb9] bg-[#f3f4f5] text-xs font-semibold text-[#575e70]">
-                <th className="px-6 py-4 whitespace-nowrap w-1/4">Người dùng</th>
+                <th className="px-6 py-4 whitespace-nowrap w-1/4">
+                  Người dùng
+                </th>
                 <th className="px-6 py-4 whitespace-nowrap">Email</th>
                 <th className="px-6 py-4 whitespace-nowrap">Số điện thoại</th>
                 <th className="px-6 py-4 whitespace-nowrap">Ngày đăng ký</th>
                 <th className="px-6 py-4 whitespace-nowrap">Trạng thái</th>
-                <th className="px-6 py-4 whitespace-nowrap text-right">Hành động</th>
+                <th className="px-6 py-4 whitespace-nowrap text-right">
+                  Hành động
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#bccbb9]/50 text-xs sm:text-sm text-[#191c1d]">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-sm text-[#575e70]">
+                  <td
+                    colSpan={6}
+                    className="py-12 text-center text-sm text-[#575e70]"
+                  >
                     Không tìm thấy người dùng nào phù hợp với bộ lọc.
                   </td>
                 </tr>
@@ -500,8 +513,11 @@ export default function AdminUsersPage() {
         <div className="flex flex-col items-center justify-between gap-3 border-t border-[#bccbb9] bg-white px-6 py-4 sm:flex-row text-xs sm:text-sm text-[#575e70]">
           <div className="hidden sm:block">
             Hiển thị <span className="font-bold text-[#191c1d]">1</span> đến{' '}
-            <span className="font-bold text-[#191c1d]">{filteredUsers.length}</span> trong số{' '}
-            <span className="font-bold text-[#191c1d]">120</span> người dùng
+            <span className="font-bold text-[#191c1d]">
+              {filteredUsers.length}
+            </span>{' '}
+            trong số <span className="font-bold text-[#191c1d]">120</span> người
+            dùng
           </div>
 
           <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
@@ -616,19 +632,27 @@ export default function AdminUsersPage() {
                   <p className="font-bold text-[#191c1d] text-base">
                     {viewingUser.fullName}
                   </p>
-                  <p className="text-xs text-[#575e70]">{viewingUser.roleLabel}</p>
-                  <div className="mt-1">{renderStatusBadge(viewingUser.status)}</div>
+                  <p className="text-xs text-[#575e70]">
+                    {viewingUser.roleLabel}
+                  </p>
+                  <div className="mt-1">
+                    {renderStatusBadge(viewingUser.status)}
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-[#575e70]">Email:</span>
-                  <span className="font-medium text-[#191c1d]">{viewingUser.email}</span>
+                  <span className="font-medium text-[#191c1d]">
+                    {viewingUser.email}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#575e70]">Số điện thoại:</span>
-                  <span className="font-medium text-[#191c1d]">{viewingUser.phone}</span>
+                  <span className="font-medium text-[#191c1d]">
+                    {viewingUser.phone}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#575e70]">Ngày tham gia:</span>
@@ -680,7 +704,10 @@ export default function AdminUsersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleAddUserSubmit} className="my-4 space-y-3.5 text-xs sm:text-sm">
+            <form
+              onSubmit={handleAddUserSubmit}
+              className="my-4 space-y-3.5 text-xs sm:text-sm"
+            >
               <div>
                 <label className="mb-1 block font-semibold text-[#191c1d]">
                   Họ và tên <span className="text-[#ba1a1a]">*</span>

@@ -25,9 +25,24 @@ import {
   X,
   Check,
   Flame,
+  MessageSquarePlus,
+  ArrowRight,
+  StarOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import type { Review } from '@/types/review';
+import {
+  INITIAL_MOCK_REVIEWS,
+  CURRENT_USER,
+  calculateReviewSummary,
+} from '@/data/mock-reviews';
+import {
+  StarRating,
+  ReviewCard,
+  WriteReviewModal,
+  DeleteReviewDialog,
+} from '@/components/reviews';
 
 // ==========================================
 // MOCK DATA & DETAILS CHO TỪNG SÂN BÓNG
@@ -430,6 +445,108 @@ export default function FieldDetailPage({
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Reviews state
+  const [reviewsList, setReviewsList] =
+    useState<Review[]>(INITIAL_MOCK_REVIEWS);
+  const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
+  const [editingReview, setEditingReview] = useState<Review | null>(null);
+  const [deletingReview, setDeletingReview] = useState<Review | null>(null);
+
+  const reviewSummary = useMemo(
+    () => calculateReviewSummary(reviewsList),
+    [reviewsList],
+  );
+
+  const handleCreateOrUpdateReview = (data: {
+    rating: number;
+    content: string;
+    reviewId?: string;
+  }) => {
+    if (data.reviewId) {
+      setReviewsList((prev) =>
+        prev.map((r) =>
+          r.id === data.reviewId
+            ? {
+                ...r,
+                rating: data.rating,
+                content: data.content,
+                updatedAt: new Date().toISOString(),
+              }
+            : r,
+        ),
+      );
+      setEditingReview(null);
+    } else {
+      const newReview: Review = {
+        id: `rev-${Date.now()}`,
+        userId: CURRENT_USER.id,
+        fieldId: fieldId,
+        bookingId: `bk-${Date.now()}`,
+        rating: data.rating,
+        content: data.content,
+        createdAt: new Date().toISOString(),
+        verifiedBooking: true,
+        isOwner: true,
+        user: CURRENT_USER,
+        booking: {
+          id: `bk-${Date.now()}`,
+          code: `KZ-BK-${Math.floor(100 + Math.random() * 900)}`,
+          fieldName: field.name,
+          matchDate: 'Hôm nay',
+          timeSlot: '18:00 - 19:30',
+          fieldTypeName: 'Sân 7 người',
+        },
+        comments: [],
+      };
+      setReviewsList((prev) => [newReview, ...prev]);
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingReview) return;
+    setReviewsList((prev) => prev.filter((r) => r.id !== deletingReview.id));
+    toast.success('Đã xóa bài đánh giá thành công.');
+    setDeletingReview(null);
+  };
+
+  const handleAddComment = (
+    reviewId: string,
+    content: string,
+    parentId?: string,
+    replyToUserName?: string,
+  ) => {
+    const newComment = {
+      id: `comm-${Date.now()}`,
+      reviewId,
+      userId: CURRENT_USER.id,
+      parentId: parentId || null,
+      replyToUserName: replyToUserName || null,
+      content,
+      createdAt: new Date().toISOString(),
+      user: CURRENT_USER,
+    };
+
+    setReviewsList((prev) =>
+      prev.map((rev) => {
+        if (rev.id !== reviewId) return rev;
+
+        if (parentId) {
+          const updatedComments = rev.comments.map((c) => {
+            if (c.id === parentId) {
+              return { ...c, replies: [...(c.replies || []), newComment] };
+            }
+            return c;
+          });
+          return { ...rev, comments: updatedComments };
+        }
+
+        return { ...rev, comments: [...rev.comments, newComment] };
+      }),
+    );
+
+    toast.success('Đã gửi bình luận thành công!');
+  };
 
   // Booking states
   const [selectedSubPitch, setSelectedSubPitch] = useState(
@@ -888,7 +1005,7 @@ export default function FieldDetailPage({
               </div>
             </div>
 
-            {/* 4. Đánh giá & Nhận xét từ khách hàng */}
+            {/* 4. Đánh giá & Nhận xét từ khách hàng (Tích hợp trọn bộ Design System) */}
             <div className="bg-white rounded-2xl p-6 border border-[#bccbb9]/40 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-[#bccbb9]/30">
                 <div>
@@ -896,58 +1013,54 @@ export default function FieldDetailPage({
                     Đánh giá từ cầu thủ & đội bóng
                   </h2>
                   <p className="text-xs text-[#575e70]">
-                    Đánh giá từ những người đã hoàn tất đặt sân thực tế
+                    Đánh giá chân thực từ những người đã hoàn tất đặt sân thực
+                    tế
                   </p>
                 </div>
                 <Button
-                  onClick={() =>
-                    toast.info(
-                      'Chức năng đánh giá sẽ mở sau khi bạn hoàn thành buổi đá!',
-                    )
-                  }
-                  variant="outline"
-                  className="border-[#006e2f] text-[#006e2f] hover:bg-[#006e2f]/10 text-xs self-start sm:self-auto"
+                  onClick={() => {
+                    setEditingReview(null);
+                    setIsWriteModalOpen(true);
+                  }}
+                  className="bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-semibold rounded-xl px-4 py-2 self-start sm:self-auto shadow-sm flex items-center gap-1.5"
                 >
-                  Viết đánh giá
+                  <MessageSquarePlus className="w-3.5 h-3.5" />
+                  <span>Viết đánh giá</span>
                 </Button>
               </div>
 
               {/* Rating summary cards */}
-              <div className="flex flex-col md:flex-row gap-6 mb-6 items-center">
-                <div className="w-full md:w-48 bg-[#f8f9fa] rounded-2xl p-5 text-center border border-[#bccbb9]/30">
-                  <div className="text-4xl font-extrabold text-[#006e2f] font-['Manrope']">
-                    {field.rating}
+              <div className="flex flex-col md:flex-row gap-6 mb-6 items-center p-5 bg-[#f8f9fa] rounded-2xl border border-[#bccbb9]/30">
+                <div className="w-full md:w-48 text-center">
+                  <div className="text-4xl sm:text-5xl font-extrabold text-[#006e2f] font-['Manrope'] mb-1">
+                    {reviewSummary.averageRating.toFixed(1)}
                   </div>
-                  <div className="flex justify-center text-[#006e2f] my-1.5">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star key={s} className="w-4 h-4 fill-[#006e2f]" />
-                    ))}
+                  <div className="flex justify-center mb-1.5">
+                    <StarRating
+                      value={reviewSummary.averageRating}
+                      size="sm"
+                      color="pitch"
+                    />
                   </div>
-                  <div className="text-xs text-[#575e70]">
-                    Dựa trên {field.reviewCount} đánh giá
+                  <div className="text-xs text-[#575e70] font-medium">
+                    Dựa trên {reviewSummary.totalReviews} đánh giá
                   </div>
                 </div>
 
-                <div className="flex-1 w-full space-y-1.5 text-xs">
-                  {[
-                    { star: 5, pct: '82%', count: 102 },
-                    { star: 4, pct: '12%', count: 15 },
-                    { star: 3, pct: '4%', count: 5 },
-                    { star: 2, pct: '1%', count: 1 },
-                    { star: 1, pct: '1%', count: 1 },
-                  ].map((row) => (
+                <div className="flex-1 w-full space-y-2 text-xs">
+                  {reviewSummary.breakdown.map((row) => (
                     <div key={row.star} className="flex items-center gap-2">
-                      <span className="w-3 text-right font-bold text-[#575e70]">
+                      <span className="w-4 text-right font-bold text-[#575e70]">
                         {row.star}
                       </span>
                       <Star className="w-3.5 h-3.5 fill-[#006e2f] text-[#006e2f]" />
                       <div className="flex-1 h-2 bg-[#edeeef] rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-[#006e2f] rounded-full"
-                          style={{ width: row.pct }}
+                          className="h-full bg-[#006e2f] rounded-full transition-all duration-500"
+                          style={{ width: `${row.percentage}%` }}
                         />
                       </div>
-                      <span className="w-8 text-right text-[#575e70] font-medium">
+                      <span className="w-8 text-right text-[#575e70] font-semibold">
                         {row.count}
                       </span>
                     </div>
@@ -955,52 +1068,65 @@ export default function FieldDetailPage({
                 </div>
               </div>
 
-              {/* Customer Reviews List */}
-              <div className="space-y-4">
-                {field.reviews.map((rev) => (
-                  <div
-                    key={rev.id}
-                    className="p-4 rounded-xl bg-[#f8f9fa] border border-[#bccbb9]/30"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={rev.avatar}
-                          alt={rev.author}
-                          className="w-10 h-10 rounded-full object-cover border border-[#bccbb9]/40"
-                        />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-xs text-[#191c1d]">
-                              {rev.author}
-                            </h4>
-                            {rev.verified && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#22c55e]/15 text-[#006e2f] font-semibold">
-                                Đã đặt sân
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[11px] text-[#575e70]">
-                            {rev.date}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex text-[#006e2f]">
-                        {Array.from({ length: rev.rating }).map((_, i) => (
-                          <Star
-                            key={i}
-                            className="w-3.5 h-3.5 fill-[#006e2f]"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <p className="text-xs text-[#575e70] leading-relaxed">
-                      {rev.content}
-                    </p>
+              {/* Customer Reviews List (Top 3 with interactive replies) */}
+              {reviewsList.length > 0 ? (
+                <div className="space-y-4 mb-6">
+                  {reviewsList.slice(0, 3).map((rev) => (
+                    <ReviewCard
+                      key={rev.id}
+                      review={rev}
+                      fieldId={fieldId}
+                      onEdit={(r) => {
+                        setEditingReview(r);
+                        setIsWriteModalOpen(true);
+                      }}
+                      onDelete={(r) => setDeletingReview(r)}
+                      onAddComment={handleAddComment}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-[#f8f9fa] p-8 rounded-xl border border-[#bccbb9]/30 text-center flex flex-col items-center justify-center mb-6">
+                  <div className="w-12 h-12 rounded-full bg-white border border-[#bccbb9]/40 flex items-center justify-center mb-2 text-[#575e70]">
+                    <StarOff className="w-6 h-6 stroke-[1.8] text-[#575e70]" />
                   </div>
-                ))}
+                  <p className="text-xs text-[#575e70]">
+                    Chưa có đánh giá nào cho sân này. Hãy là người đầu tiên đánh
+                    giá!
+                  </p>
+                </div>
+              )}
+
+              {/* Link to All Reviews Page */}
+              <div className="pt-2 text-center border-t border-[#bccbb9]/30">
+                <Link
+                  href={`/fields/${fieldId}/reviews`}
+                  className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-[#006e2f] hover:underline p-2 rounded-xl transition-all"
+                >
+                  <span>
+                    Xem tất cả {reviewsList.length} đánh giá & bình luận
+                  </span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
               </div>
             </div>
+
+            {/* Modals for Write/Edit/Delete Reviews */}
+            <WriteReviewModal
+              isOpen={isWriteModalOpen}
+              onClose={() => {
+                setIsWriteModalOpen(false);
+                setEditingReview(null);
+              }}
+              onSubmit={handleCreateOrUpdateReview}
+              initialReview={editingReview}
+            />
+
+            <DeleteReviewDialog
+              isOpen={Boolean(deletingReview)}
+              onClose={() => setDeletingReview(null)}
+              onConfirm={handleConfirmDelete}
+            />
           </div>
 
           {/* ==========================================

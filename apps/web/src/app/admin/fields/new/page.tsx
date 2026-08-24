@@ -81,7 +81,7 @@ export default function AdminNewFieldPage() {
       prev.map((img) => ({
         ...img,
         isCover: img.id === id,
-      }))
+      })),
     );
   };
 
@@ -138,7 +138,10 @@ export default function AdminNewFieldPage() {
       )}
 
       {/* Main Form */}
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <form
+        onSubmit={handleSubmit}
+        className="grid grid-cols-1 gap-6 lg:grid-cols-3"
+      >
         {/* Left Column (2/3) */}
         <div className="flex flex-col gap-6 lg:col-span-2">
           {/* Section: Thông tin cơ bản */}
@@ -196,7 +199,8 @@ export default function AdminNewFieldPage() {
                     htmlFor="field-price"
                     className="mb-1.5 block text-xs sm:text-sm font-semibold text-[#575e70]"
                   >
-                    Giá cơ bản / giờ (VNĐ) <span className="text-[#ba1a1a]">*</span>
+                    Giá cơ bản / giờ (VNĐ){' '}
+                    <span className="text-[#ba1a1a]">*</span>
                   </label>
                   <input
                     id="field-price"
@@ -447,7 +451,10 @@ export default function AdminNewFieldPage() {
                   type="checkbox"
                   checked={amenities.dressingRoom}
                   onChange={(e) =>
-                    setAmenities({ ...amenities, dressingRoom: e.target.checked })
+                    setAmenities({
+                      ...amenities,
+                      dressingRoom: e.target.checked,
+                    })
                   }
                   className="h-4 w-4 rounded border-[#bccbb9] text-[#006e2f] focus:ring-[#006e2f]"
                 />

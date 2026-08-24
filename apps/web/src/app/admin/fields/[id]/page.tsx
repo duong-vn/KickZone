@@ -124,7 +124,8 @@ export default function AdminFieldDetailPage({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditFieldModalOpen, setIsEditFieldModalOpen] = useState(false);
   const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
-  const [editingPriceRule, setEditingPriceRule] = useState<PriceRuleItem | null>(null);
+  const [editingPriceRule, setEditingPriceRule] =
+    useState<PriceRuleItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Field Edit Form State
@@ -162,7 +163,7 @@ export default function AdminFieldDetailPage({
     showToast(
       nextStatus === 'ACTIVE'
         ? `Đã kích hoạt hoạt động sân "${field.name}"!`
-        : `Đã vô hiệu hóa sân "${field.name}".`
+        : `Đã vô hiệu hóa sân "${field.name}".`,
     );
   };
 
@@ -216,7 +217,9 @@ export default function AdminFieldDetailPage({
 
   const toggleDay = (dayVal: number) => {
     setSelectedDays((prev) =>
-      prev.includes(dayVal) ? prev.filter((d) => d !== dayVal) : [...prev, dayVal]
+      prev.includes(dayVal)
+        ? prev.filter((d) => d !== dayVal)
+        : [...prev, dayVal],
     );
   };
 
@@ -263,7 +266,7 @@ export default function AdminFieldDetailPage({
                 pricePerHour: priceNumber,
                 isActive: isRuleActive,
               }
-            : r
+            : r,
         ),
       }));
       showToast(`Đã cập nhật mức giá "${ruleName}"!`);
@@ -330,7 +333,9 @@ export default function AdminFieldDetailPage({
           />
           <div className="absolute left-4 top-4 flex items-center gap-1.5 rounded-full border border-[#c8e6c9] bg-[#e8f5e9] px-3 py-1 text-xs font-bold text-[#2e7d32] shadow-sm">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            <span>{field.status === 'ACTIVE' ? 'Đang hoạt động' : 'Vô hiệu hóa'}</span>
+            <span>
+              {field.status === 'ACTIVE' ? 'Đang hoạt động' : 'Vô hiệu hóa'}
+            </span>
           </div>
         </div>
 
@@ -366,7 +371,9 @@ export default function AdminFieldDetailPage({
             {/* 4 Metric Boxes */}
             <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
               <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-3.5">
-                <p className="mb-1 text-xs font-semibold text-[#575e70]">Loại sân</p>
+                <p className="mb-1 text-xs font-semibold text-[#575e70]">
+                  Loại sân
+                </p>
                 <p className="flex items-center gap-1.5 font-bold text-[#191c1d] text-sm">
                   <span className="h-2 w-2 rounded-full bg-[#006e2f]" />
                   <span>{field.fieldTypeLabel}</span>
@@ -374,19 +381,27 @@ export default function AdminFieldDetailPage({
               </div>
 
               <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-3.5">
-                <p className="mb-1 text-xs font-semibold text-[#575e70]">Kích thước</p>
-                <p className="font-bold text-[#191c1d] text-sm">{field.dimensions}</p>
+                <p className="mb-1 text-xs font-semibold text-[#575e70]">
+                  Kích thước
+                </p>
+                <p className="font-bold text-[#191c1d] text-sm">
+                  {field.dimensions}
+                </p>
               </div>
 
               <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-3.5">
-                <p className="mb-1 text-xs font-semibold text-[#575e70]">Giá cơ bản</p>
+                <p className="mb-1 text-xs font-semibold text-[#575e70]">
+                  Giá cơ bản
+                </p>
                 <p className="font-bold text-[#191c1d] text-sm">
                   {formatVND(field.basePricePerHour)}
                 </p>
               </div>
 
               <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-3.5">
-                <p className="mb-1 text-xs font-semibold text-[#575e70]">Đơn sắp tới</p>
+                <p className="mb-1 text-xs font-semibold text-[#575e70]">
+                  Đơn sắp tới
+                </p>
                 <p className="font-bold text-[#006e2f] text-sm">
                   {field.upcomingBookingsCount} đơn
                 </p>
@@ -440,9 +455,15 @@ export default function AdminFieldDetailPage({
                   <th className="px-6 py-4 whitespace-nowrap">Tên mức giá</th>
                   <th className="px-6 py-4 whitespace-nowrap">Ngày áp dụng</th>
                   <th className="px-6 py-4 whitespace-nowrap">Khung giờ</th>
-                  <th className="px-6 py-4 whitespace-nowrap text-right">Giá/giờ</th>
-                  <th className="px-6 py-4 whitespace-nowrap text-center">Trạng thái</th>
-                  <th className="px-6 py-4 whitespace-nowrap text-right">Hành động</th>
+                  <th className="px-6 py-4 whitespace-nowrap text-right">
+                    Giá/giờ
+                  </th>
+                  <th className="px-6 py-4 whitespace-nowrap text-center">
+                    Trạng thái
+                  </th>
+                  <th className="px-6 py-4 whitespace-nowrap text-right">
+                    Hành động
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#bccbb9]/40 text-[#191c1d]">
@@ -524,7 +545,8 @@ export default function AdminFieldDetailPage({
             <span>Vùng nguy hiểm</span>
           </h4>
           <p className="mt-1 text-xs sm:text-sm text-[#93000a]">
-            Các thao tác dưới đây có thể ảnh hưởng nghiêm trọng đến dữ liệu hệ thống.
+            Các thao tác dưới đây có thể ảnh hưởng nghiêm trọng đến dữ liệu hệ
+            thống.
           </p>
         </div>
 
@@ -534,10 +556,13 @@ export default function AdminFieldDetailPage({
           <div className="flex flex-col justify-between gap-4 border-b border-[#ffdad6] pb-6 md:flex-row md:items-center">
             <div>
               <h5 className="font-bold text-[#191c1d] text-xs sm:text-sm mb-1">
-                {field.status === 'ACTIVE' ? 'Vô hiệu hóa sân' : 'Kích hoạt lại sân'}
+                {field.status === 'ACTIVE'
+                  ? 'Vô hiệu hóa sân'
+                  : 'Kích hoạt lại sân'}
               </h5>
               <p className="text-xs sm:text-sm text-[#575e70]">
-                Tạm dừng hoạt động đặt sân mới. Các đơn đã đặt vẫn được giữ nguyên.
+                Tạm dừng hoạt động đặt sân mới. Các đơn đã đặt vẫn được giữ
+                nguyên.
               </p>
             </div>
             <button
@@ -545,7 +570,9 @@ export default function AdminFieldDetailPage({
               onClick={handleToggleStatus}
               className="whitespace-nowrap rounded-xl border border-[#ba1a1a] bg-white px-4 py-2 text-xs sm:text-sm font-bold text-[#ba1a1a] transition-colors hover:bg-[#ba1a1a] hover:text-white"
             >
-              {field.status === 'ACTIVE' ? 'Vô hiệu hóa sân' : 'Kích hoạt lại sân'}
+              {field.status === 'ACTIVE'
+                ? 'Vô hiệu hóa sân'
+                : 'Kích hoạt lại sân'}
             </button>
           </div>
 
@@ -556,7 +583,8 @@ export default function AdminFieldDetailPage({
                 Xóa sân vĩnh viễn
               </h5>
               <p className="text-xs sm:text-sm text-[#575e70]">
-                Xóa hoàn toàn sân này khỏi hệ thống. Không thể hoàn tác hành động này.
+                Xóa hoàn toàn sân này khỏi hệ thống. Không thể hoàn tác hành
+                động này.
               </p>
             </div>
             <button
@@ -584,8 +612,11 @@ export default function AdminFieldDetailPage({
 
             <p className="text-xs sm:text-sm text-[#575e70] mb-6 leading-relaxed">
               Sân bóng <strong>&ldquo;{field.name}&rdquo;</strong> hiện đang có{' '}
-              <strong className="text-[#ba1a1a]">{field.upcomingBookingsCount} đơn đặt sân</strong>{' '}
-              đang chờ xử lý hoặc sắp diễn ra. Vui lòng hoàn tất hoặc hủy các đơn này trước khi thực hiện xóa.
+              <strong className="text-[#ba1a1a]">
+                {field.upcomingBookingsCount} đơn đặt sân
+              </strong>{' '}
+              đang chờ xử lý hoặc sắp diễn ra. Vui lòng hoàn tất hoặc hủy các
+              đơn này trước khi thực hiện xóa.
             </p>
 
             <div className="flex flex-col gap-3">
@@ -624,7 +655,10 @@ export default function AdminFieldDetailPage({
               </button>
             </div>
 
-            <form onSubmit={handleSavePriceRule} className="p-6 space-y-5 text-xs sm:text-sm">
+            <form
+              onSubmit={handleSavePriceRule}
+              className="p-6 space-y-5 text-xs sm:text-sm"
+            >
               <div>
                 <label className="mb-1.5 block font-semibold text-[#191c1d]">
                   Tên mức giá <span className="text-[#ba1a1a]">*</span>
@@ -773,7 +807,10 @@ export default function AdminFieldDetailPage({
               </button>
             </div>
 
-            <form onSubmit={handleSaveFieldInfo} className="my-4 space-y-3.5 text-xs sm:text-sm">
+            <form
+              onSubmit={handleSaveFieldInfo}
+              className="my-4 space-y-3.5 text-xs sm:text-sm"
+            >
               <div>
                 <label className="mb-1 block font-semibold text-[#191c1d]">
                   Tên sân bóng
