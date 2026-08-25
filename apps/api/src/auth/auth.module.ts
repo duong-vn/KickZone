@@ -5,11 +5,18 @@ import { RolesGuard } from './roles.guard';
 import { SupabaseAuthService } from './supabase-auth.service';
 import { SupabaseAuthGuard } from './supabase-auth.guard';
 import { UsersController } from './users.controller';
+import { AuthController } from './auth.controller';
+import { PasswordResetService } from './password-reset.service';
+import { OAuthService } from './oauth.service';
+import { EmailService } from '../email/email.service';
 
 @Module({
-  controllers: [UsersController],
+  controllers: [UsersController, AuthController],
   providers: [
     AuthService,
+    PasswordResetService,
+    OAuthService,
+    EmailService,
     AuthGuard,
     RolesGuard,
     SupabaseAuthService,
@@ -17,6 +24,8 @@ import { UsersController } from './users.controller';
   ],
   exports: [
     AuthService,
+    PasswordResetService,
+    OAuthService,
     AuthGuard,
     RolesGuard,
     SupabaseAuthService,

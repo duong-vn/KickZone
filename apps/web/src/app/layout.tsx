@@ -30,8 +30,12 @@ type RootLayoutProps = Readonly<{
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="vi" className={`${inter.variable} ${manrope.variable}`}>
-      <body>
+    <html
+      lang="vi"
+      className={`${inter.variable} ${manrope.variable}`}
+      suppressHydrationWarning
+    >
+      <body suppressHydrationWarning>
         <QueryProvider>{children}</QueryProvider>
         <Toaster richColors position="top-right" closeButton duration={4000} />
       </body>

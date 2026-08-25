@@ -20,12 +20,29 @@ function getLoginErrorMessage(message: string) {
   const normalizedMessage = message.toLowerCase();
 
   if (
+    normalizedMessage.includes('unsupported provider') ||
+    normalizedMessage.includes('not enabled') ||
+    normalizedMessage.includes('provider is not enabled')
+  ) {
+    return 'Phương thức đăng nhập này tạm thời chưa được kích hoạt trong cấu hình hệ thống.';
+  }
+
+  if (
     normalizedMessage.includes('banned') ||
     normalizedMessage.includes('disabled') ||
     normalizedMessage.includes('vô hiệu hóa') ||
     normalizedMessage.includes('khóa')
   ) {
     return 'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được kích hoạt lại.';
+  }
+
+  if (
+    normalizedMessage.includes('cancelled') ||
+    normalizedMessage.includes('canceled') ||
+    normalizedMessage.includes('denied') ||
+    normalizedMessage.includes('hủy')
+  ) {
+    return 'Bạn đã hủy yêu cầu đăng nhập bằng mạng xã hội.';
   }
 
   if (normalizedMessage.includes('invalid login credentials')) {
@@ -36,7 +53,7 @@ function getLoginErrorMessage(message: string) {
     return 'Bạn cần xác nhận email trước khi đăng nhập.';
   }
 
-  return 'Không thể đăng nhập lúc này. Vui lòng thử lại.';
+  return message || 'Không thể đăng nhập lúc này. Vui lòng thử lại.';
 }
 
 export function LoginForm() {
@@ -138,8 +155,14 @@ export function LoginForm() {
       if (error) {
         toast.error(getLoginErrorMessage(error.message));
       }
-    } catch {
-      toast.error('Không thể mở đăng nhập mạng xã hội. Vui lòng thử lại.');
+    } catch (err: unknown) {
+      const anyErr = err as { message?: string };
+      toast.error(
+        getLoginErrorMessage(
+          anyErr?.message ||
+            'Không thể mở đăng nhập mạng xã hội. Vui lòng thử lại.',
+        ),
+      );
     } finally {
       setOauthProvider(null);
     }
@@ -148,7 +171,7 @@ export function LoginForm() {
   const isBusy = isSubmitting || oauthProvider !== null;
 
   return (
-    <div className="w-full max-w-[420px]">
+    <div className="w-full max-w-[420px] mx-auto">
       <div className="mb-9">
         <AuthBrand />
       </div>
@@ -248,37 +271,39 @@ export function LoginForm() {
       <div className="my-7 flex items-center gap-4" aria-hidden="true">
         <div className="h-px flex-1 bg-border" />
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Hoặc tiếp tục với
+          Hoặc đăng nhập bằng
         </span>
         <div className="h-px flex-1 bg-border" />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
+        {/* GOOGLE OAUTH BUTTON */}
         <Button
           type="button"
           variant="outline"
           size="lg"
-          className="h-11 bg-card font-semibold"
+          className="h-11 border-border/80 bg-white font-semibold text-neutral-800 shadow-sm transition-all hover:bg-neutral-50 dark:bg-card dark:text-foreground dark:hover:bg-neutral-800"
           onClick={() => handleOAuth('google')}
           disabled={isBusy}
         >
           {oauthProvider === 'google' ? (
-            <LoaderCircle className="animate-spin" />
+            <LoaderCircle className="size-4.5 animate-spin" />
           ) : (
             <GoogleIcon />
           )}
           Google
         </Button>
+
+        {/* FACEBOOK OAUTH BUTTON */}
         <Button
           type="button"
-          variant="outline"
           size="lg"
-          className="h-11 bg-card font-semibold"
+          className="h-11 border-transparent bg-[#1877f2] font-semibold text-white shadow-sm transition-all hover:bg-[#166fe5] hover:text-white"
           onClick={() => handleOAuth('facebook')}
           disabled={isBusy}
         >
           {oauthProvider === 'facebook' ? (
-            <LoaderCircle className="animate-spin" />
+            <LoaderCircle className="size-4.5 animate-spin" />
           ) : (
             <FacebookIcon />
           )}
@@ -306,7 +331,7 @@ export function LoginForm() {
 
 function GoogleIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4">
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4.5 shrink-0">
       <path
         fill="#4285F4"
         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09Z"
@@ -332,7 +357,7 @@ function FacebookIcon() {
     <svg
       viewBox="0 0 24 24"
       aria-hidden="true"
-      className="size-4 fill-[#1877f2]"
+      className="size-4.5 shrink-0 fill-current text-white"
     >
       <path d="M24 12.073C24 5.446 18.627.073 12 .073S0 5.446 0 12.073c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073Z" />
     </svg>
