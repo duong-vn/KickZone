@@ -14,7 +14,6 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { CURRENT_USER } from '@/data/mock-reviews';
 import {
   StarRating,
   ReviewCommentItem,
@@ -22,11 +21,16 @@ import {
   DeleteReviewDialog,
 } from '@/components/reviews';
 import { Button } from '@/components/ui/button';
+import { formatFieldTypeName } from '@/lib/utils';
 import {
   fetchFieldReviews,
   updateReview,
   deleteReview,
   checkReviewEligibility,
+  createReviewComment,
+  updateReviewComment,
+  deleteReviewComment,
+  fetchCurrentUserProfile,
 } from '@/lib/api';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 
@@ -44,6 +48,8 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
   const [currentUser, setCurrentUser] = useState<{
     id: string;
     email?: string;
+    avatarUrl?: string | null;
+    fullName?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -53,9 +59,16 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
         const supabase = getSupabaseBrowserClient();
         const { data } = await supabase.auth.getUser();
         if (isMounted && data.user) {
+          const userMeta = data.user.user_metadata || {};
           setCurrentUser({
             id: data.user.id,
             email: data.user.email,
+            avatarUrl: userMeta.avatar_url || userMeta.picture || null,
+            fullName:
+              userMeta.full_name ||
+              userMeta.name ||
+              data.user.email?.split('@')[0] ||
+              'Người dùng',
           });
         }
       } catch {
@@ -67,6 +80,34 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
       isMounted = false;
     };
   }, []);
+
+  // Fetch current user profile from DB (for accurate name, role, avatar)
+  const { data: userProfileData } = useQuery({
+    queryKey: ['currentUserProfile', currentUser?.id],
+    queryFn: () => fetchCurrentUserProfile(),
+    enabled: !!currentUser,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const profileFromApi = userProfileData?.data ?? userProfileData;
+  const currentProfile = profileFromApi?.id
+    ? {
+        id: profileFromApi.id,
+        authUserId: profileFromApi.authUserId || currentUser?.id,
+        fullName:
+          profileFromApi.fullName || currentUser?.fullName || 'Người dùng',
+        avatarUrl: profileFromApi.avatarUrl || currentUser?.avatarUrl || null,
+        role: profileFromApi.role || 'USER',
+      }
+    : currentUser
+      ? {
+          id: currentUser.id,
+          authUserId: currentUser.id,
+          fullName: currentUser.fullName || 'Người dùng',
+          avatarUrl: currentUser.avatarUrl || null,
+          role: 'USER',
+        }
+      : null;
 
   // Fetch reviews for field
   const { data: reviewsResponse, isLoading } = useQuery({
@@ -83,10 +124,9 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
   });
 
   const effectiveCurrentUserId =
-    eligibilityData?.currentProfileId || currentUser?.id;
+    currentProfile?.id || eligibilityData?.currentProfileId || currentUser?.id;
 
   const [newCommentText, setNewCommentText] = useState('');
-  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
   // Modals for editing / deleting current review
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -99,9 +139,12 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
   }, [reviewsResponse, reviewId]);
 
   const isOwner = Boolean(
+    currentUser &&
     effectiveCurrentUserId &&
     (currentReview?.userId === effectiveCurrentUserId ||
-      currentReview?.user?.id === effectiveCurrentUserId),
+      currentReview?.user?.id === effectiveCurrentUserId ||
+      (currentReview as { authUserId?: string })?.authUserId ===
+        effectiveCurrentUserId),
   );
 
   // Count all comments including nested replies
@@ -129,7 +172,7 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
         })
       : rawDate || 'Gần đây';
 
-  // Mutations
+  // Mutations for Review
   const updateReviewMutation = useMutation({
     mutationFn: (data: { rating?: number; content?: string }) =>
       updateReview(reviewId, data),
@@ -137,6 +180,12 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
       queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
       queryClient.invalidateQueries({ queryKey: ['field', fieldId] });
       setIsEditModalOpen(false);
+      toast.success('Đã cập nhật bài đánh giá thành công.');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể cập nhật bài đánh giá.';
+      toast.error(message);
     },
   });
 
@@ -159,23 +208,87 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
     },
   });
 
+  // Mutations for Comments
+  const createCommentMutation = useMutation({
+    mutationFn: (input: { content: string; parentId?: string }) =>
+      createReviewComment(reviewId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã gửi bình luận thành công!');
+      setNewCommentText('');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể gửi bình luận.';
+      toast.error(message);
+    },
+  });
+
+  const updateCommentMutation = useMutation({
+    mutationFn: ({
+      commentId,
+      content,
+    }: {
+      commentId: string;
+      content: string;
+    }) => updateReviewComment(commentId, { content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã cập nhật bình luận.');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể cập nhật bình luận.';
+      toast.error(message);
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: (commentId: string) => deleteReviewComment(commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã xóa bình luận.');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể xóa bình luận.';
+      toast.error(message);
+    },
+  });
+
   // Add a top-level comment
   const handleAddTopComment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCommentText.trim() || !currentReview) return;
+    if (!currentUser) {
+      toast.error('Vui lòng đăng nhập để tham gia bình luận.');
+      return;
+    }
 
-    setIsSubmittingComment(true);
-    toast.info('Tính năng bình luận chi tiết sẽ sớm được cập nhật!');
-    setNewCommentText('');
-    setIsSubmittingComment(false);
+    createCommentMutation.mutate({ content: newCommentText.trim() });
   };
 
   // Add a nested reply
-  const handleAddReply = () => {
-    toast.info('Tính năng trả lời bình luận sẽ sớm được cập nhật!');
+  const handleAddReply = (parentId: string, content: string) => {
+    if (!currentUser) {
+      toast.error('Vui lòng đăng nhập để trả lời bình luận.');
+      return;
+    }
+
+    createCommentMutation.mutate({ content, parentId });
   };
 
-  // Edit handler
+  // Edit comment handler
+  const handleEditComment = (commentId: string, content: string) => {
+    updateCommentMutation.mutate({ commentId, content });
+  };
+
+  // Delete comment handler
+  const handleDeleteComment = (commentId: string) => {
+    deleteCommentMutation.mutate(commentId);
+  };
+
+  // Edit review handler
   const handleUpdateReview = async (data: {
     rating: number;
     content: string;
@@ -186,7 +299,7 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
     });
   };
 
-  // Delete handler
+  // Delete review handler
   const handleConfirmDelete = async () => {
     await deleteReviewMutation.mutateAsync();
   };
@@ -219,6 +332,11 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
       </div>
     );
   }
+
+  const userAvatar = currentProfile?.avatarUrl;
+  const userInitials = (currentProfile?.fullName || 'Bạn')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] pt-6 pb-20">
@@ -315,7 +433,7 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
                 {/* Badges and Owner Action buttons */}
                 <div className="flex items-center gap-2">
                   <span className="bg-[#22c55e]/15 text-[#006e2f] px-2.5 py-1 rounded-md text-xs font-bold font-['Manrope']">
-                    {currentReview.booking?.fieldTypeName || 'Sân tiêu chuẩn'}
+                    {formatFieldTypeName(currentReview.booking?.fieldTypeName)}
                   </span>
 
                   {isOwner && (
@@ -366,15 +484,15 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
             onSubmit={handleAddTopComment}
             className="flex items-start gap-3 mb-8"
           >
-            {CURRENT_USER.avatarUrl ? (
+            {userAvatar ? (
               <img
-                src={CURRENT_USER.avatarUrl}
-                alt={CURRENT_USER.fullName}
+                src={userAvatar}
+                alt={currentProfile?.fullName || 'Avatar'}
                 className="w-10 h-10 rounded-full object-cover shrink-0 border border-[#bccbb9]/40"
               />
             ) : (
               <div className="w-10 h-10 rounded-full bg-[#006e2f] text-white text-xs font-bold flex items-center justify-center shrink-0">
-                {CURRENT_USER.fullName.slice(0, 2).toUpperCase()}
+                {userInitials}
               </div>
             )}
 
@@ -383,13 +501,22 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
                 rows={3}
                 value={newCommentText}
                 onChange={(e) => setNewCommentText(e.target.value)}
-                placeholder="Viết bình luận hoặc câu hỏi của bạn về bài đánh giá này..."
-                className="w-full bg-[#f8f9fa] border border-[#bccbb9]/60 rounded-xl p-3.5 text-xs sm:text-sm text-[#191c1d] placeholder:text-[#575e70]/60 focus:outline-none focus:bg-white focus:border-[#006e2f] focus:ring-2 focus:ring-[#006e2f]/20 transition-all resize-none"
+                placeholder={
+                  currentUser
+                    ? 'Viết bình luận hoặc câu hỏi của bạn về bài đánh giá này...'
+                    : 'Đăng nhập để tham gia bình luận...'
+                }
+                disabled={!currentUser}
+                className="w-full bg-[#f8f9fa] border border-[#bccbb9]/60 rounded-xl p-3.5 text-xs sm:text-sm text-[#191c1d] placeholder:text-[#575e70]/60 focus:outline-none focus:bg-white focus:border-[#006e2f] focus:ring-2 focus:ring-[#006e2f]/20 transition-all resize-none disabled:opacity-60"
               />
               <div className="flex justify-end">
                 <Button
                   type="submit"
-                  disabled={isSubmittingComment || !newCommentText.trim()}
+                  disabled={
+                    !currentUser ||
+                    createCommentMutation.isPending ||
+                    !newCommentText.trim()
+                  }
                   className="bg-[#006e2f] hover:bg-[#004b1e] text-white font-semibold rounded-xl px-5 text-xs shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5" />
@@ -410,6 +537,10 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
                   <ReviewCommentItem
                     comment={comm}
                     onAddReply={handleAddReply}
+                    onEditComment={handleEditComment}
+                    onDeleteComment={handleDeleteComment}
+                    currentUserId={effectiveCurrentUserId}
+                    currentUser={currentProfile}
                   />
                 </div>
               ))}

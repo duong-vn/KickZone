@@ -18,7 +18,7 @@ import type {
   FieldReviewsResponse,
   Paginated,
 } from '@/types/field';
-import type { Review, ReviewBookingProof } from '@/types/review';
+import type { Review, ReviewComment, ReviewBookingProof } from '@/types/review';
 
 export interface ApiErrorShape {
   status: number;
@@ -359,6 +359,49 @@ export function checkReviewEligibility(fieldId: string) {
   return request<ReviewEligibilityResponse>(
     'get',
     `/fields/${fieldId}/reviews/eligibility`,
+    undefined,
+    undefined,
+    true,
+  );
+}
+
+export function fetchReviewComments(reviewId: string) {
+  return request<{ data: ReviewComment[] }>(
+    'get',
+    `/reviews/${reviewId}/comments`,
+  );
+}
+
+export function createReviewComment(
+  reviewId: string,
+  input: { content: string; parentId?: string },
+) {
+  return request<{ data: ReviewComment; message: string }>(
+    'post',
+    `/reviews/${reviewId}/comments`,
+    input,
+    undefined,
+    true,
+  );
+}
+
+export function updateReviewComment(
+  commentId: string,
+  input: { content: string },
+) {
+  return request<{ data: ReviewComment; message: string }>(
+    'patch',
+    `/reviews/comments/${commentId}`,
+    input,
+    undefined,
+    true,
+  );
+}
+
+export function deleteReviewComment(commentId: string) {
+  return request<{ success: boolean; message: string; id: string }>(
+    'delete',
+    `/reviews/comments/${commentId}`,
     undefined,
     undefined,
     true,
