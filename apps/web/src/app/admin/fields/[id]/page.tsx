@@ -716,7 +716,7 @@ export default function AdminFieldDetailPage({
             </div>
 
             <p className="my-4 rounded-lg bg-[#ffdad6]/30 p-3 text-xs text-[#93000a]">
-              Bạn có chắc chắn muốn xóa sân <strong>"{field.name}"</strong>? Sân này sẽ không còn hiển thị cho người dùng đặt lịch.
+              Bạn có chắc chắn muốn xóa sân <strong>&quot;{field.name}&quot;</strong>? Sân này sẽ không còn hiển thị cho người dùng đặt lịch.
             </p>
 
             <div className="flex justify-end gap-2">

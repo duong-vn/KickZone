@@ -123,8 +123,7 @@ export class AdminDashboardService {
     }> = [];
 
     for (const b of recentBookings) {
-      const customer =
-        b.profiles.full_name || b.profiles.email || 'Khách hàng';
+      const customer = b.profiles.full_name || b.profiles.email || 'Khách hàng';
       if (b.status === booking_status.CANCELLED) {
         activities.push({
           id: `act-cancel-${b.id}`,
