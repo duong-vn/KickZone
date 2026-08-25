@@ -36,13 +36,16 @@ export function ReviewCommentItem({
     setShowReplyForm(false);
   };
 
-  const formattedDate = comment.createdAt.includes('T')
-    ? new Date(comment.createdAt).toLocaleDateString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      })
-    : comment.createdAt;
+  const rawDate =
+    comment.createdAt || (comment as { date?: string }).date || '';
+  const formattedDate =
+    typeof rawDate === 'string' && rawDate.includes('T')
+      ? new Date(rawDate).toLocaleDateString('vi-VN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        })
+      : rawDate || 'Gần đây';
 
   return (
     <div className={cn('relative', isNested && 'ml-6 sm:ml-10 mt-3')}>

@@ -35,15 +35,32 @@ export function ReviewSummaryCard({
 
       {/* Average Score & Stars */}
       <div className="flex flex-col items-center justify-center p-4 bg-[#f8f9fa] rounded-xl border border-[#bccbb9]/20 mb-6 text-center">
-        <div className="font-['Manrope'] font-extrabold text-4xl sm:text-5xl text-[#191c1d] tracking-tight mb-1">
-          {summary.averageRating.toFixed(1)}
-        </div>
-        <div className="mb-1.5">
-          <StarRating value={summary.averageRating} size="md" color="pitch" />
-        </div>
-        <p className="text-xs text-[#575e70] font-medium">
-          Dựa trên {summary.totalReviews} đánh giá từ người chơi đã đặt sân
-        </p>
+        {summary.totalReviews > 0 ? (
+          <>
+            <div className="font-['Manrope'] font-extrabold text-4xl sm:text-5xl text-[#191c1d] tracking-tight mb-1">
+              {summary.averageRating.toFixed(1)}
+            </div>
+            <div className="mb-1.5">
+              <StarRating
+                value={summary.averageRating}
+                size="md"
+                color="pitch"
+              />
+            </div>
+            <p className="text-xs text-[#575e70] font-medium">
+              Dựa trên {summary.totalReviews} đánh giá từ người chơi đã đặt sân
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="font-['Manrope'] font-bold text-xl text-[#191c1d] mb-1">
+              Chưa có đánh giá
+            </div>
+            <p className="text-xs text-[#575e70] font-medium">
+              Sân này chưa có lượt đánh giá nào từ người chơi
+            </p>
+          </>
+        )}
       </div>
 
       {/* Star Progress Bars */}

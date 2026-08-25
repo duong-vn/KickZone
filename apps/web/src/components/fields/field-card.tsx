@@ -71,8 +71,8 @@ export function FieldCard({
   );
 
   const price = field.base_price_per_hour ?? field.pricePerHour ?? 0;
-  const rating = field.rating_avg ?? field.rating ?? 5.0;
-  const reviewsCount = field.reviews_count ?? 0;
+  const rating = field.rating_avg ?? field.rating ?? 0;
+  const reviewsCount = field.reviews_count ?? field.reviewCount ?? 0;
   const isAvailable = field.is_available_today ?? field.available ?? true;
   const location =
     field.location || field.address || `${field.district}, TP.HCM`;
@@ -155,12 +155,20 @@ export function FieldCard({
           {/* Rating pill */}
           <div className="flex items-center gap-1 bg-[#edeeef] py-0.5 px-1.5 rounded-md shrink-0">
             <Star className="w-3 h-3 fill-[#f59e0b] text-[#f59e0b]" />
-            <span className="font-['Inter',sans-serif] text-[11px] font-bold text-[#191c1d]">
-              {rating.toFixed(1)}
-            </span>
-            <span className="font-['Inter',sans-serif] text-[10px] text-[#575e70]">
-              ({reviewsCount})
-            </span>
+            {reviewsCount > 0 ? (
+              <>
+                <span className="font-['Inter',sans-serif] text-[11px] font-bold text-[#191c1d]">
+                  {Number(rating).toFixed(1)}
+                </span>
+                <span className="font-['Inter',sans-serif] text-[10px] text-[#575e70]">
+                  ({reviewsCount})
+                </span>
+              </>
+            ) : (
+              <span className="font-['Inter',sans-serif] text-[10px] font-medium text-[#575e70]">
+                Chưa có đánh giá
+              </span>
+            )}
           </div>
         </div>
 

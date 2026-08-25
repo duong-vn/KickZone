@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 
 export interface ReviewCardProps {
   review: Review;
+  currentUserId?: string | null;
   onEdit?: (review: Review) => void;
   onDelete?: (review: Review) => void;
   onAddComment?: (
@@ -37,6 +38,7 @@ export interface ReviewCardProps {
 
 export function ReviewCard({
   review,
+  currentUserId,
   onEdit,
   onDelete,
   onAddComment,
@@ -50,21 +52,30 @@ export function ReviewCard({
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [commentText, setCommentText] = useState('');
 
-  const isOwner = review.isOwner || review.userId === CURRENT_USER.id;
+  const isOwner = Boolean(
+    currentUserId &&
+    (review.userId === currentUserId ||
+      review.user?.id === currentUserId ||
+      (review as { profiles?: { id?: string } }).profiles?.id ===
+        currentUserId),
+  );
 
   // Flatten comments count including nested replies
-  const totalCommentsCount = review.comments.reduce(
+  const commentsList = review.comments || [];
+  const totalCommentsCount = commentsList.reduce(
     (acc, c) => acc + 1 + (c.replies?.length || 0),
     0,
   );
 
-  const formattedDate = review.createdAt.includes('T')
-    ? new Date(review.createdAt).toLocaleDateString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      })
-    : review.createdAt;
+  const rawDate = review.createdAt || (review as { date?: string }).date || '';
+  const formattedDate =
+    typeof rawDate === 'string' && rawDate.includes('T')
+      ? new Date(rawDate).toLocaleDateString('vi-VN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        })
+      : rawDate || 'Gần đây';
 
   const handleSendComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -270,9 +281,9 @@ export function ReviewCard({
       )}
 
       {/* 5. Expanded Comments Thread (Screen 1 & 4) */}
-      {isCommentsExpanded && review.comments.length > 0 && (
+      {isCommentsExpanded && commentsList.length > 0 && (
         <div className="mt-4 pt-3.5 border-t border-[#bccbb9]/20 space-y-3.5">
-          {review.comments.map((comm) => (
+          {commentsList.map((comm) => (
             <ReviewCommentItem
               key={comm.id}
               comment={comm}

@@ -1,9 +1,10 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useState, useMemo, use } from 'react';
+import { useState, useMemo, use, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   MessageSquare,
@@ -13,8 +14,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Review } from '@/types/review';
-import { INITIAL_MOCK_REVIEWS, CURRENT_USER } from '@/data/mock-reviews';
+import { CURRENT_USER } from '@/data/mock-reviews';
 import {
   StarRating,
   ReviewCommentItem,
@@ -22,6 +22,13 @@ import {
   DeleteReviewDialog,
 } from '@/components/reviews';
 import { Button } from '@/components/ui/button';
+import {
+  fetchFieldReviews,
+  updateReview,
+  deleteReview,
+  checkReviewEligibility,
+} from '@/lib/api';
+import { getSupabaseBrowserClient } from '@/lib/supabase';
 
 interface PageProps {
   params: Promise<{ id: string; reviewId: string }>;
@@ -29,12 +36,55 @@ interface PageProps {
 
 export default function ReviewDiscussionDetailPage({ params }: PageProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const resolvedParams = use(params);
   const { id: fieldId, reviewId } = resolvedParams;
 
-  // Local reviews store
-  const [reviewsList, setReviewsList] =
-    useState<Review[]>(INITIAL_MOCK_REVIEWS);
+  // Auth user state
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    email?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkAuth = async () => {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { data } = await supabase.auth.getUser();
+        if (isMounted && data.user) {
+          setCurrentUser({
+            id: data.user.id,
+            email: data.user.email,
+          });
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void checkAuth();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Fetch reviews for field
+  const { data: reviewsResponse, isLoading } = useQuery({
+    queryKey: ['field-reviews', fieldId],
+    queryFn: () => fetchFieldReviews(fieldId),
+  });
+
+  // Check eligibility for reviews (to resolve profile id)
+  const { data: eligibilityData } = useQuery({
+    queryKey: ['review-eligibility', fieldId],
+    queryFn: () => checkReviewEligibility(fieldId),
+    enabled: !!currentUser,
+    retry: false,
+  });
+
+  const effectiveCurrentUserId =
+    eligibilityData?.currentProfileId || currentUser?.id;
+
   const [newCommentText, setNewCommentText] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
@@ -44,116 +94,113 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
 
   // Find the active review
   const currentReview = useMemo(() => {
-    return reviewsList.find((r) => r.id === reviewId) || reviewsList[0];
-  }, [reviewsList, reviewId]);
+    const list = reviewsResponse?.data || [];
+    return list.find((r) => r.id === reviewId) || null;
+  }, [reviewsResponse, reviewId]);
 
-  const isOwner =
-    currentReview?.isOwner || currentReview?.userId === CURRENT_USER.id;
+  const isOwner = Boolean(
+    effectiveCurrentUserId &&
+    (currentReview?.userId === effectiveCurrentUserId ||
+      currentReview?.user?.id === effectiveCurrentUserId),
+  );
 
   // Count all comments including nested replies
+  const commentsList = useMemo(
+    () => currentReview?.comments || [],
+    [currentReview],
+  );
   const totalCommentsCount = useMemo(() => {
-    if (!currentReview) return 0;
-    return currentReview.comments.reduce(
+    return commentsList.reduce(
       (acc, c) => acc + 1 + (c.replies?.length || 0),
       0,
     );
-  }, [currentReview]);
+  }, [commentsList]);
 
-  const formattedDate = currentReview?.createdAt.includes('T')
-    ? new Date(currentReview.createdAt).toLocaleDateString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      })
-    : currentReview?.createdAt || 'Gần đây';
+  const rawDate =
+    currentReview?.createdAt ||
+    (currentReview as { date?: string })?.date ||
+    '';
+  const formattedDate =
+    typeof rawDate === 'string' && rawDate.includes('T')
+      ? new Date(rawDate).toLocaleDateString('vi-VN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        })
+      : rawDate || 'Gần đây';
+
+  // Mutations
+  const updateReviewMutation = useMutation({
+    mutationFn: (data: { rating?: number; content?: string }) =>
+      updateReview(reviewId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      queryClient.invalidateQueries({ queryKey: ['field', fieldId] });
+      setIsEditModalOpen(false);
+    },
+  });
+
+  const deleteReviewMutation = useMutation({
+    mutationFn: () => deleteReview(reviewId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      queryClient.invalidateQueries({ queryKey: ['field', fieldId] });
+      queryClient.invalidateQueries({
+        queryKey: ['review-eligibility', fieldId],
+      });
+      toast.success('Đã xóa bài đánh giá thành công.');
+      setIsDeleteDialogOpen(false);
+      router.push(`/fields/${fieldId}/reviews`);
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể xóa bài đánh giá.';
+      toast.error(message);
+    },
+  });
 
   // Add a top-level comment
   const handleAddTopComment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCommentText.trim()) return;
+    if (!newCommentText.trim() || !currentReview) return;
 
     setIsSubmittingComment(true);
-
-    const newComment = {
-      id: `comm-${Date.now()}`,
-      reviewId: currentReview.id,
-      userId: CURRENT_USER.id,
-      parentId: null,
-      content: newCommentText.trim(),
-      createdAt: new Date().toISOString(),
-      user: CURRENT_USER,
-    };
-
-    setReviewsList((prev) =>
-      prev.map((r) =>
-        r.id === currentReview.id
-          ? { ...r, comments: [...r.comments, newComment] }
-          : r,
-      ),
-    );
-
+    toast.info('Tính năng bình luận chi tiết sẽ sớm được cập nhật!');
     setNewCommentText('');
     setIsSubmittingComment(false);
-    toast.success('Đã gửi bình luận thành công!');
   };
 
   // Add a nested reply
-  const handleAddReply = (
-    parentId: string,
-    content: string,
-    replyToUserName: string,
-  ) => {
-    const newReply = {
-      id: `comm-${Date.now()}`,
-      reviewId: currentReview.id,
-      userId: CURRENT_USER.id,
-      parentId,
-      replyToUserName,
-      content,
-      createdAt: new Date().toISOString(),
-      user: CURRENT_USER,
-    };
-
-    setReviewsList((prev) =>
-      prev.map((r) => {
-        if (r.id !== currentReview.id) return r;
-        const updated = r.comments.map((c) => {
-          if (c.id === parentId) {
-            return { ...c, replies: [...(c.replies || []), newReply] };
-          }
-          return c;
-        });
-        return { ...r, comments: updated };
-      }),
-    );
-
-    toast.success('Đã gửi phản hồi thành công!');
+  const handleAddReply = () => {
+    toast.info('Tính năng trả lời bình luận sẽ sớm được cập nhật!');
   };
 
   // Edit handler
-  const handleUpdateReview = (data: { rating: number; content: string }) => {
-    setReviewsList((prev) =>
-      prev.map((r) =>
-        r.id === currentReview.id
-          ? {
-              ...r,
-              rating: data.rating,
-              content: data.content,
-              updatedAt: new Date().toISOString(),
-            }
-          : r,
-      ),
-    );
-    setIsEditModalOpen(false);
+  const handleUpdateReview = async (data: {
+    rating: number;
+    content: string;
+  }) => {
+    await updateReviewMutation.mutateAsync({
+      rating: data.rating,
+      content: data.content,
+    });
   };
 
   // Delete handler
-  const handleConfirmDelete = () => {
-    setReviewsList((prev) => prev.filter((r) => r.id !== currentReview.id));
-    toast.success('Đã xóa bài đánh giá.');
-    setIsDeleteDialogOpen(false);
-    router.push(`/fields/${fieldId}/reviews`);
+  const handleConfirmDelete = async () => {
+    await deleteReviewMutation.mutateAsync();
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center p-6">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-[#e1e3e4]" />
+          <div className="h-4 w-48 bg-[#e1e3e4] rounded" />
+        </div>
+      </div>
+    );
+  }
 
   if (!currentReview) {
     return (
@@ -164,7 +211,7 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
           </h2>
           <Link
             href={`/fields/${fieldId}/reviews`}
-            className="text-xs font-semibold text-[#006e2f] hover:underline"
+            className="text-xs font-semibold text-[#006e2f] hover:underline cursor-pointer"
           >
             Quay lại danh sách đánh giá
           </Link>
@@ -180,7 +227,7 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
         <nav className="flex flex-col gap-2 mb-6">
           <Link
             href={`/fields/${fieldId}/reviews`}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#575e70] hover:text-[#006e2f] transition-colors w-fit"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#575e70] hover:text-[#006e2f] transition-colors w-fit cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Quay lại tất cả đánh giá</span>
@@ -216,7 +263,7 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
           </ol>
         </nav>
 
-        {/* 2. Original Highlighted Review Card (Screen 4) */}
+        {/* 2. Original Highlighted Review Card */}
         <section className="bg-white border border-[#bccbb9]/50 rounded-2xl p-6 shadow-sm mb-8 relative">
           <div className="flex items-start gap-4">
             {/* Avatar */}
@@ -268,7 +315,7 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
                 {/* Badges and Owner Action buttons */}
                 <div className="flex items-center gap-2">
                   <span className="bg-[#22c55e]/15 text-[#006e2f] px-2.5 py-1 rounded-md text-xs font-bold font-['Manrope']">
-                    {currentReview.booking?.fieldTypeName || 'Sân 7 người'}
+                    {currentReview.booking?.fieldTypeName || 'Sân tiêu chuẩn'}
                   </span>
 
                   {isOwner && (
@@ -343,7 +390,7 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
                 <Button
                   type="submit"
                   disabled={isSubmittingComment || !newCommentText.trim()}
-                  className="bg-[#006e2f] hover:bg-[#004b1e] text-white font-semibold rounded-xl px-5 text-xs shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
+                  className="bg-[#006e2f] hover:bg-[#004b1e] text-white font-semibold rounded-xl px-5 text-xs shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>Gửi bình luận</span>
@@ -353,9 +400,9 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
           </form>
 
           {/* Nested Comments Thread */}
-          {currentReview.comments.length > 0 ? (
+          {commentsList.length > 0 ? (
             <div className="space-y-6">
-              {currentReview.comments.map((comm) => (
+              {commentsList.map((comm) => (
                 <div
                   key={comm.id}
                   className="pb-5 border-b border-[#bccbb9]/20 last:border-b-0 last:pb-0"
@@ -388,6 +435,7 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
           isOpen={isDeleteDialogOpen}
           onClose={() => setIsDeleteDialogOpen(false)}
           onConfirm={handleConfirmDelete}
+          isLoading={deleteReviewMutation.isPending}
         />
       </div>
     </div>
