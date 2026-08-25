@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { cn, formatFieldTypeName } from '@/lib/utils';
 import {
   ApiError,
   createBooking,
@@ -84,13 +85,20 @@ function CheckoutContent() {
     0,
   );
 
-  const [voucherCode, setVoucherCode] = useState('');
+  const voucherParam = (
+    params.get('voucher') ??
+    params.get('voucherCode') ??
+    ''
+  ).trim();
+
+  const [voucherCode, setVoucherCode] = useState(voucherParam);
   const [voucher, setVoucher] = useState<{
     code: string;
     discountAmount: number;
     finalPrice: number;
   } | null>(null);
   const [isVoucherLoading, setVoucherLoading] = useState(false);
+  const autoAppliedRef = useRef(false);
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -120,8 +128,8 @@ function CheckoutContent() {
     },
   });
 
-  const applyVoucher = async () => {
-    const code = voucherCode.trim().toUpperCase();
+  const applyVoucher = async (codeToApply?: string) => {
+    const code = (codeToApply ?? voucherCode).trim().toUpperCase();
     if (!code) return toast.error('Vui lòng nhập mã voucher.');
     setVoucherLoading(true);
     try {
@@ -132,12 +140,48 @@ function CheckoutContent() {
         code,
         originalPrice: originalPrice || field?.basePricePerHour || 0,
       });
-      setVoucher({
-        code: response.data.code,
-        discountAmount: response.data.discountAmount,
-        finalPrice: response.data.finalPrice,
-      });
-      toast.success('Đã kiểm tra voucher trên server.');
+      const result =
+        (
+          response as {
+            data?: {
+              code?: string;
+              discountAmount?: number;
+              finalPrice?: number;
+              valid?: boolean;
+              message?: string;
+            };
+          }
+        )?.data ||
+        (response as {
+          code?: string;
+          discountAmount?: number;
+          finalPrice?: number;
+          valid?: boolean;
+          message?: string;
+        });
+      if (
+        result &&
+        result.valid !== false &&
+        (result.code || result.discountAmount !== undefined)
+      ) {
+        const effectiveCode = result.code || code;
+        const effectiveDiscount = result.discountAmount ?? 0;
+        const effectiveFinalPrice =
+          result.finalPrice ??
+          Math.max(
+            0,
+            (originalPrice || field?.basePricePerHour || 0) - effectiveDiscount,
+          );
+        setVoucher({
+          code: effectiveCode,
+          discountAmount: effectiveDiscount,
+          finalPrice: effectiveFinalPrice,
+        });
+        toast.success(result.message || 'Áp dụng mã giảm giá thành công!');
+      } else {
+        setVoucher(null);
+        toast.error(result?.message || 'Voucher không hợp lệ.');
+      }
     } catch (error) {
       setVoucher(null);
       toast.error(
@@ -147,6 +191,25 @@ function CheckoutContent() {
       setVoucherLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (
+      voucherParam &&
+      !autoAppliedRef.current &&
+      fieldQuery.data &&
+      (availabilityQuery.data || !date)
+    ) {
+      autoAppliedRef.current = true;
+      void applyVoucher(voucherParam);
+    }
+  }, [
+    voucherParam,
+    fieldQuery.data,
+    availabilityQuery.data,
+    date,
+    originalPrice,
+    field?.basePricePerHour,
+  ]);
 
   if (!authReady) return <State message="Đang kiểm tra đăng nhập..." />;
   if (!validDraft)
@@ -209,9 +272,7 @@ function CheckoutContent() {
                 {field.address}
               </p>
               <span className="mt-2 inline-block rounded-full bg-[#006e2f]/10 px-2.5 py-1 text-xs font-bold text-[#006e2f]">
-                {typeof field.type === 'string'
-                  ? field.type
-                  : (field.type?.name ?? 'Sân bóng')}
+                {formatFieldTypeName(field.type)}
               </span>
             </div>
           </div>
@@ -246,20 +307,39 @@ function CheckoutContent() {
             <div className="flex gap-2">
               <input
                 value={voucherCode}
+                disabled={Boolean(voucher)}
                 onChange={(event) => {
                   setVoucherCode(event.target.value);
                   setVoucher(null);
                 }}
                 placeholder="Nhập mã voucher (vd: KICKZONE50, KZ10)"
-                className="flex-1 rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] px-3 py-2 text-xs uppercase outline-none focus:border-[#006e2f]"
+                className={cn(
+                  'flex-1 rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] px-3 py-2 text-xs uppercase outline-none focus:border-[#006e2f]',
+                  voucher && 'bg-gray-100 text-gray-500 cursor-not-allowed',
+                )}
               />
-              <Button
-                onClick={applyVoucher}
-                disabled={isVoucherLoading}
-                className="rounded-xl bg-[#006e2f] text-xs font-bold"
-              >
-                {isVoucherLoading ? 'Đang kiểm tra...' : 'Áp dụng'}
-              </Button>
+              {voucher ? (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setVoucher(null);
+                    setVoucherCode('');
+                    toast.info('Đã bỏ áp dụng mã giảm giá.');
+                  }}
+                  variant="outline"
+                  className="rounded-xl border-[#ba1a1a]/30 text-[#ba1a1a] hover:bg-[#ba1a1a]/10 hover:text-[#ba1a1a] text-xs font-bold"
+                >
+                  Bỏ áp dụng
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => void applyVoucher()}
+                  disabled={isVoucherLoading}
+                  className="rounded-xl bg-[#006e2f] text-xs font-bold"
+                >
+                  {isVoucherLoading ? 'Đang kiểm tra...' : 'Áp dụng'}
+                </Button>
+              )}
             </div>
             {voucher && (
               <p className="mt-3 flex items-center gap-1 text-xs font-semibold text-[#006e2f]">

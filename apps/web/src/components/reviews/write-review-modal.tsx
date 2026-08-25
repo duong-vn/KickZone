@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import type { Review, ReviewBookingProof } from '@/types/review';
 import { StarRating } from './star-rating';
 import { Button } from '@/components/ui/button';
+import { formatFieldTypeName } from '@/lib/utils';
 
 export interface WriteReviewModalProps {
   isOpen: boolean;
@@ -173,7 +174,8 @@ function WriteReviewModalContent({
                     <Clock className="w-3.5 h-3.5 text-[#006e2f]" />
                     <span>
                       Khung giờ: {effectiveBookingProof.timeSlot} (
-                      {effectiveBookingProof.fieldTypeName || 'Sân tiêu chuẩn'})
+                      {formatFieldTypeName(effectiveBookingProof.fieldTypeName)}
+                      )
                     </span>
                   </div>
                 </div>

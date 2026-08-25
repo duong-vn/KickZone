@@ -26,6 +26,7 @@ import {
   FAVORITE_STATUS_QUERY_KEY,
 } from '@/hooks/use-favorites';
 import { toggleFavoriteField } from '@/lib/api';
+import { formatFieldTypeName } from '@/lib/utils';
 
 // Helper format VND currency
 function formatVND(amount: number): string {
@@ -417,10 +418,11 @@ export default function FavoritesPage() {
                       <div className="flex items-center gap-1.5">
                         <Users className="w-3.5 h-3.5 shrink-0 text-[#575e70]" />
                         <span className="line-clamp-1">
-                          {field.field_type?.name ||
-                            (field as unknown as { field_type?: string })
-                              .field_type ||
-                            'Sân bóng đá'}
+                          {formatFieldTypeName(
+                            field.field_type?.name ||
+                              (field as unknown as { field_type?: string })
+                                .field_type,
+                          )}
                         </span>
                       </div>
                     </div>
@@ -443,21 +445,11 @@ export default function FavoritesPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
-                        {/* Secondary heart toggle button */}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveFavorite(item)}
-                          title="Bỏ thích"
-                          className="p-1.5 rounded-lg border border-[#bccbb9] text-[#575e70] hover:bg-[#edeeef] hover:text-[#ba1a1a] transition-colors cursor-pointer"
-                        >
-                          <Heart className="w-3.5 h-3.5" />
-                        </button>
-
+                      <div>
                         <Link href={`/fields/${field.id}`}>
                           <button
                             type="button"
-                            className="px-3 py-1.5 bg-[#006e2f] text-white font-['Inter',sans-serif] text-xs font-semibold rounded-lg hover:bg-[#006e2f]/90 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                            className="px-4 py-1.5 bg-[#006e2f] text-white font-['Inter',sans-serif] text-xs font-semibold rounded-lg hover:bg-[#005321] transition-all shadow-2xs active:scale-95 cursor-pointer"
                           >
                             Đặt ngay
                           </button>

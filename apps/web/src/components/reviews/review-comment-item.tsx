@@ -2,9 +2,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Reply, ShieldCheck, Send } from 'lucide-react';
+import {
+  Reply,
+  ShieldCheck,
+  Send,
+  Trash2,
+  Edit3,
+  X,
+  Check,
+} from 'lucide-react';
 import type { ReviewComment } from '@/types/review';
-import { CURRENT_USER } from '@/data/mock-reviews';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -15,18 +22,50 @@ export interface ReviewCommentItemProps {
     content: string,
     replyToUserName: string,
   ) => void;
+  onDeleteComment?: (commentId: string) => void;
+  onEditComment?: (commentId: string, content: string) => void;
+  currentUserId?: string | null;
+  currentUser?: {
+    id: string;
+    fullName?: string;
+    avatarUrl?: string | null;
+    role?: string;
+  } | null;
   isNested?: boolean;
 }
 
 export function ReviewCommentItem({
   comment,
   onAddReply,
+  onDeleteComment,
+  onEditComment,
+  currentUserId,
+  currentUser,
   isNested = false,
 }: ReviewCommentItemProps) {
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(comment.content);
 
   const isAdmin = comment.user.role === 'ADMIN';
+  const hasLoggedInUser = Boolean(currentUserId || currentUser?.id);
+  const isOwner = Boolean(
+    hasLoggedInUser &&
+    ((currentUserId &&
+      (comment.userId === currentUserId ||
+        comment.user?.id === currentUserId)) ||
+      (currentUser?.id &&
+        (comment.userId === currentUser.id ||
+          comment.user?.id === currentUser.id ||
+          (comment as { authUserId?: string }).authUserId === currentUser.id ||
+          (currentUser as { authUserId?: string }).authUserId ===
+            comment.userId ||
+          (currentUser as { authUserId?: string }).authUserId ===
+            comment.user?.id))),
+  );
+  const canDelete =
+    hasLoggedInUser && (isOwner || currentUser?.role === 'ADMIN');
 
   const handleSendReply = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +73,13 @@ export function ReviewCommentItem({
     onAddReply(comment.id, replyText.trim(), comment.user.fullName);
     setReplyText('');
     setShowReplyForm(false);
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editText.trim() || !onEditComment) return;
+    onEditComment(comment.id, editText.trim());
+    setIsEditing(false);
   };
 
   const rawDate =
@@ -47,8 +93,13 @@ export function ReviewCommentItem({
         })
       : rawDate || 'Gần đây';
 
+  const userAvatar = currentUser?.avatarUrl;
+  const userInitials = (currentUser?.fullName || 'Bạn')
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
-    <div className={cn('relative', isNested && 'ml-6 sm:ml-10 mt-3')}>
+    <div className={cn('relative group', isNested && 'ml-6 sm:ml-10 mt-3')}>
       {/* Visual Connecting Line for nested comments */}
       {isNested && (
         <>
@@ -78,6 +129,11 @@ export function ReviewCommentItem({
               <span className="font-bold text-xs sm:text-sm text-[#191c1d]">
                 {comment.user.fullName}
               </span>
+              {isOwner && (
+                <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-[#006e2f]/10 text-[#006e2f] border border-[#006e2f]/20">
+                  Bạn
+                </span>
+              )}
               {isAdmin && (
                 <span className="inline-flex items-center gap-1 bg-[#006e2f] text-white text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
                   <ShieldCheck className="w-3 h-3" />
@@ -89,14 +145,50 @@ export function ReviewCommentItem({
               </span>
             </div>
 
-            <p className="text-xs sm:text-sm text-[#191c1d] leading-relaxed whitespace-pre-wrap">
-              {comment.replyToUserName && (
-                <span className="text-[#006e2f] font-semibold mr-1.5">
-                  @{comment.replyToUserName}
-                </span>
-              )}
-              {comment.content}
-            </p>
+            {isEditing ? (
+              <form onSubmit={handleSaveEdit} className="mt-2 space-y-2">
+                <textarea
+                  rows={2}
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  className="w-full bg-white border border-[#bccbb9]/80 rounded-lg p-2 text-xs text-[#191c1d] focus:outline-none focus:border-[#006e2f] focus:ring-1 focus:ring-[#006e2f] resize-none"
+                  autoFocus
+                />
+                <div className="flex justify-end gap-1.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditText(comment.content);
+                    }}
+                    className="text-xs text-[#575e70]"
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Hủy
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="xs"
+                    disabled={!editText.trim()}
+                    className="bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-semibold"
+                  >
+                    <Check className="w-3 h-3 mr-1" />
+                    Lưu
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <p className="text-xs sm:text-sm text-[#191c1d] leading-relaxed whitespace-pre-wrap">
+                {comment.replyToUserName && (
+                  <span className="text-[#006e2f] font-semibold mr-1.5">
+                    @{comment.replyToUserName}
+                  </span>
+                )}
+                {comment.content}
+              </p>
+            )}
           </div>
 
           {/* Comment Actions */}
@@ -109,6 +201,28 @@ export function ReviewCommentItem({
               <Reply className="w-3 h-3" />
               <span>{showReplyForm ? 'Đóng' : 'Trả lời'}</span>
             </button>
+
+            {isOwner && onEditComment && !isEditing && (
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#575e70] hover:text-[#006e2f] transition-colors cursor-pointer"
+              >
+                <Edit3 className="w-3 h-3" />
+                <span>Sửa</span>
+              </button>
+            )}
+
+            {canDelete && onDeleteComment && (
+              <button
+                type="button"
+                onClick={() => onDeleteComment(comment.id)}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#575e70] hover:text-[#ba1a1a] transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Xóa</span>
+              </button>
+            )}
           </div>
 
           {/* Inline Reply Form */}
@@ -117,15 +231,15 @@ export function ReviewCommentItem({
               onSubmit={handleSendReply}
               className="mt-3 flex items-start gap-2 animate-in fade-in-0 duration-200"
             >
-              {CURRENT_USER.avatarUrl ? (
+              {userAvatar ? (
                 <img
-                  src={CURRENT_USER.avatarUrl}
-                  alt={CURRENT_USER.fullName}
-                  className="w-7 h-7 rounded-full object-cover shrink-0"
+                  src={userAvatar}
+                  alt={currentUser?.fullName || 'Avatar'}
+                  className="w-7 h-7 rounded-full object-cover shrink-0 border border-[#bccbb9]/40"
                 />
               ) : (
                 <div className="w-7 h-7 rounded-full bg-[#006e2f] text-white text-[10px] font-bold flex items-center justify-center shrink-0">
-                  {CURRENT_USER.fullName.slice(0, 2).toUpperCase()}
+                  {userInitials}
                 </div>
               )}
               <div className="flex-1 flex flex-col gap-1.5">
@@ -169,6 +283,10 @@ export function ReviewCommentItem({
                   key={reply.id}
                   comment={reply}
                   onAddReply={onAddReply}
+                  onDeleteComment={onDeleteComment}
+                  onEditComment={onEditComment}
+                  currentUserId={currentUserId}
+                  currentUser={currentUser}
                   isNested={true}
                 />
               ))}

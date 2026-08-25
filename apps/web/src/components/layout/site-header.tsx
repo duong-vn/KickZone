@@ -172,6 +172,13 @@ export function SiteHeader() {
     }
   };
 
+  const isLinkActive = (href: string) => {
+    if (href === '/') {
+      return pathname === '/';
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-[#bccbb9]/40 bg-[#f8f9fa]/95 backdrop-blur-md shadow-sm">
       <div className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -189,7 +196,7 @@ export function SiteHeader() {
         {/* Desktop Navigation */}
         <nav className="hidden items-center gap-8 md:flex">
           {NAV_LINKS.map((link) => {
-            const active = pathname === link.href;
+            const active = isLinkActive(link.href);
             return (
               <Link
                 key={link.href}
@@ -380,7 +387,7 @@ export function SiteHeader() {
                 onClick={() => setMobileOpen(false)}
                 className={cn(
                   'rounded-xl px-3.5 py-2 text-xs font-medium transition-colors',
-                  pathname === link.href
+                  isLinkActive(link.href)
                     ? 'bg-[#e7e8e9] font-bold text-[#006e2f]'
                     : 'text-[#575e70] hover:bg-[#edeeef]',
                 )}

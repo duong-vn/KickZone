@@ -23,6 +23,7 @@ import {
 } from '@/lib/booking-time';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 import type { BookingStatus } from '@/types/booking';
+import { formatFieldTypeName } from '@/lib/utils';
 
 const labels: Record<BookingStatus, string> = {
   PENDING: 'Chờ xác nhận',
@@ -114,7 +115,7 @@ export default function BookingDetailPage({
               {booking.field.address}
             </p>
             <span className="mt-3 inline-block rounded-full bg-[#006e2f]/10 px-2.5 py-1 text-xs font-semibold text-[#006e2f]">
-              {booking.field.type?.name ?? 'Sân bóng'}
+              {formatFieldTypeName(booking.field.type)}
             </span>
           </div>
 
