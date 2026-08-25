@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { booking_status } from '../../generated/prisma/client';
+import { formatBusinessTime } from '../../bookings/booking-rules';
 
 @Injectable()
 export class AdminDashboardService {
@@ -199,7 +200,7 @@ export class AdminDashboardService {
       todaySchedule: todayBookings.map((b) => ({
         id: b.id,
         code: b.code,
-        timeSlot: `${b.start_time.toISOString().substring(11, 16)} - ${b.end_time.toISOString().substring(11, 16)}`,
+        timeSlot: `${formatBusinessTime(b.start_time)} - ${formatBusinessTime(b.end_time)}`,
         courtName: b.fields.name,
         fieldType: b.fields.field_types?.name || 'Sân bóng',
         customerName: b.profiles.full_name || 'Khách hàng',

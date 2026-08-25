@@ -11,6 +11,10 @@ import {
   CreateReviewCommentDto,
   UpdateReviewCommentDto,
 } from './dto/comments.dto';
+import {
+  formatBusinessDate,
+  formatBusinessTime,
+} from '../bookings/booking-rules';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -353,8 +357,8 @@ export class ReviewsService {
               id: review.bookings.id,
               code: review.bookings.code,
               fieldName: review.fields.name,
-              matchDate: review.bookings.start_time.toISOString().split('T')[0],
-              timeSlot: `${review.bookings.start_time.toISOString().substring(11, 16)} - ${review.bookings.end_time.toISOString().substring(11, 16)}`,
+              matchDate: formatBusinessDate(review.bookings.start_time),
+              timeSlot: `${formatBusinessTime(review.bookings.start_time)} - ${formatBusinessTime(review.bookings.end_time)}`,
               fieldTypeName: formatFieldTypeName(
                 review.fields.field_types?.name,
               ),
@@ -482,10 +486,8 @@ export class ReviewsService {
               id: updated.bookings.id,
               code: updated.bookings.code,
               fieldName: updated.fields.name,
-              matchDate: updated.bookings.start_time
-                .toISOString()
-                .split('T')[0],
-              timeSlot: `${updated.bookings.start_time.toISOString().substring(11, 16)} - ${updated.bookings.end_time.toISOString().substring(11, 16)}`,
+              matchDate: formatBusinessDate(updated.bookings.start_time),
+              timeSlot: `${formatBusinessTime(updated.bookings.start_time)} - ${formatBusinessTime(updated.bookings.end_time)}`,
               fieldTypeName: formatFieldTypeName(
                 updated.fields.field_types?.name,
               ),
@@ -595,8 +597,8 @@ export class ReviewsService {
         id: eligibleBooking.id,
         code: eligibleBooking.code,
         fieldName: field.name,
-        matchDate: eligibleBooking.start_time.toISOString().split('T')[0],
-        timeSlot: `${eligibleBooking.start_time.toISOString().substring(11, 16)} - ${eligibleBooking.end_time.toISOString().substring(11, 16)}`,
+        matchDate: formatBusinessDate(eligibleBooking.start_time),
+        timeSlot: `${formatBusinessTime(eligibleBooking.start_time)} - ${formatBusinessTime(eligibleBooking.end_time)}`,
         fieldTypeName: formatFieldTypeName(field.field_types?.name),
       },
     };

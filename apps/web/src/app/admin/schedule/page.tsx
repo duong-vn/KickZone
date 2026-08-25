@@ -6,6 +6,11 @@ import { useQuery } from '@tanstack/react-query';
 import { adminFilterControlClass } from '@/components/admin/admin-filter-bar';
 import { fetchAdminFields, fetchAdminBookingCalendar } from '@/lib/api';
 import {
+  formatBusinessTime,
+  getBusinessParts,
+  durationMinutes,
+} from '@/lib/booking-time';
+import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -290,22 +295,12 @@ export default function AdminSchedulePage() {
         status: BookingStatus;
         finalPrice?: number;
       }) => {
-        const s = new Date(b.startTime);
-        const e = new Date(b.endTime);
-
-        const startHour = s.getHours() + s.getMinutes() / 60;
-        const endHour = e.getHours() + e.getMinutes() / 60;
-        const duration = Math.max(endHour - startHour, 0.5);
-
-        const formatHM = (d: Date) => {
-          const h = String(d.getHours()).padStart(2, '0');
-          const m = String(d.getMinutes()).padStart(2, '0');
-          return `${h}:${m}`;
-        };
-
-        const y = s.getFullYear();
-        const m = String(s.getMonth() + 1).padStart(2, '0');
-        const day = String(s.getDate()).padStart(2, '0');
+        const startParts = getBusinessParts(b.startTime);
+        const startHour = startParts.hour + startParts.minute / 60;
+        const duration = Math.max(
+          durationMinutes(b.startTime, b.endTime) / 60,
+          0.5,
+        );
 
         return {
           id: b.id,
@@ -317,12 +312,12 @@ export default function AdminSchedulePage() {
           customerPhone: b.customerPhone,
           customerEmail: b.customerEmail,
           customerAvatar: b.customerAvatar,
-          bookingDate: `${y}-${m}-${day}`,
+          bookingDate: startParts.dateKey,
           startTime: b.startTime,
           endTime: b.endTime,
           startHour,
           durationHours: duration,
-          timeDisplay: `${formatHM(s)} - ${formatHM(e)}`,
+          timeDisplay: `${formatBusinessTime(b.startTime)} - ${formatBusinessTime(b.endTime)}`,
           status: b.status,
           finalPrice: b.finalPrice,
         };

@@ -150,8 +150,8 @@ describe('ReviewsService', () => {
         bookings: {
           id: bookingId,
           code: 'KZ-BK-123',
-          start_time: new Date('2026-08-25T18:00:00.000Z'),
-          end_time: new Date('2026-08-25T19:30:00.000Z'),
+          start_time: new Date('2026-08-25T18:00:00+07:00'),
+          end_time: new Date('2026-08-25T19:30:00+07:00'),
         },
         fields: {
           id: fieldId,
@@ -357,8 +357,8 @@ describe('ReviewsService', () => {
       findFirstBooking.mockResolvedValue({
         id: bookingId,
         code: 'KZ-BK-999',
-        start_time: new Date('2026-08-25T18:00:00.000Z'),
-        end_time: new Date('2026-08-25T19:30:00.000Z'),
+        start_time: new Date('2026-08-25T18:00:00+07:00'),
+        end_time: new Date('2026-08-25T19:30:00+07:00'),
       });
 
       const result = await service.checkEligibility(fieldId, mockUser);

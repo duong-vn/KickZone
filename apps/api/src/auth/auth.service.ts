@@ -7,6 +7,10 @@ import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { PrismaService } from '../prisma/prisma.service';
 import type { profiles } from '../generated/prisma/client';
+import {
+  formatBusinessDate,
+  formatBusinessTime,
+} from '../bookings/booking-rules';
 
 @Injectable()
 export class AuthService {
@@ -132,6 +136,8 @@ export class AuthService {
       bookingsList,
       reviewsList,
       favoritesList,
+      newFieldsList,
+      newVouchersList,
       bookingCount,
       reviewCount,
       favoriteCount,
@@ -141,10 +147,10 @@ export class AuthService {
             where: { user_id: userId },
             include: {
               fields: {
-                select: { id: true, name: true, slug: true },
+                select: { id: true, name: true, slug: true, address: true },
               },
             },
-            orderBy: { created_at: 'desc' },
+            orderBy: [{ updated_at: 'desc' }, { created_at: 'desc' }],
             take: fetchLimit,
           })
         : Promise.resolve([]),
@@ -170,6 +176,34 @@ export class AuthService {
             },
             orderBy: { created_at: 'desc' },
             take: fetchLimit,
+          })
+        : Promise.resolve([]),
+      filterType === 'ALL' && this.prisma.fields?.findMany
+        ? this.prisma.fields.findMany({
+            where: { deleted_at: null, status: 'ACTIVE' },
+            orderBy: { created_at: 'desc' },
+            take: 3,
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              address: true,
+              created_at: true,
+            },
+          })
+        : Promise.resolve([]),
+      filterType === 'ALL' && this.prisma.vouchers?.findMany
+        ? this.prisma.vouchers.findMany({
+            where: { is_active: true },
+            orderBy: { created_at: 'desc' },
+            take: 3,
+            select: {
+              id: true,
+              code: true,
+              discount_type: true,
+              value: true,
+              created_at: true,
+            },
           })
         : Promise.resolve([]),
       shouldFetchBookings
@@ -200,25 +234,30 @@ export class AuthService {
     // Map bookings
     for (const b of bookingsList) {
       let type = 'BOOKING_CREATED';
-      let title = 'Đã tạo yêu cầu đặt sân';
-      let description = `Bạn đã gửi yêu cầu đặt ${b.fields.name}.`;
+      let title = `Đã tạo yêu cầu đặt sân #${b.code}`;
+      const timeRangeStr =
+        b.start_time && b.end_time
+          ? ` (${formatBusinessTime(b.start_time)} - ${formatBusinessTime(b.end_time)}, ${formatBusinessDate(b.start_time)})`
+          : '';
+      let description = `Yêu cầu đặt sân ${b.fields?.name || 'sân bóng'}${timeRangeStr} đang chờ quản trị viên xác nhận.`;
+      const activityTime = b.updated_at || b.created_at;
 
       if (b.status === 'CONFIRMED') {
         type = 'BOOKING_CONFIRMED';
-        title = 'Đơn đặt sân đã được xác nhận';
-        description = `Đơn đặt tại ${b.fields.name} đã được quản trị viên duyệt.`;
+        title = `Đơn #${b.code} đã được xác nhận`;
+        description = `Đơn đặt sân ${b.fields?.name || 'sân bóng'}${timeRangeStr} đã được quản trị viên phê duyệt thành công.`;
       } else if (b.status === 'CANCELLED') {
         type = 'BOOKING_CANCELLED';
-        title = 'Đã hủy đơn đặt sân';
-        description = `Bạn đã hủy đơn đặt sân tại ${b.fields.name}.`;
+        title = `Đơn #${b.code} đã được hủy`;
+        description = `Đơn đặt sân ${b.fields?.name || 'sân bóng'}${timeRangeStr} đã hủy thành công.${b.cancellation_reason ? ` Lý do: ${b.cancellation_reason}` : ''}`;
       } else if (b.status === 'REJECTED') {
         type = 'BOOKING_REJECTED';
-        title = 'Đơn đặt sân bị từ chối';
-        description = `Yêu cầu đặt sân tại ${b.fields.name} đã bị từ chối.`;
+        title = `Đơn #${b.code} đã bị từ chối`;
+        description = `Yêu cầu đặt sân ${b.fields?.name || 'sân bóng'}${timeRangeStr} đã bị từ chối.${b.rejection_reason ? ` Lý do: ${b.rejection_reason}` : ''}`;
       } else if (b.status === 'COMPLETED') {
         type = 'BOOKING_COMPLETED';
-        title = 'Hoàn thành trận đấu';
-        description = `Trận đấu tại ${b.fields.name} đã hoàn tất.`;
+        title = `Đơn #${b.code} đã hoàn thành`;
+        description = `Trận đấu tại sân ${b.fields?.name || 'sân bóng'}${timeRangeStr} đã kết thúc. Hãy để lại đánh giá cho sân nhé!`;
       }
 
       activities.push({
@@ -226,12 +265,48 @@ export class AuthService {
         type,
         title,
         description,
-        time: b.created_at.toISOString(),
-        timestamp: b.created_at,
+        time: activityTime.toISOString(),
+        timestamp: activityTime,
         code: b.code,
         linkHref: `/bookings/${b.id}`,
         linkText: 'Xem chi tiết đơn',
       });
+    }
+
+    // Map new fields
+    if (Array.isArray(newFieldsList)) {
+      for (const f of newFieldsList) {
+        activities.push({
+          id: `field-${f.id}`,
+          type: 'NEW_FIELD',
+          title: `Sân mới ra mắt: ${f.name}`,
+          description: `Sân bóng ${f.name} đã chính thức có mặt tại ${f.address}. Khám phá và đặt sân ngay!`,
+          time: f.created_at.toISOString(),
+          timestamp: f.created_at,
+          linkHref: `/fields/${f.slug || f.id}`,
+          linkText: 'Xem sân bóng',
+        });
+      }
+    }
+
+    // Map new vouchers
+    if (Array.isArray(newVouchersList)) {
+      for (const v of newVouchersList) {
+        const discountText =
+          v.discount_type === 'PERCENT'
+            ? `${v.value}%`
+            : `${Number(v.value).toLocaleString('vi-VN')}đ`;
+        activities.push({
+          id: `voucher-${v.id}`,
+          type: 'NEW_VOUCHER',
+          title: `Ưu đãi mới: Mã giảm giá ${v.code}`,
+          description: `Nhận ngay ưu đãi giảm ${discountText} cho các lượt đặt sân khi áp dụng mã ${v.code}. Đặt sân ngay hôm nay!`,
+          time: v.created_at.toISOString(),
+          timestamp: v.created_at,
+          linkHref: '/fields',
+          linkText: 'Đặt sân ngay',
+        });
+      }
     }
 
     // Map reviews
@@ -284,7 +359,11 @@ export class AuthService {
     const total =
       query?.search && query.search.trim()
         ? activities.length
-        : bookingCount + reviewCount + favoriteCount;
+        : bookingCount +
+          reviewCount +
+          favoriteCount +
+          (newFieldsList?.length || 0) +
+          (newVouchersList?.length || 0);
 
     // Slice for requested page
     const startIndex = (page - 1) * limit;

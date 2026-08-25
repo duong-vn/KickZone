@@ -599,7 +599,10 @@ export default function FieldDetailPage({
     ? getDurationMinutes(startTime, endTime)
     : 0;
   const durationHours = durationMinutes / 60;
-  const originalPrice = selectedSlots.reduce((sum, slot) => sum + slot.price, 0);
+  const originalPrice = selectedSlots.reduce(
+    (sum, slot) => sum + slot.price,
+    0,
+  );
   const activeVoucher =
     appliedVoucher?.startTime === startTime &&
     appliedVoucher.endTime === endTime &&
@@ -1324,7 +1327,9 @@ export default function FieldDetailPage({
                     <span>1. Chọn ngày đặt sân</span>
                   </label>
                   <span className="text-[11px] font-semibold text-[#006e2f]">
-                    {selectedDate === businessDateKey(new Date()) ? 'Hôm nay' : ''}
+                    {selectedDate === businessDateKey(new Date())
+                      ? 'Hôm nay'
+                      : ''}
                   </span>
                 </div>
 
@@ -1371,7 +1376,8 @@ export default function FieldDetailPage({
                 ) : (
                   <>
                     <p className="mb-2 text-[11px] text-[#575e70]">
-                      {startSlots.length} khung giờ trống · Mở cửa {availabilityWindow}
+                      {startSlots.length} khung giờ trống · Mở cửa{' '}
+                      {availabilityWindow}
                     </p>
                     <div className="grid grid-cols-2 gap-2 mb-2.5">
                       <div>
@@ -1380,7 +1386,9 @@ export default function FieldDetailPage({
                         </label>
                         <select
                           value={startTime}
-                          onChange={(event) => handleStartTimeChange(event.target.value)}
+                          onChange={(event) =>
+                            handleStartTimeChange(event.target.value)
+                          }
                           className="w-full px-2.5 py-2 text-xs font-bold border border-[#bccbb9]/60 rounded-xl bg-white text-[#191c1d] focus:outline-none focus:ring-2 focus:ring-[#006e2f]/20 cursor-pointer"
                         >
                           <option value="" disabled>
@@ -1412,7 +1420,8 @@ export default function FieldDetailPage({
                           </option>
                           {endSlots.map((slot) => (
                             <option key={slot.endTime} value={slot.endTime}>
-                              {formatBusinessTime(slot.endTime)} ({getDurationMinutes(startTime, slot.endTime)}p)
+                              {formatBusinessTime(slot.endTime)} (
+                              {getDurationMinutes(startTime, slot.endTime)}p)
                             </option>
                           ))}
                         </select>
@@ -1426,7 +1435,8 @@ export default function FieldDetailPage({
                       {[60, 90, 120].map((minutes) => {
                         const available = endSlots.some(
                           (slot) =>
-                            getDurationMinutes(startTime, slot.endTime) === minutes,
+                            getDurationMinutes(startTime, slot.endTime) ===
+                            minutes,
                         );
                         return (
                           <button
@@ -1449,7 +1459,11 @@ export default function FieldDetailPage({
                     {isSelectionValid && (
                       <div className="p-2 rounded-xl bg-[#006e2f]/5 border border-[#006e2f]/20 flex items-center justify-between text-xs text-[#006e2f] font-semibold">
                         <span>
-                          Khung giờ: <strong>{formatBusinessTime(startTime)} - {formatBusinessTime(endTime)}</strong>
+                          Khung giờ:{' '}
+                          <strong>
+                            {formatBusinessTime(startTime)} -{' '}
+                            {formatBusinessTime(endTime)}
+                          </strong>
                         </span>
                         <span className="font-bold">
                           {durationMinutes} phút ({durationHours}h)
@@ -1540,7 +1554,9 @@ export default function FieldDetailPage({
                       ? 'Tiến hành đặt sân'
                       : 'Chọn khung giờ còn trống'}
                 </span>
-                {isSelectionValid && !availabilityQuery.isFetching && <ArrowRight className="w-4 h-4" />}
+                {isSelectionValid && !availabilityQuery.isFetching && (
+                  <ArrowRight className="w-4 h-4" />
+                )}
               </Button>
             </div>
           </div>

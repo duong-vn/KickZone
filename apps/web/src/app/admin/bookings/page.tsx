@@ -9,6 +9,7 @@ import {
   approveAdminBooking,
   rejectAdminBooking,
 } from '@/lib/api';
+import { formatBusinessTime, getBusinessParts } from '@/lib/booking-time';
 import {
   AdminFilterBar,
   adminFilterControlClass,
@@ -127,10 +128,10 @@ export default function AdminBookingsPage() {
         search: searchQuery || undefined,
         status: statusFilter || undefined,
         from: bookingDateFilter
-          ? `${bookingDateFilter}T00:00:00.000Z`
+          ? new Date(`${bookingDateFilter}T00:00:00+07:00`).toISOString()
           : undefined,
         to: bookingDateFilter
-          ? `${bookingDateFilter}T23:59:59.999Z`
+          ? new Date(`${bookingDateFilter}T23:59:59.999+07:00`).toISOString()
           : undefined,
         page: currentPage,
         limit: pageSize,
@@ -177,16 +178,20 @@ export default function AdminBookingsPage() {
             name: item.fieldName,
             fieldType: item.fieldTypeLabel || 'Sân bóng',
           },
-          bookingDate: item.bookingDate,
+          bookingDate: item.startTime
+            ? getBusinessParts(item.startTime).dateKey
+            : item.bookingDate,
           startTime: item.startTime
-            ? item.startTime.substring(11, 16)
+            ? formatBusinessTime(item.startTime)
             : '00:00',
-          endTime: item.endTime ? item.endTime.substring(11, 16) : '00:00',
+          endTime: item.endTime ? formatBusinessTime(item.endTime) : '00:00',
           originalPrice: item.originalPrice,
           discountAmount: item.discountAmount,
           finalPrice: item.finalPrice,
           status: item.status,
-          createdAt: item.createdAt ? item.createdAt.split('T')[0] : '',
+          createdAt: item.createdAt
+            ? getBusinessParts(item.createdAt).dateKey
+            : '',
           rejectionReason: item.rejectionReason,
           cancellationReason: item.cancellationReason,
         }),

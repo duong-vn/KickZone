@@ -11,6 +11,12 @@ import {
   rejectAdminBooking,
 } from '@/lib/api';
 import {
+  formatBusinessDateOnly,
+  formatBusinessTime,
+  formatBusinessDateTime,
+  durationMinutes,
+} from '@/lib/booking-time';
+import {
   User,
   Mail,
   Phone,
@@ -122,9 +128,7 @@ export default function AdminBookingDetailPage({
       return {
         id: apiBooking.id,
         code: apiBooking.code,
-        createdAt: apiBooking.createdAt
-          ? apiBooking.createdAt.replace('T', ' ').substring(0, 16)
-          : '',
+        createdAt: apiBooking.createdAt || '',
         status: localStatus || apiBooking.status,
         user: {
           id: apiBooking.user.id,
@@ -144,14 +148,19 @@ export default function AdminBookingDetailPage({
             apiBooking.field.images?.[0] ||
             'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&auto=format&fit=crop&q=80',
         },
-        bookingDate: apiBooking.bookingDate,
+        bookingDate: apiBooking.startTime
+          ? formatBusinessDateOnly(apiBooking.startTime)
+          : apiBooking.bookingDate,
         startTime: apiBooking.startTime
-          ? apiBooking.startTime.substring(11, 16)
+          ? formatBusinessTime(apiBooking.startTime)
           : '00:00',
         endTime: apiBooking.endTime
-          ? apiBooking.endTime.substring(11, 16)
+          ? formatBusinessTime(apiBooking.endTime)
           : '00:00',
-        durationMinutes: 90,
+        durationMinutes:
+          apiBooking.startTime && apiBooking.endTime
+            ? durationMinutes(apiBooking.startTime, apiBooking.endTime)
+            : 0,
         originalPrice: apiBooking.originalPrice,
         voucherCode: apiBooking.voucher?.code,
         discountAmount: apiBooking.discountAmount,
@@ -181,6 +190,7 @@ export default function AdminBookingDetailPage({
 
   const formatDateVN = (dateStr: string) => {
     if (!dateStr) return '';
+    if (dateStr.includes('/')) return dateStr;
     const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
     const parts = cleanDate.split('-');
     if (parts.length === 3) {
@@ -191,18 +201,7 @@ export default function AdminBookingDetailPage({
 
   const formatDateTimeVN = (isoStr: string) => {
     if (!isoStr) return '';
-    try {
-      const d = new Date(isoStr);
-      if (isNaN(d.getTime())) return isoStr;
-      const hours = String(d.getHours()).padStart(2, '0');
-      const minutes = String(d.getMinutes()).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = d.getFullYear();
-      return `${hours}:${minutes} - ${day}/${month}/${year}`;
-    } catch {
-      return isoStr;
-    }
+    return formatBusinessDateTime(isoStr);
   };
 
   const showToast = (msg: string) => {

@@ -39,8 +39,11 @@ interface PendingBookingItem {
   status: BookingStatus;
 }
 
+import { formatBusinessTime, getBusinessParts } from '@/lib/booking-time';
+
 function formatDateVN(dateStr: string): string {
   if (!dateStr) return '';
+  if (dateStr.includes('/')) return dateStr;
   const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
   const parts = cleanDate.split('-');
   if (parts.length === 3) {
@@ -51,18 +54,13 @@ function formatDateVN(dateStr: string): string {
 
 function formatLocalTimeSlot(startTime?: string, endTime?: string): string {
   if (!startTime) return '00:00 - 00:00';
-  const s = new Date(startTime);
-  const e = endTime ? new Date(endTime) : s;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(s.getHours())}:${pad(s.getMinutes())} - ${pad(e.getHours())}:${pad(e.getMinutes())}`;
+  const start = formatBusinessTime(startTime);
+  const end = endTime ? formatBusinessTime(endTime) : start;
+  return `${start} - ${end}`;
 }
 
 function getLocalDateString(dateInput: string | Date): string {
-  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return getBusinessParts(dateInput).dateKey;
 }
 
 export default function AdminDashboardPage() {

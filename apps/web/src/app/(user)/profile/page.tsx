@@ -20,10 +20,7 @@ import {
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import {
-  fetchCurrentUserProfile,
-  updateCurrentUserProfile,
-} from '@/lib/api';
+import { fetchCurrentUserProfile, updateCurrentUserProfile } from '@/lib/api';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 
 function validatePassword(password: string): boolean {

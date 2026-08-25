@@ -14,12 +14,21 @@ import {
   Bell,
   ChevronDown,
   LayoutDashboard,
-  Shield,
+  CheckCircle2,
+  XCircle,
+  Ticket,
+  Sparkles,
+  Star,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 
 import { getSupabaseBrowserClient } from '@/lib/supabase';
-import { fetchCurrentUserProfile } from '@/lib/api';
+import {
+  fetchCurrentUserProfile,
+  fetchUserActivities,
+  type ActivityItem,
+} from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
@@ -28,6 +37,172 @@ const NAV_LINKS = [
   { href: '/bookings', label: 'Đơn đặt sân' },
   { href: '/favorites', label: 'Yêu thích' },
 ];
+
+function formatTimeAgoVN(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return 'Vừa xong';
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) return `${diffInMinutes} phút trước`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours} giờ trước`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 30) return `${diffInDays} ngày trước`;
+    return date.toLocaleDateString('vi-VN');
+  } catch {
+    return dateString;
+  }
+}
+
+function UserNotificationDropdown({ isLoggedIn }: { isLoggedIn: boolean }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const { data: activitiesResponse } = useQuery({
+    queryKey: ['user-activities-header'],
+    queryFn: () => fetchUserActivities({ limit: 10 }),
+    enabled: isLoggedIn,
+    staleTime: 30000,
+  });
+
+  const activities: ActivityItem[] = activitiesResponse?.data || [];
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-colors active:scale-95 cursor-pointer ${
+          isOpen
+            ? 'bg-[#e7e8e9] text-[#006e2f]'
+            : 'text-[#575e70] hover:text-[#006e2f] hover:bg-[#edeeef]'
+        }`}
+        aria-label="Thông báo"
+      >
+        <Bell className="w-5 h-5" />
+        {activities.length > 0 && (
+          <span className="absolute top-2 right-2 flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#006e2f] opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#006e2f]" />
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-84 sm:w-[420px] rounded-2xl border border-[#bccbb9] bg-white shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-[#bccbb9]/60 px-4 py-3 bg-[#f8f9fa]">
+            <div className="flex items-center gap-2">
+              <span className="font-(family-name:--font-manrope) text-sm font-bold text-[#191c1d]">
+                Thông báo của bạn
+              </span>
+              <span className="rounded-full bg-[#22c55e]/20 px-2 py-0.5 text-[11px] font-bold text-[#006e2f]">
+                {activities.length}
+              </span>
+            </div>
+            <span className="text-[11px] text-[#575e70]">Mới nhất</span>
+          </div>
+
+          {/* Activities List */}
+          <div className="max-h-[360px] overflow-y-auto divide-y divide-[#bccbb9]/30">
+            {activities.length === 0 ? (
+              <div className="py-8 text-center text-xs text-[#575e70]">
+                Chưa có thông báo mới nào.
+              </div>
+            ) : (
+              activities.map((act) => {
+                let iconEl = <Calendar className="h-4 w-4" />;
+                let badgeStyle = 'bg-[#006e2f]/10 text-[#006e2f]';
+
+                if (
+                  act.type === 'BOOKING_CANCELLED' ||
+                  act.type === 'BOOKING_REJECTED'
+                ) {
+                  iconEl = <XCircle className="h-4 w-4" />;
+                  badgeStyle = 'bg-[#ffdad6] text-[#ba1a1a]';
+                } else if (
+                  act.type === 'BOOKING_CONFIRMED' ||
+                  act.type === 'BOOKING_COMPLETED'
+                ) {
+                  iconEl = <CheckCircle2 className="h-4 w-4" />;
+                  badgeStyle = 'bg-[#22c55e]/20 text-[#006e2f]';
+                } else if (act.type === 'NEW_FIELD') {
+                  iconEl = <Sparkles className="h-4 w-4" />;
+                  badgeStyle = 'bg-amber-100 text-amber-800';
+                } else if (act.type === 'NEW_VOUCHER') {
+                  iconEl = <Ticket className="h-4 w-4" />;
+                  badgeStyle = 'bg-emerald-100 text-emerald-800';
+                } else if (act.type === 'REVIEW') {
+                  iconEl = <Star className="h-4 w-4" />;
+                  badgeStyle = 'bg-[#fef08a] text-[#854d0e]';
+                }
+
+                return (
+                  <Link
+                    key={act.id}
+                    href={act.linkHref || '/bookings'}
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-start justify-between p-3.5 transition-colors hover:bg-[#f8f9fa] gap-3 group"
+                  >
+                    <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                      <div
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-0.5 ${badgeStyle}`}
+                      >
+                        {iconEl}
+                      </div>
+                      <div className="flex-1 min-w-0 text-xs space-y-1">
+                        <p className="font-bold text-[#191c1d] group-hover:text-[#006e2f] transition-colors leading-snug break-words">
+                          {act.title}
+                        </p>
+                        <p className="text-[#575e70] leading-relaxed break-words">
+                          {act.description}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-[10px] font-medium text-[#575e70] mt-0.5">
+                      {formatTimeAgoVN(act.time)}
+                    </span>
+                  </Link>
+                );
+              })
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-[#bccbb9]/40 bg-[#f8f9fa] px-4 py-2.5 text-center">
+            <Link
+              href="/profile/activity"
+              onClick={() => setIsOpen(false)}
+              className="text-xs font-bold text-[#006e2f] hover:text-[#004b1e] transition-colors"
+            >
+              Xem tất cả hoạt động
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -223,14 +398,7 @@ export function SiteHeader() {
           ) : isLoggedIn ? (
             <div className="flex items-center gap-3">
               {/* Notification Button */}
-              <button
-                type="button"
-                onClick={() => toast.info('Bạn không có thông báo mới nào.')}
-                className="w-10 h-10 rounded-full flex items-center justify-center text-[#575e70] hover:text-[#006e2f] hover:bg-[#edeeef] transition-colors active:scale-95"
-                aria-label="Thông báo"
-              >
-                <Bell className="w-5 h-5" />
-              </button>
+              <UserNotificationDropdown isLoggedIn={isLoggedIn} />
 
               {/* User Avatar & Dropdown */}
               <div className="relative" ref={dropdownRef}>
