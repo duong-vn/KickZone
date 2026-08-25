@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -22,14 +30,17 @@ export class FavoritesController {
     summary:
       'Toggle favorite status for a field (add if not favorited, remove if favorited)',
   })
-  toggleFavorite(@Param('id') fieldId: string, @CurrentUser() user: profiles) {
+  toggleFavorite(
+    @Param('id', new ParseUUIDPipe()) fieldId: string,
+    @CurrentUser() user: profiles,
+  ) {
     return this.favoritesService.toggleFavorite(user.id, fieldId);
   }
 
   @Get('fields/:id/favorite')
   @ApiOperation({ summary: 'Get current user favorite status for a field' })
   getFavoriteStatus(
-    @Param('id') fieldId: string,
+    @Param('id', new ParseUUIDPipe()) fieldId: string,
     @CurrentUser() user: profiles,
   ) {
     return this.favoritesService.getFavoriteStatus(user.id, fieldId);
