@@ -337,6 +337,8 @@ export class FieldsService {
             select: {
               id: true,
               user_id: true,
+              field_id: true,
+              booking_id: true,
               rating: true,
               content: true,
               created_at: true,
@@ -496,6 +498,9 @@ export class FieldsService {
 
     const mappedReviews = reviews.map((r) => ({
       id: r.id,
+      userId: r.user_id,
+      fieldId: r.field_id || field.id,
+      bookingId: r.booking_id,
       author: r.profiles?.full_name || 'Khách hàng',
       avatar:
         r.profiles?.avatar_path ||
@@ -503,9 +508,17 @@ export class FieldsService {
       date: r.created_at
         ? new Date(r.created_at).toISOString()
         : new Date().toISOString(),
+      createdAt: r.created_at
+        ? new Date(r.created_at).toISOString()
+        : new Date().toISOString(),
+      updatedAt: r.updated_at
+        ? new Date(r.updated_at).toISOString()
+        : undefined,
       rating: r.rating,
       content: r.content,
       verified: true,
+      verifiedBooking: true,
+      comments: [],
       user: {
         id: r.profiles?.id || r.user_id,
         fullName: r.profiles?.full_name || 'Khách hàng',
