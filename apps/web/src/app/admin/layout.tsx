@@ -107,7 +107,7 @@ function AdminNotificationDropdown() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-[#bccbb9] bg-white shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-84 sm:w-[420px] rounded-2xl border border-[#bccbb9] bg-white shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-[#bccbb9]/60 px-4 py-3 bg-[#f8f9fa]">
             <div className="flex items-center gap-2">
@@ -121,8 +121,8 @@ function AdminNotificationDropdown() {
             <span className="text-[11px] text-[#575e70]">Mới nhất</span>
           </div>
 
-          {/* Activities List (height shows 3 items directly, scrollable for more) */}
-          <div className="max-h-[225px] overflow-y-auto divide-y divide-[#bccbb9]/30">
+          {/* Activities List */}
+          <div className="max-h-[360px] overflow-y-auto divide-y divide-[#bccbb9]/30">
             {recentActivities.length === 0 ? (
               <div className="py-8 text-center text-xs text-[#575e70]">
                 Chưa có hoạt động mới nào.
@@ -152,16 +152,16 @@ function AdminNotificationDropdown() {
                 return (
                   <div
                     key={act.id}
-                    className="flex items-center justify-between p-3 transition-colors hover:bg-[#f8f9fa] gap-3"
+                    className="flex items-start justify-between p-3.5 transition-colors hover:bg-[#f8f9fa] gap-3"
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex items-start gap-2.5 flex-1 min-w-0">
                       <div
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${badgeStyle}`}
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full mt-0.5 ${badgeStyle}`}
                       >
                         {iconEl}
                       </div>
-                      <div className="min-w-0 text-xs">
-                        <p className="truncate text-[#191c1d]">
+                      <div className="flex-1 min-w-0 text-xs">
+                        <p className="text-[#191c1d] leading-relaxed break-words">
                           <span className="font-bold text-[#191c1d]">
                             {act.subject}
                           </span>{' '}
@@ -169,13 +169,24 @@ function AdminNotificationDropdown() {
                         </p>
                       </div>
                     </div>
-                    <span className="shrink-0 text-[10px] font-medium text-[#575e70]">
+                    <span className="shrink-0 text-[10px] font-medium text-[#575e70] mt-0.5">
                       {formatTimeAgoVN(act.timestamp)}
                     </span>
                   </div>
                 );
               })
             )}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-[#bccbb9]/40 bg-[#f8f9fa] px-4 py-2.5 text-center">
+            <Link
+              href="/admin"
+              onClick={() => setIsOpen(false)}
+              className="text-xs font-bold text-[#006e2f] hover:text-[#004b1e] transition-colors"
+            >
+              Xem chi tiết tại Tổng quan
+            </Link>
           </div>
         </div>
       )}

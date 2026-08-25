@@ -21,6 +21,8 @@ import {
   X,
   Filter,
   ArrowUpDown,
+  Ticket,
+  MapPin,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { fetchUserActivities, type ActivityItem } from '@/lib/api';
@@ -49,6 +51,18 @@ function getActivityIcon(type: string) {
       return (
         <div className="w-10 h-10 rounded-full bg-rose-100 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0 shadow-sm">
           <XCircle className="w-4 h-4" />
+        </div>
+      );
+    case 'NEW_FIELD':
+      return (
+        <div className="w-10 h-10 rounded-full bg-amber-100 border border-amber-200 text-amber-800 flex items-center justify-center shrink-0 shadow-sm">
+          <Sparkles className="w-4 h-4 text-amber-700" />
+        </div>
+      );
+    case 'NEW_VOUCHER':
+      return (
+        <div className="w-10 h-10 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-800 flex items-center justify-center shrink-0 shadow-sm">
+          <Ticket className="w-4 h-4 text-emerald-700" />
         </div>
       );
     case 'FAVORITE':

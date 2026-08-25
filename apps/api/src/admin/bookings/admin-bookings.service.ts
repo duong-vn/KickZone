@@ -9,6 +9,7 @@ import {
   RejectBookingDto,
 } from './dto/query-bookings.dto';
 import { booking_status, Prisma } from '../../generated/prisma/client';
+import { formatBusinessDate } from '../../bookings/booking-rules';
 
 @Injectable()
 export class AdminBookingsService {
@@ -120,7 +121,7 @@ export class AdminBookingsService {
         fieldAddress: b.fields?.address || '',
         startTime: b.start_time.toISOString(),
         endTime: b.end_time.toISOString(),
-        bookingDate: b.start_time.toISOString().split('T')[0],
+        bookingDate: formatBusinessDate(b.start_time),
         status: b.status,
         originalPrice: b.original_price,
         discountAmount: b.discount_amount,
@@ -198,7 +199,7 @@ export class AdminBookingsService {
       },
       startTime: booking.start_time.toISOString(),
       endTime: booking.end_time.toISOString(),
-      bookingDate: booking.start_time.toISOString().split('T')[0],
+      bookingDate: formatBusinessDate(booking.start_time),
       status: booking.status,
       originalPrice: booking.original_price,
       discountAmount: booking.discount_amount,

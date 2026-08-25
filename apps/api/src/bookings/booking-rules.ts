@@ -177,6 +177,17 @@ export function getBusinessDateParts(value: Date): {
   };
 }
 
+export function formatBusinessTime(value: Date | string): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  const parts = getBusinessDateParts(date);
+  return `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
+}
+
+export function formatBusinessDate(value: Date | string): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  return getBusinessDateParts(date).date;
+}
+
 export function getSqlTimeMinutes(value: Date): number {
   return value.getUTCHours() * 60 + value.getUTCMinutes();
 }

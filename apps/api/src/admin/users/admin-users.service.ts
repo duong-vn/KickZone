@@ -11,6 +11,7 @@ import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { formatBusinessDate, formatBusinessTime } from '../../bookings/booking-rules';
 
 @Injectable()
 export class AdminUsersService {
@@ -122,7 +123,7 @@ export class AdminUsersService {
       fullName: profile.full_name || 'Chưa cập nhật',
       email: profile.email,
       phone: profile.phone || '',
-      registeredDate: profile.created_at.toISOString().split('T')[0],
+      registeredDate: formatBusinessDate(profile.created_at),
       loginProvider: 'Email',
       status: profile.status,
       avatarUrl:
@@ -140,8 +141,8 @@ export class AdminUsersService {
         id: b.id,
         fieldName: b.fields.name,
         fieldLocation: b.fields.address,
-        bookingDate: b.start_time.toISOString().split('T')[0],
-        timeRange: `${b.start_time.toISOString().substring(11, 16)} - ${b.end_time.toISOString().substring(11, 16)}`,
+        bookingDate: formatBusinessDate(b.start_time),
+        timeRange: `${formatBusinessTime(b.start_time)} - ${formatBusinessTime(b.end_time)}`,
         status: b.status,
       })),
       recentReviews: profile.reviews.map((r) => ({
@@ -149,7 +150,7 @@ export class AdminUsersService {
         fieldName: r.fields.name,
         rating: r.rating,
         content: r.content,
-        date: r.created_at.toISOString().split('T')[0],
+        date: formatBusinessDate(r.created_at),
       })),
     };
   }

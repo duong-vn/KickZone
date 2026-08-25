@@ -10,6 +10,8 @@ import {
   getSqlTimeMinutes,
   makeLocalDateTime,
   parseAvailabilityDate,
+  formatBusinessDate,
+  formatBusinessTime,
   type BookingInterval,
   type PriceRuleInput,
 } from '../bookings/booking-rules';
@@ -523,11 +525,11 @@ export class FieldsService {
             code: r.bookings.code,
             fieldName: field.name,
             matchDate: r.bookings.start_time
-              ? new Date(r.bookings.start_time).toISOString().split('T')[0]
+              ? formatBusinessDate(r.bookings.start_time)
               : '',
             timeSlot:
               r.bookings.start_time && r.bookings.end_time
-                ? `${new Date(r.bookings.start_time).toISOString().substring(11, 16)} - ${new Date(r.bookings.end_time).toISOString().substring(11, 16)}`
+                ? `${formatBusinessTime(r.bookings.start_time)} - ${formatBusinessTime(r.bookings.end_time)}`
                 : '',
             fieldTypeName,
           }
@@ -768,11 +770,11 @@ export class FieldsService {
             code: r.bookings.code,
             fieldName: field.name,
             matchDate: r.bookings.start_time
-              ? new Date(r.bookings.start_time).toISOString().split('T')[0]
+              ? formatBusinessDate(r.bookings.start_time)
               : '',
             timeSlot:
               r.bookings.start_time && r.bookings.end_time
-                ? `${new Date(r.bookings.start_time).toISOString().substring(11, 16)} - ${new Date(r.bookings.end_time).toISOString().substring(11, 16)}`
+                ? `${formatBusinessTime(r.bookings.start_time)} - ${formatBusinessTime(r.bookings.end_time)}`
                 : '',
             fieldTypeName: formatFieldTypeName(field.field_types?.name),
           }

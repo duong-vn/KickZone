@@ -56,6 +56,15 @@ export function formatBusinessDate(value: string | Date): string {
   }).format(typeof value === 'string' ? new Date(value) : value);
 }
 
+export function formatBusinessDateOnly(value: string | Date): string {
+  return new Intl.DateTimeFormat('vi-VN', {
+    timeZone: TIME_ZONE,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(typeof value === 'string' ? new Date(value) : value);
+}
+
 export function formatBusinessTime(value: string | Date): string {
   return new Intl.DateTimeFormat('vi-VN', {
     timeZone: TIME_ZONE,
@@ -63,6 +72,58 @@ export function formatBusinessTime(value: string | Date): string {
     minute: '2-digit',
     hour12: false,
   }).format(typeof value === 'string' ? new Date(value) : value);
+}
+
+export function formatBusinessDateTime(value: string | Date): string {
+  if (!value) return '';
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (isNaN(date.getTime())) return String(value);
+  const time = formatBusinessTime(date);
+  const d = formatBusinessDateOnly(date);
+  return `${time} - ${d}`;
+}
+
+export function getBusinessParts(value: string | Date): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  dateKey: string;
+} {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    hourCycle: 'h23',
+  }).formatToParts(date);
+
+  const values: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type !== 'literal') {
+      values[part.type] = part.value;
+    }
+  }
+
+  const hour = Number(values.hour ?? 0);
+  const minute = Number(values.minute ?? 0);
+  const year = Number(values.year ?? 0);
+  const month = Number(values.month ?? 0);
+  const day = Number(values.day ?? 0);
+
+  return {
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    dateKey: `${values.year}-${values.month}-${values.day}`,
+  };
 }
 
 export function durationMinutes(start: string, end: string): number {
