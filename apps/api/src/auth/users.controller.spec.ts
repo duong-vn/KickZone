@@ -52,7 +52,9 @@ describe('UsersController', () => {
         full_name: 'Nguyễn Văn Mới',
         phone: '0988888888',
       };
-      (authService.updateProfile as jest.Mock).mockResolvedValue(updatedProfile);
+      (authService.updateProfile as jest.Mock).mockResolvedValue(
+        updatedProfile,
+      );
 
       const res = await controller.updateMe(
         { fullName: 'Nguyễn Văn Mới', phone: '0988888888' },
@@ -74,17 +76,22 @@ describe('UsersController', () => {
         data: [],
         meta: { total: 0, page: 1, limit: 10, totalPages: 1 },
       };
-      (authService.getUserActivities as jest.Mock).mockResolvedValue(mockResult);
+      (authService.getUserActivities as jest.Mock).mockResolvedValue(
+        mockResult,
+      );
 
       const res = await controller.getActivities(
         { page: '1', limit: '10' },
         mockProfile,
       );
 
-      expect(authService.getUserActivities).toHaveBeenCalledWith('user-uuid-1', {
-        page: '1',
-        limit: '10',
-      });
+      expect(authService.getUserActivities).toHaveBeenCalledWith(
+        'user-uuid-1',
+        {
+          page: '1',
+          limit: '10',
+        },
+      );
       expect(res).toEqual(mockResult);
     });
   });

@@ -121,9 +121,11 @@ export class AuthService {
         : 20;
 
     const filterType = query?.type?.toUpperCase() || 'ALL';
-    const shouldFetchBookings = filterType === 'ALL' || filterType === 'BOOKING';
+    const shouldFetchBookings =
+      filterType === 'ALL' || filterType === 'BOOKING';
     const shouldFetchReviews = filterType === 'ALL' || filterType === 'REVIEW';
-    const shouldFetchFavorites = filterType === 'ALL' || filterType === 'FAVORITE';
+    const shouldFetchFavorites =
+      filterType === 'ALL' || filterType === 'FAVORITE';
     const fetchLimit = Math.max(page * limit * 2, 50);
 
     const [
@@ -288,7 +290,11 @@ export class AuthService {
     const startIndex = (page - 1) * limit;
     const paginatedItems = activities
       .slice(startIndex, startIndex + limit)
-      .map(({ timestamp: _, ...rest }) => rest);
+      .map((item) => {
+        const { timestamp, ...rest } = item;
+        void timestamp;
+        return rest;
+      });
 
     return {
       data: paginatedItems,
