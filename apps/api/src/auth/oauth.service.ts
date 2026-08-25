@@ -9,7 +9,6 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { PrismaService } from '../prisma/prisma.service';
 import { GoogleLoginDto } from './dto/google-login.dto';
 import { FacebookLoginDto } from './dto/facebook-login.dto';
-import type { profiles } from '../generated/prisma/client';
 
 export interface OAuthUserProfile {
   provider: 'google' | 'facebook';

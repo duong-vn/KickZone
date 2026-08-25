@@ -11,7 +11,8 @@ export class ResetPasswordDto {
   token!: string;
 
   @ApiProperty({
-    description: 'Mật khẩu mới (tối thiểu 8 ký tự, gồm ít nhất 3 trong 4 nhóm ký tự)',
+    description:
+      'Mật khẩu mới (tối thiểu 8 ký tự, gồm ít nhất 3 trong 4 nhóm ký tự)',
     example: 'NewSecurePass123!',
   })
   @IsNotEmpty({ message: 'Vui lòng nhập mật khẩu mới.' })

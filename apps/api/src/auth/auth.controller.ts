@@ -116,7 +116,8 @@ export class AuthController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Mã xác thực không hợp lệ, đã hết hạn hoặc mật khẩu không đủ mạnh.',
+    description:
+      'Mã xác thực không hợp lệ, đã hết hạn hoặc mật khẩu không đủ mạnh.',
   })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.passwordResetService.handleResetPassword(

@@ -27,10 +27,7 @@ describe('OAuthService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        OAuthService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [OAuthService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = module.get<OAuthService>(OAuthService);
@@ -51,7 +48,7 @@ describe('OAuthService', () => {
       // Mock global fetch to return 401
       jest.spyOn(global, 'fetch').mockResolvedValueOnce({
         ok: false,
-        json: async () => ({}),
+        json: () => Promise.resolve({}),
       } as Response);
 
       await expect(
@@ -62,12 +59,13 @@ describe('OAuthService', () => {
     it('creates new profile when email does not exist', async () => {
       jest.spyOn(global, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          email: 'newuser@gmail.com',
-          name: 'New Google User',
-          picture: 'https://avatar.url/pic.jpg',
-          sub: 'google-sub-123',
-        }),
+        json: () =>
+          Promise.resolve({
+            email: 'newuser@gmail.com',
+            name: 'New Google User',
+            picture: 'https://avatar.url/pic.jpg',
+            sub: 'google-sub-123',
+          }),
       } as Response);
 
       prisma.profiles.findFirst.mockResolvedValue(null);
@@ -93,11 +91,12 @@ describe('OAuthService', () => {
     it('logs in existing profile and throws ForbiddenException if INACTIVE', async () => {
       jest.spyOn(global, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          email: 'banned@gmail.com',
-          name: 'Banned User',
-          sub: 'google-sub-456',
-        }),
+        json: () =>
+          Promise.resolve({
+            email: 'banned@gmail.com',
+            name: 'Banned User',
+            sub: 'google-sub-456',
+          }),
       } as Response);
 
       prisma.profiles.findFirst.mockResolvedValue({
@@ -118,12 +117,13 @@ describe('OAuthService', () => {
     it('logs in existing active profile without creating duplicates', async () => {
       jest.spyOn(global, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          email: 'existing@gmail.com',
-          name: 'Existing User',
-          picture: 'https://avatar.url/pic.jpg',
-          sub: 'google-sub-789',
-        }),
+        json: () =>
+          Promise.resolve({
+            email: 'existing@gmail.com',
+            name: 'Existing User',
+            picture: 'https://avatar.url/pic.jpg',
+            sub: 'google-sub-789',
+          }),
       } as Response);
 
       prisma.profiles.findFirst.mockResolvedValue({
@@ -155,7 +155,7 @@ describe('OAuthService', () => {
     it('throws UnauthorizedException if Facebook verification fails', async () => {
       jest.spyOn(global, 'fetch').mockResolvedValueOnce({
         ok: false,
-        json: async () => ({}),
+        json: () => Promise.resolve({}),
       } as Response);
 
       await expect(
@@ -166,12 +166,13 @@ describe('OAuthService', () => {
     it('creates or logs in user with Facebook profile', async () => {
       jest.spyOn(global, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          id: 'fb-id-12345',
-          name: 'Facebook User',
-          email: 'fbuser@facebook.com',
-          picture: { data: { url: 'https://fb.url/pic.jpg' } },
-        }),
+        json: () =>
+          Promise.resolve({
+            id: 'fb-id-12345',
+            name: 'Facebook User',
+            email: 'fbuser@facebook.com',
+            picture: { data: { url: 'https://fb.url/pic.jpg' } },
+          }),
       } as Response);
 
       prisma.profiles.findFirst.mockResolvedValue(null);

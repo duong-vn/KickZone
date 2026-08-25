@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpException, HttpStatus, BadRequestException } from '@nestjs/common';
+import { HttpException, BadRequestException } from '@nestjs/common';
 import {
   PasswordResetService,
   validatePasswordStrength,

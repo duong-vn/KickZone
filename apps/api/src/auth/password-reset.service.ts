@@ -82,7 +82,9 @@ export class PasswordResetService {
 
     if (!profile) {
       // Return generic message to prevent email enumeration, but do not send email
-      this.logger.warn(`Forgot password requested for non-existing email: ${email}`);
+      this.logger.warn(
+        `Forgot password requested for non-existing email: ${email}`,
+      );
       return {
         message:
           'Nếu email tồn tại trong hệ thống, hướng dẫn khôi phục mật khẩu sẽ được gửi đến hòm thư của bạn.',
