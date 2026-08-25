@@ -419,7 +419,7 @@ export default function AdminSchedulePage() {
           </div>
 
           {/* Interactive Date Title with Native Datepicker */}
-          <label className="relative flex items-center gap-2 px-2 py-1 text-xl sm:text-2xl font-normal text-[#3c4043] cursor-pointer hover:bg-[#f1f3f4] rounded-xl transition-colors select-none">
+          <label className="relative flex items-center gap-2 px-2 py-1 font-(family-name:--font-manrope) text-xl sm:text-2xl font-bold text-[#191c1d] cursor-pointer hover:bg-[#f1f3f4] rounded-xl transition-colors select-none">
             <span>{titleDisplay}</span>
             <input
               type="date"
@@ -478,11 +478,14 @@ export default function AdminSchedulePage() {
       <div className="flex-1 overflow-hidden rounded-2xl border border-[#dadce0] bg-white flex flex-col mt-2 shadow-xs">
         {/* VIEW 1: WEEK VIEW (Exact 7-day Google Calendar layout) */}
         {viewMode === 'week' && (
-          <div className="flex flex-col h-full">
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto relative flex flex-col"
+          >
             {/* Top Day Header Row: SUN 23, MON 24, TUE 25... */}
-            <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-[#dadce0] bg-white z-20 shrink-0">
+            <div className="sticky top-0 z-30 grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-[#dadce0] bg-white shrink-0 shadow-2xs">
               {/* GMT Column */}
-              <div className="border-r border-[#dadce0] p-2 text-center text-[10px] font-semibold text-[#70757a] flex items-end justify-center pb-2">
+              <div className="border-r border-[#dadce0] p-2 text-center text-[10px] font-semibold text-[#70757a] flex items-end justify-center pb-2 bg-white">
                 GMT+07
               </div>
 
@@ -490,7 +493,7 @@ export default function AdminSchedulePage() {
               {weekDays.map((day) => (
                 <div
                   key={day.dateString}
-                  className="py-2.5 text-center border-r border-[#dadce0] last:border-r-0"
+                  className="py-2.5 text-center border-r border-[#dadce0] last:border-r-0 bg-white"
                 >
                   <p
                     className={`text-[11px] font-bold uppercase tracking-wider ${
@@ -514,11 +517,8 @@ export default function AdminSchedulePage() {
               ))}
             </div>
 
-            {/* 24-Hour Scrollable Body */}
-            <div
-              ref={scrollContainerRef}
-              className="overflow-y-auto flex-1 relative divide-y divide-[#dadce0]"
-            >
+            {/* 24-Hour Grid */}
+            <div className="relative">
               {TIME_SLOTS_24H.map((hour) => {
                 const hourLabel = formatHourLabel(hour);
 
@@ -528,16 +528,16 @@ export default function AdminSchedulePage() {
                     style={{ height: `${HOUR_ROW_HEIGHT}px` }}
                     className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] relative group"
                   >
-                    {/* Left Hour Label */}
-                    <div className="border-r border-[#dadce0] pr-2 -mt-2 text-right text-[10px] font-medium text-[#70757a] select-none">
+                    {/* Left Hour Label - No horizontal borders */}
+                    <div className="border-r border-[#dadce0] pr-2 -mt-2 text-right text-[10px] font-medium text-[#70757a] select-none bg-transparent">
                       {hour > 0 ? hourLabel : ''}
                     </div>
 
-                    {/* 7 Day Column Background Cells */}
+                    {/* 7 Day Column Background Cells - Horizontal lines only here */}
                     {weekDays.map((day) => (
                       <div
                         key={`cell-${day.dateString}-${hour}`}
-                        className="h-full border-r border-[#dadce0] last:border-r-0 relative hover:bg-[#f1f3f4]/25"
+                        className="h-full border-r border-b border-[#dadce0] last:border-r-0 relative hover:bg-[#f1f3f4]/25"
                       />
                     ))}
                   </div>
@@ -550,7 +550,7 @@ export default function AdminSchedulePage() {
                 className="absolute inset-x-0 z-20 pointer-events-none grid grid-cols-[64px_repeat(7,minmax(0,1fr))]"
               >
                 <div className="flex justify-end pr-1 items-center">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#ea4335]" />
+                  <span className="h-3 w-3 rounded-full bg-[#ea4335] shadow-xs" />
                 </div>
                 <div className="col-span-7 h-[2px] bg-[#ea4335] relative" />
               </div>
@@ -614,13 +614,16 @@ export default function AdminSchedulePage() {
 
         {/* VIEW 2: DAY VIEW */}
         {viewMode === 'day' && (
-          <div className="flex flex-col h-full">
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto relative flex flex-col"
+          >
             {/* Day Header */}
-            <div className="grid grid-cols-[64px_1fr] border-b border-[#dadce0] bg-white sticky top-0 z-20 shrink-0">
-              <div className="border-r border-[#dadce0] p-2 text-center text-[10px] font-semibold text-[#70757a] flex items-end justify-center pb-2">
+            <div className="sticky top-0 z-30 grid grid-cols-[64px_1fr] border-b border-[#dadce0] bg-white shrink-0 shadow-2xs">
+              <div className="border-r border-[#dadce0] p-2 text-center text-[10px] font-semibold text-[#70757a] flex items-end justify-center pb-2 bg-white">
                 GMT+07
               </div>
-              <div className="py-2.5 text-center">
+              <div className="py-2.5 text-center bg-white">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-[#006e2f]">
                   {weekDays[0]?.dayName}
                 </p>
@@ -633,10 +636,7 @@ export default function AdminSchedulePage() {
             </div>
 
             {/* 24-Hour Grid */}
-            <div
-              ref={scrollContainerRef}
-              className="overflow-y-auto flex-1 relative divide-y divide-[#dadce0]"
-            >
+            <div className="relative">
               {TIME_SLOTS_24H.map((hour) => {
                 const hourLabel = formatHourLabel(hour);
 
@@ -646,10 +646,11 @@ export default function AdminSchedulePage() {
                     style={{ height: `${HOUR_ROW_HEIGHT}px` }}
                     className="grid grid-cols-[64px_1fr] relative group"
                   >
-                    <div className="border-r border-[#dadce0] pr-2 -mt-2 text-right text-[10px] font-medium text-[#70757a] select-none">
+                    {/* Left Hour Label - No horizontal borders */}
+                    <div className="border-r border-[#dadce0] pr-2 -mt-2 text-right text-[10px] font-medium text-[#70757a] select-none bg-transparent">
                       {hour > 0 ? hourLabel : ''}
                     </div>
-                    <div className="h-full relative hover:bg-[#f1f3f4]/25" />
+                    <div className="h-full border-b border-[#dadce0] relative hover:bg-[#f1f3f4]/25" />
                   </div>
                 );
               })}
@@ -868,7 +869,7 @@ export default function AdminSchedulePage() {
                 <span className="text-xs font-semibold text-[#70757a]">
                   Chi tiết đơn đặt sân
                 </span>
-                <h4 className="text-xl font-bold text-[#006e2f]">
+                <h4 className="font-(family-name:--font-manrope) text-xl font-extrabold text-[#006e2f]">
                   {selectedBooking.code}
                 </h4>
               </div>
