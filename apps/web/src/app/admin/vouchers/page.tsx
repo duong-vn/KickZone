@@ -18,6 +18,10 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  AdminFilterBar,
+  adminFilterControlClass,
+} from '@/components/admin/admin-filter-bar';
 import { useDebounce } from '@/hooks/use-debounce';
 import {
   AdminVoucherPayload,
@@ -143,6 +147,25 @@ export default function AdminVouchersPage() {
     const used = vouchers.reduce((sum, item) => sum + item.usageCount, 0);
     return { active, used };
   }, [vouchers]);
+
+  const getPageNumbers = () => {
+    const totalPages = Math.max(meta.totalPages, 1);
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+    if (page <= 3) return [1, 2, 3, 4, '...', totalPages];
+    if (page >= totalPages - 2) {
+      return [
+        1,
+        '...',
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      ];
+    }
+    return [1, '...', page - 1, page, page + 1, '...', totalPages];
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -297,56 +320,54 @@ export default function AdminVouchersPage() {
         ))}
       </section>
 
-      <section className="rounded-2xl border border-[#bccbb9] bg-white p-4 shadow-[0_2px_5px_rgba(0,0,0,0.04)]">
-        <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_190px_190px]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
-            <input
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              placeholder="Tìm theo mã voucher..."
-              className={`${inputClass} pl-9`}
-            />
-          </div>
-          <select
-            value={status}
+      <AdminFilterBar className="md:grid-cols-[minmax(240px,1fr)_190px_190px]">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
+          <input
+            value={search}
             onChange={(e) => {
-              setStatus(e.target.value);
+              setSearch(e.target.value);
               setPage(1);
             }}
-            className={inputClass}
-            aria-label="Lọc trạng thái"
-          >
-            <option value="all">Tất cả trạng thái</option>
-            <option value="active">Đang hoạt động</option>
-            <option value="scheduled">Sắp diễn ra</option>
-            <option value="expired">Hết hạn</option>
-            <option value="inactive">Tạm ngưng</option>
-          </select>
-          <select
-            value={type}
-            onChange={(e) => {
-              setType(e.target.value);
-              setPage(1);
-            }}
-            className={inputClass}
-            aria-label="Lọc loại giảm giá"
-          >
-            <option value="all">Tất cả loại giảm</option>
-            <option value="PERCENT">Giảm phần trăm</option>
-            <option value="FIXED">Giảm số tiền</option>
-          </select>
+            placeholder="Tìm theo mã voucher..."
+            className={`${adminFilterControlClass} pl-9`}
+          />
         </div>
-      </section>
+        <select
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value);
+            setPage(1);
+          }}
+          className={`${adminFilterControlClass} appearance-none`}
+          aria-label="Lọc trạng thái"
+        >
+          <option value="all">Tất cả trạng thái</option>
+          <option value="active">Đang hoạt động</option>
+          <option value="scheduled">Sắp diễn ra</option>
+          <option value="expired">Hết hạn</option>
+          <option value="inactive">Tạm ngưng</option>
+        </select>
+        <select
+          value={type}
+          onChange={(e) => {
+            setType(e.target.value);
+            setPage(1);
+          }}
+          className={`${adminFilterControlClass} appearance-none`}
+          aria-label="Lọc loại giảm giá"
+        >
+          <option value="all">Tất cả loại giảm</option>
+          <option value="PERCENT">Giảm phần trăm</option>
+          <option value="FIXED">Giảm số tiền</option>
+        </select>
+      </AdminFilterBar>
 
       <section className="overflow-hidden rounded-2xl border border-[#bccbb9] bg-white shadow-[0_2px_5px_rgba(0,0,0,0.04)]">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] border-collapse font-(family-name:--font-inter) text-sm">
-            <thead className="bg-[#f3f4f5] text-left text-xs font-semibold uppercase tracking-wide text-[#575e70]">
-              <tr>
+          <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-[#bccbb9] bg-[#f3f4f5] text-xs font-semibold text-[#575e70]">
                 <th className="px-5 py-3.5">Mã voucher</th>
                 <th className="px-4 py-3.5">Mức giảm</th>
                 <th className="px-4 py-3.5">Điều kiện</th>
@@ -356,7 +377,7 @@ export default function AdminVouchersPage() {
                 <th className="px-5 py-3.5 text-right">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#dfe3de] text-[#191c1d]">
+            <tbody className="divide-y divide-[#bccbb9]/50 text-xs text-[#191c1d] sm:text-sm">
               {isLoading ? (
                 <tr>
                   <td colSpan={7} className="h-52 text-center">
@@ -487,43 +508,70 @@ export default function AdminVouchersPage() {
             </tbody>
           </table>
         </div>
-        <div className="flex flex-col items-center justify-between gap-3 border-t border-[#bccbb9] px-5 py-3.5 sm:flex-row">
-          <div className="flex items-center gap-3 text-xs text-[#575e70]">
+        <div className="flex flex-col items-center justify-between gap-3 border-t border-[#bccbb9] bg-white px-4 py-3.5 sm:flex-row sm:px-6">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-[#575e70] sm:text-sm">
             <span>
               {meta.total === 0
                 ? 'Không có voucher'
-                : `Hiển thị ${(page - 1) * limit + 1}–${Math.min(page * limit, meta.total)} trong ${meta.total} voucher`}
+                : `Hiển thị ${(page - 1) * limit + 1} - ${Math.min(page * limit, meta.total)} của ${meta.total} voucher`}
             </span>
-            <select
-              value={limit}
-              onChange={(e) => {
-                setLimit(Number(e.target.value));
-                setPage(1);
-              }}
-              className="rounded-lg border border-[#bccbb9] bg-white px-2 py-1.5 font-semibold text-[#191c1d]"
-            >
-              <option value={5}>5 / trang</option>
-              <option value={10}>10 / trang</option>
-              <option value={20}>20 / trang</option>
-            </select>
+            <div className="flex items-center gap-1.5 border-l border-[#bccbb9]/60 pl-3">
+              <span className="text-xs text-[#575e70]">Hiển thị:</span>
+              <select
+                value={limit}
+                onChange={(e) => {
+                  setLimit(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="rounded-lg border border-[#bccbb9] bg-[#f8f9fa] px-2 py-1 text-xs font-semibold text-[#191c1d] transition-colors focus:border-[#006e2f] focus:outline-none"
+              >
+                <option value={5}>5 voucher / trang</option>
+                <option value={10}>10 voucher / trang</option>
+                <option value={20}>20 voucher / trang</option>
+              </select>
+            </div>
           </div>
           <div className="flex items-center gap-1">
             <button
               type="button"
               disabled={page <= 1}
-              onClick={() => setPage((value) => value - 1)}
-              className="rounded-lg border border-[#bccbb9] p-2 text-[#575e70] hover:bg-[#f3f4f5] disabled:opacity-40"
+              onClick={() => setPage((value) => Math.max(1, value - 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bccbb9] text-[#575e70] transition-colors hover:bg-[#e7e8e9] disabled:pointer-events-none disabled:opacity-40"
+              title="Trang trước"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="px-3 text-xs font-semibold text-[#575e70]">
-              Trang {meta.page} / {Math.max(meta.totalPages, 1)}
-            </span>
+            {getPageNumbers().map((pageNumber, index) =>
+              pageNumber === '...' ? (
+                <span
+                  key={`ellipsis-${index}`}
+                  className="flex h-8 w-8 items-center justify-center text-xs text-[#575e70]"
+                >
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  onClick={() => setPage(Number(pageNumber))}
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                    page === pageNumber
+                      ? 'bg-[#006e2f] text-white shadow-sm'
+                      : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
+                  }`}
+                >
+                  {pageNumber}
+                </button>
+              ),
+            )}
             <button
               type="button"
               disabled={page >= meta.totalPages}
-              onClick={() => setPage((value) => value + 1)}
-              className="rounded-lg border border-[#bccbb9] p-2 text-[#575e70] hover:bg-[#f3f4f5] disabled:opacity-40"
+              onClick={() =>
+                setPage((value) => Math.min(meta.totalPages, value + 1))
+              }
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bccbb9] text-[#575e70] transition-colors hover:bg-[#e7e8e9] disabled:pointer-events-none disabled:opacity-40"
+              title="Trang sau"
             >
               <ChevronRight className="h-4 w-4" />
             </button>

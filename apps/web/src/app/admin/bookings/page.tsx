@@ -3,14 +3,18 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   fetchAdminBookings,
   approveAdminBooking,
   rejectAdminBooking,
 } from '@/lib/api';
 import {
+  AdminFilterBar,
+  adminFilterControlClass,
+} from '@/components/admin/admin-filter-bar';
+import {
   Search,
-  Filter,
   Calendar,
   CalendarDays,
   CheckCircle2,
@@ -23,7 +27,6 @@ import {
   X,
   Check,
   AlertCircle,
-  CheckCircle,
 } from 'lucide-react';
 
 // Types mapping directly to KickZone database schema (init.sql)
@@ -197,6 +200,16 @@ export default function AdminBookingsPage() {
     return bookings.filter((b) => b.startTime === startTimeFilter);
   }, [bookings, startTimeFilter]);
 
+  const bookingSummary = useMemo(
+    () => ({
+      total: apiResponse?.meta?.total ?? bookings.length,
+      pending: bookings.filter((item) => item.status === 'PENDING').length,
+      confirmed: bookings.filter((item) => item.status === 'CONFIRMED').length,
+      completed: bookings.filter((item) => item.status === 'COMPLETED').length,
+    }),
+    [apiResponse?.meta?.total, bookings],
+  );
+
   const totalRecords = apiResponse?.meta?.total ?? filteredBookings.length ?? 0;
   const totalPages =
     apiResponse?.meta?.totalPages ??
@@ -210,7 +223,6 @@ export default function AdminBookingsPage() {
   const [rejectingBooking, setRejectingBooking] =
     useState<AdminBookingItem | null>(null);
   const [rejectReasonInput, setRejectReasonInput] = useState('');
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const formatVND = (value: number) => {
     return new Intl.NumberFormat('vi-VN').format(value) + ' ₫';
@@ -227,8 +239,9 @@ export default function AdminBookingsPage() {
   };
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+    if (/^(Lỗi|Không thể|Có lỗi)/.test(msg)) toast.error(msg);
+    else if (/^(Vui lòng|Cảnh báo)/.test(msg)) toast.warning(msg);
+    else toast.success(msg);
   };
 
   // Reset all filters
@@ -353,179 +366,176 @@ export default function AdminBookingsPage() {
 
   return (
     <div className="w-full space-y-5">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="flex items-center justify-between rounded-xl border border-[#22c55e]/40 bg-[#22c55e]/15 px-4 py-3 text-sm font-semibold text-[#004b1e] shadow-sm animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-[#006e2f]" />
-            <span>{toastMessage}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setToastMessage(null)}
-            className="rounded p-1 hover:bg-[#22c55e]/20"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Filters Section (Glassmorphism Card) */}
-      <section
-        aria-label="Bộ lọc tìm kiếm"
-        className="rounded-xl border border-[#bccbb9] bg-white p-4 sm:p-5 shadow-sm"
-      >
-        <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {/* Search Box */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#575e70]">
-              Tìm kiếm
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#575e70]" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="Tìm theo mã đơn / khách hàng / sân"
-                className="w-full rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-9 pr-4 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-              />
-            </div>
-          </div>
-
-          {/* Status Select */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#575e70]">
-              Trạng thái
-            </label>
-            <div className="relative">
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full appearance-none rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-3 pr-8 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-              >
-                <option value="">Tất cả</option>
-                <option value="PENDING">Chờ xác nhận</option>
-                <option value="CONFIRMED">Đã xác nhận</option>
-                <option value="COMPLETED">Hoàn thành</option>
-                <option value="CANCELLED">Đã hủy</option>
-                <option value="REJECTED">Bị từ chối</option>
-              </select>
-              <ChevronRight className="pointer-events-none absolute right-3 top-3 h-4 w-4 rotate-90 text-[#575e70]" />
-            </div>
-          </div>
-
-          {/* Booking Date Range */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#575e70]">
-              Ngày đặt
-            </label>
-            <div
-              onClick={(e) => {
-                const input = e.currentTarget.querySelector(
-                  'input[type="date"]',
-                ) as HTMLInputElement;
-                if (input) {
-                  if ('showPicker' in HTMLInputElement.prototype) {
-                    input.showPicker();
-                  } else {
-                    input.focus();
-                  }
-                }
-              }}
-              className="relative flex items-center justify-between rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-9 pr-3 text-xs sm:text-sm text-[#191c1d] transition-all hover:border-[#006e2f] focus-within:border-[#006e2f] focus-within:bg-white focus-within:ring-1 focus-within:ring-[#006e2f] cursor-pointer select-none"
-            >
-              <Calendar className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-[#575e70]" />
-              <span
-                className={
-                  bookingDateFilter
-                    ? 'text-[#191c1d] font-medium'
-                    : 'text-[#575e70]'
-                }
-              >
-                {bookingDateFilter
-                  ? formatDateVN(bookingDateFilter)
-                  : 'dd/mm/yyyy'}
-              </span>
-              <div className="flex items-center gap-1">
-                {bookingDateFilter && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setBookingDateFilter('');
-                      setCurrentPage(1);
-                    }}
-                    className="z-10 rounded p-0.5 text-[#575e70] hover:bg-[#e7e8e9] hover:text-[#191c1d]"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                <Calendar className="h-4 w-4 text-[#575e70] shrink-0 pointer-events-none" />
-              </div>
-              <input
-                type="date"
-                value={bookingDateFilter}
-                onChange={(e) => {
-                  setBookingDateFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-              />
-            </div>
-          </div>
-
-          {/* Start Time Select */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#575e70]">
-              Thời gian bắt đầu
-            </label>
-            <div className="relative">
-              <Clock className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-[#575e70]" />
-              <select
-                value={startTimeFilter}
-                onChange={(e) => {
-                  setStartTimeFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full appearance-none rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-9 pr-8 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-              >
-                {START_TIME_OPTIONS.map((slot) => (
-                  <option key={slot.value} value={slot.value}>
-                    {slot.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronRight className="pointer-events-none absolute right-3 top-3 h-4 w-4 rotate-90 text-[#575e70]" />
-            </div>
-          </div>
-        </div>
-
-        {/* Filter Action Buttons */}
-        <div className="mt-4 flex items-center justify-end gap-3 border-t border-[#bccbb9]/40 pt-3.5">
-          <button
-            type="button"
-            onClick={handleResetFilters}
-            className="flex items-center gap-1.5 rounded-lg border border-[#bccbb9] px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9]"
-          >
-            <RotateCcw className="h-4 w-4" />
-            <span>Xóa bộ lọc</span>
-          </button>
-          <button
-            type="button"
-            className="flex items-center gap-1.5 rounded-lg bg-[#006e2f] px-4 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#004b1e]"
-          >
-            <Filter className="h-4 w-4" />
-            <span>Lọc kết quả</span>
-          </button>
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="mb-1 text-sm font-semibold text-[#006e2f]">Vận hành</p>
+          <h1 className="font-(family-name:--font-manrope) text-2xl font-extrabold tracking-tight text-[#191c1d]">
+            Quản lý đơn đặt sân
+          </h1>
+          <p className="mt-1 text-sm text-[#575e70]">
+            Theo dõi, xác nhận và xử lý toàn bộ đơn đặt sân.
+          </p>
         </div>
       </section>
+
+      <section
+        aria-label="Tổng quan đơn đặt sân"
+        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        {[
+          {
+            label: 'Tổng đơn',
+            value: bookingSummary.total,
+            icon: CalendarDays,
+            tone: 'bg-[#dce2f3] text-[#585f6c]',
+          },
+          {
+            label: 'Chờ xác nhận trên trang',
+            value: bookingSummary.pending,
+            icon: Clock,
+            tone: 'bg-[#fff1d6] text-[#8a4f00]',
+          },
+          {
+            label: 'Đã xác nhận trên trang',
+            value: bookingSummary.confirmed,
+            icon: CheckCircle2,
+            tone: 'bg-[#dcfce7] text-[#006e2f]',
+          },
+          {
+            label: 'Hoàn thành trên trang',
+            value: bookingSummary.completed,
+            icon: XCircle,
+            tone: 'bg-[#e7e8e9] text-[#575e70]',
+          },
+        ].map(({ label, value, icon: Icon, tone }) => (
+          <div
+            key={label}
+            className="flex items-center gap-3 rounded-2xl border border-[#bccbb9] bg-white p-4 shadow-[0_2px_5px_rgba(0,0,0,0.04)]"
+          >
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-xl ${tone}`}
+            >
+              <Icon className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[#575e70]">{label}</p>
+              <p className="font-(family-name:--font-manrope) text-xl font-extrabold text-[#191c1d]">
+                {value}
+              </p>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <AdminFilterBar className="md:grid-cols-2 xl:grid-cols-[minmax(280px,1fr)_180px_190px_210px_auto]">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            placeholder="Tìm theo mã đơn, khách hàng hoặc sân..."
+            className={`${adminFilterControlClass} pl-9`}
+            aria-label="Tìm kiếm đơn đặt sân"
+          />
+        </div>
+
+        <div className="relative">
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className={`${adminFilterControlClass} appearance-none pr-10`}
+            aria-label="Lọc trạng thái đơn"
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="PENDING">Chờ xác nhận</option>
+            <option value="CONFIRMED">Đã xác nhận</option>
+            <option value="COMPLETED">Hoàn thành</option>
+            <option value="CANCELLED">Đã hủy</option>
+            <option value="REJECTED">Bị từ chối</option>
+          </select>
+          <ChevronRight className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 rotate-90 text-[#575e70]" />
+        </div>
+
+        <div
+          onClick={(event) => {
+            const input = event.currentTarget.querySelector(
+              'input[type="date"]',
+            ) as HTMLInputElement;
+            if ('showPicker' in HTMLInputElement.prototype) input.showPicker();
+            else input.focus();
+          }}
+          className={`${adminFilterControlClass} relative flex cursor-pointer select-none items-center justify-between pl-9 pr-3`}
+        >
+          <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
+          <span
+            className={bookingDateFilter ? 'font-medium' : 'text-[#8a9188]'}
+          >
+            {bookingDateFilter
+              ? formatDateVN(bookingDateFilter)
+              : 'Tất cả ngày đặt'}
+          </span>
+          {bookingDateFilter && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setBookingDateFilter('');
+                setCurrentPage(1);
+              }}
+              className="z-10 rounded p-1 text-[#575e70] hover:bg-[#e7e8e9]"
+              aria-label="Xóa ngày lọc"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <input
+            type="date"
+            value={bookingDateFilter}
+            onChange={(e) => {
+              setBookingDateFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            aria-label="Lọc ngày đặt"
+          />
+        </div>
+
+        <div className="relative">
+          <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
+          <select
+            value={startTimeFilter}
+            onChange={(e) => {
+              setStartTimeFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className={`${adminFilterControlClass} appearance-none pl-9 pr-10`}
+            aria-label="Lọc thời gian bắt đầu"
+          >
+            {START_TIME_OPTIONS.map((slot) => (
+              <option key={slot.value} value={slot.value}>
+                {slot.label}
+              </option>
+            ))}
+          </select>
+          <ChevronRight className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 rotate-90 text-[#575e70]" />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleResetFilters}
+          className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[#bccbb9] bg-white px-4 text-sm font-semibold text-[#575e70] transition hover:border-[#8ca18c] hover:bg-[#f3f4f5]"
+        >
+          <RotateCcw className="h-4 w-4" />
+          <span>Đặt lại</span>
+        </button>
+      </AdminFilterBar>
 
       {/* Table Section */}
       <section className="flex flex-col overflow-hidden rounded-xl border border-[#bccbb9] bg-white shadow-sm">

@@ -165,6 +165,7 @@ export class AdminFieldsService {
       id: field.id,
       name: field.name,
       slug: field.slug,
+      fieldTypeId: field.field_type_id,
       fieldType: field.field_types?.name || '5-a-side',
       fieldTypeLabel:
         field.field_types?.name === '5-a-side'
@@ -182,6 +183,12 @@ export class AdminFieldsService {
       description: field.description || '',
       imageUrl,
       images,
+      fieldImages: fieldImages.map((image) => ({
+        id: image.id,
+        url: image.storage_path,
+        isPrimary: image.is_primary,
+        sortOrder: image.sort_order,
+      })),
       priceRules: field.price_rules.map((pr) => ({
         id: pr.id,
         fieldId: pr.field_id,
@@ -373,6 +380,9 @@ export class AdminFieldsService {
       where: { field_id: fieldId },
       orderBy: { sort_order: 'desc' },
     });
+    if (existingImages.length + files.length > 5) {
+      throw new BadRequestException('Mỗi sân chỉ được tải tối đa 5 hình ảnh');
+    }
     const hasPrimary = existingImages.some((img) => img.is_primary);
     let currentMaxOrder =
       existingImages.length > 0 ? existingImages[0].sort_order : -1;
@@ -404,6 +414,56 @@ export class AdminFieldsService {
     return createdImages;
   }
 
+  async setPrimaryImage(fieldId: string, imageId: string) {
+    const image = await this.prisma.field_images.findFirst({
+      where: { id: imageId, field_id: fieldId },
+    });
+    if (!image) {
+      throw new NotFoundException('Ảnh sân bóng không tồn tại');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.field_images.updateMany({
+        where: { field_id: fieldId, is_primary: true },
+        data: { is_primary: false },
+      }),
+      this.prisma.field_images.update({
+        where: { id: imageId },
+        data: { is_primary: true },
+      }),
+    ]);
+
+    return { message: 'Đã cập nhật ảnh bìa.' };
+  }
+
+  async deleteFieldImage(fieldId: string, imageId: string) {
+    const image = await this.prisma.field_images.findFirst({
+      where: { id: imageId, field_id: fieldId },
+    });
+    if (!image) {
+      throw new NotFoundException('Ảnh sân bóng không tồn tại');
+    }
+
+    await this.storageService.deleteFieldImage(image.storage_path);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.field_images.delete({ where: { id: imageId } });
+      if (image.is_primary) {
+        const nextImage = await tx.field_images.findFirst({
+          where: { field_id: fieldId },
+          orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
+        });
+        if (nextImage) {
+          await tx.field_images.update({
+            where: { id: nextImage.id },
+            data: { is_primary: true },
+          });
+        }
+      }
+    });
+
+    return { message: 'Đã xóa ảnh sân bóng.' };
+  }
+
   async updateStatus(id: string, status: 'ACTIVE' | 'INACTIVE') {
     const field = await this.prisma.fields.findUnique({ where: { id } });
     if (!field) {
@@ -426,6 +486,7 @@ export class AdminFieldsService {
       basePricePerHour?: number;
       description?: string;
       status?: 'ACTIVE' | 'INACTIVE';
+      fieldTypeId?: string;
     },
   ) {
     const field = await this.prisma.fields.findUnique({ where: { id } });
@@ -456,6 +517,7 @@ export class AdminFieldsService {
           description: data.description,
         }),
         ...(data.status && { status: data.status }),
+        ...(data.fieldTypeId && { field_type_id: data.fieldTypeId }),
       },
     });
   }

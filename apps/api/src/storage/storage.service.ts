@@ -142,6 +142,29 @@ export class StorageService {
     };
   }
 
+  async deleteFieldImage(storagePath: string): Promise<void> {
+    if (!this.supabase) {
+      throw new InternalServerErrorException(
+        'Supabase Storage is not configured',
+      );
+    }
+
+    const publicMarker = `/storage/v1/object/public/${this.defaultBucket}/`;
+    const objectPath = storagePath.includes(publicMarker)
+      ? decodeURIComponent(storagePath.split(publicMarker)[1])
+      : storagePath.replace(/^\/+/, '');
+
+    const { error } = await this.supabase.storage
+      .from(this.defaultBucket)
+      .remove([objectPath]);
+    if (error) {
+      this.logger.error(`Storage delete error: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Không thể xóa ảnh khỏi Supabase Storage: ${error.message}`,
+      );
+    }
+  }
+
   async uploadAvatar(
     file: Express.Multer.File,
     userId: string,

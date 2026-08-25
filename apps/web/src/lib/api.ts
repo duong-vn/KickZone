@@ -457,6 +457,27 @@ export async function uploadAdminFieldImages(
   return res.data;
 }
 
+export async function setAdminFieldPrimaryImage(
+  fieldId: string,
+  imageId: string,
+) {
+  const token = await getAuthToken();
+  const res = await api.patch(
+    `/admin/fields/${fieldId}/images/${imageId}/primary`,
+    {},
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+  );
+  return res.data;
+}
+
+export async function deleteAdminFieldImage(fieldId: string, imageId: string) {
+  const token = await getAuthToken();
+  const res = await api.delete(`/admin/fields/${fieldId}/images/${imageId}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return res.data;
+}
+
 export async function fetchAdminUsers(params?: {
   search?: string;
   role?: string;

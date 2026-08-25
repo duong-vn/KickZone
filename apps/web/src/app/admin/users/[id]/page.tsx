@@ -4,6 +4,7 @@
 import React, { useState, use, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   fetchAdminUserById,
   updateAdminUserStatus,
@@ -15,7 +16,6 @@ import {
   ChevronRight,
   Edit,
   Ban,
-  CheckCircle2,
   Mail,
   Eye,
   Star,
@@ -137,7 +137,6 @@ export default function AdminUserDetailPage({
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Edit form state
   const [editFormData, setEditFormData] = useState({
@@ -152,8 +151,9 @@ export default function AdminUserDetailPage({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+    if (/^(Lỗi|Không thể|Có lỗi)/.test(msg)) toast.error(msg);
+    else if (/^(Vui lòng|Kích thước|Cảnh báo)/.test(msg)) toast.warning(msg);
+    else toast.success(msg);
   };
 
   const formatDateVN = (dateStr?: string) => {
@@ -363,23 +363,6 @@ export default function AdminUserDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="flex items-center justify-between rounded-xl border border-[#22c55e]/40 bg-[#22c55e]/15 px-4 py-3 text-sm font-semibold text-[#004b1e] shadow-sm animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-[#006e2f]" />
-            <span>{toastMessage}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setToastMessage(null)}
-            className="rounded p-1 hover:bg-[#22c55e]/20"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
       {/* Header Section */}
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>

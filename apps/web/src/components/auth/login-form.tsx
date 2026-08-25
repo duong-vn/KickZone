@@ -46,16 +46,22 @@ export function LoginForm() {
   const [oauthProvider, setOauthProvider] = useState<OAuthProvider | null>(
     null,
   );
-  const [errorMessage, setErrorMessage] = useState('');
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setErrorMessage('');
-    setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get('email') ?? '').trim();
     const password = String(formData.get('password') ?? '');
+    if (!email) {
+      toast.warning('Vui lòng nhập địa chỉ email.');
+      return;
+    }
+    if (!password) {
+      toast.warning('Vui lòng nhập mật khẩu.');
+      return;
+    }
+    setIsSubmitting(true);
 
     try {
       const supabase = getSupabaseBrowserClient();
@@ -65,7 +71,7 @@ export function LoginForm() {
       });
 
       if (error) {
-        setErrorMessage(getLoginErrorMessage(error.message));
+        toast.error(getLoginErrorMessage(error.message));
         return;
       }
 
@@ -74,7 +80,7 @@ export function LoginForm() {
         const profile = await fetchCurrentUserProfile();
         if (profile && profile.status === 'INACTIVE') {
           await supabase.auth.signOut();
-          setErrorMessage(
+          toast.error(
             'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được kích hoạt lại.',
           );
           return;
@@ -90,7 +96,7 @@ export function LoginForm() {
           anyErr?.response?.data?.message?.includes('khóa')
         ) {
           await supabase.auth.signOut();
-          setErrorMessage(
+          toast.error(
             'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên để được kích hoạt lại.',
           );
           return;
@@ -111,14 +117,13 @@ export function LoginForm() {
       }
       router.refresh();
     } catch {
-      setErrorMessage('Thiếu cấu hình Supabase hoặc kết nối đang gián đoạn.');
+      toast.error('Thiếu cấu hình Supabase hoặc kết nối đang gián đoạn.');
     } finally {
       setIsSubmitting(false);
     }
   }
 
   async function handleOAuth(provider: OAuthProvider) {
-    setErrorMessage('');
     setOauthProvider(provider);
 
     try {
@@ -131,10 +136,10 @@ export function LoginForm() {
       });
 
       if (error) {
-        setErrorMessage(getLoginErrorMessage(error.message));
+        toast.error(getLoginErrorMessage(error.message));
       }
     } catch {
-      setErrorMessage('Không thể mở đăng nhập mạng xã hội. Vui lòng thử lại.');
+      toast.error('Không thể mở đăng nhập mạng xã hội. Vui lòng thử lại.');
     } finally {
       setOauthProvider(null);
     }
@@ -160,7 +165,7 @@ export function LoginForm() {
         </p>
       </div>
 
-      <form className="space-y-5" onSubmit={handleSubmit}>
+      <form className="space-y-5" onSubmit={handleSubmit} noValidate>
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <Input
@@ -172,7 +177,6 @@ export function LoginForm() {
             inputMode="email"
             required
             disabled={isBusy}
-            aria-invalid={errorMessage ? true : undefined}
           />
         </div>
 
@@ -196,7 +200,6 @@ export function LoginForm() {
               required
               minLength={8}
               disabled={isBusy}
-              aria-invalid={errorMessage ? true : undefined}
               className="pr-11"
             />
             <button
@@ -224,16 +227,6 @@ export function LoginForm() {
             Duy trì đăng nhập trên thiết bị này
           </Label>
         </div>
-
-        {errorMessage && (
-          <p
-            role="alert"
-            aria-live="polite"
-            className="rounded-lg border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-sm text-destructive"
-          >
-            {errorMessage}
-          </p>
-        )}
 
         <Button
           type="submit"

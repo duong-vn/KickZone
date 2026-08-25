@@ -5,7 +5,6 @@ import { RolesGuard } from './roles.guard';
 import { SupabaseAuthService } from './supabase-auth.service';
 import { SupabaseAuthGuard } from './supabase-auth.guard';
 import { UsersController } from './users.controller';
-import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
   controllers: [UsersController],
@@ -15,7 +14,6 @@ import { PrismaService } from '../prisma/prisma.service';
     RolesGuard,
     SupabaseAuthService,
     SupabaseAuthGuard,
-    PrismaService,
   ],
   exports: [
     AuthService,

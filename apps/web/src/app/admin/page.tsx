@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   fetchAdminDashboardStats,
   fetchAdminBookings,
@@ -22,11 +23,7 @@ import {
 
 // Types mapping directly to KickZone database schema
 type BookingStatus =
-  | 'PENDING'
-  | 'CONFIRMED'
-  | 'REJECTED'
-  | 'CANCELLED'
-  | 'COMPLETED';
+  'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED';
 
 interface PendingBookingItem {
   id: string;
@@ -41,7 +38,6 @@ interface PendingBookingItem {
   finalPrice: number;
   status: BookingStatus;
 }
-
 
 function formatDateVN(dateStr: string): string {
   if (!dateStr) return '';
@@ -73,7 +69,6 @@ export default function AdminDashboardPage() {
   const queryClient = useQueryClient();
   const [selectedBooking, setSelectedBooking] =
     useState<PendingBookingItem | null>(null);
-  const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
   // 1. Dashboard Stats Query (KPIs & Recent Activities)
   const { data: statsData } = useQuery({
@@ -127,7 +122,6 @@ export default function AdminDashboardPage() {
     return [];
   }, [pendingResponse]);
 
-
   const formatVND = (value: number) => {
     return new Intl.NumberFormat('vi-VN').format(value) + 'đ';
   };
@@ -141,10 +135,9 @@ export default function AdminDashboardPage() {
       });
       queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
-      setActionSuccessMsg('Đã duyệt đơn đặt sân thành công!');
-      setTimeout(() => setActionSuccessMsg(null), 4000);
+      toast.success('Đã duyệt đơn đặt sân thành công!');
     } catch (err) {
-      setActionSuccessMsg(`Lỗi duyệt đơn: ${(err as Error).message}`);
+      toast.error(`Lỗi duyệt đơn: ${(err as Error).message}`);
     }
   };
 
@@ -157,10 +150,9 @@ export default function AdminDashboardPage() {
       });
       queryClient.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
-      setActionSuccessMsg('Đã từ chối đơn đặt sân.');
-      setTimeout(() => setActionSuccessMsg(null), 4000);
+      toast.success('Đã từ chối đơn đặt sân.');
     } catch (err) {
-      setActionSuccessMsg(`Lỗi từ chối đơn: ${(err as Error).message}`);
+      toast.error(`Lỗi từ chối đơn: ${(err as Error).message}`);
     }
   };
 
@@ -209,23 +201,6 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="w-full space-y-6">
-      {/* Toast Notification */}
-      {actionSuccessMsg && (
-        <div className="flex items-center justify-between rounded-xl border border-[#22c55e]/30 bg-[#22c55e]/15 px-4 py-3 text-sm font-semibold text-[#004b1e] shadow-sm animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-[#006e2f]" />
-            <span>{actionSuccessMsg}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setActionSuccessMsg(null)}
-            className="rounded p-1 hover:bg-[#22c55e]/20"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
       {/* Row 1: KPI Cards (Full Width) */}
       <section
         aria-label="Thống kê tổng quan"

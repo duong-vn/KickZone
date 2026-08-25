@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { adminFilterControlClass } from '@/components/admin/admin-filter-bar';
 import { fetchAdminFields, fetchAdminBookingCalendar } from '@/lib/api';
 import {
   ChevronLeft,
@@ -443,7 +444,7 @@ export default function AdminSchedulePage() {
             <select
               value={selectedCourtFilter}
               onChange={(e) => setSelectedCourtFilter(e.target.value)}
-              className="w-full appearance-none rounded-lg border border-[#dadce0] bg-white py-2 pl-3.5 pr-8 text-sm font-medium text-[#3c4043] shadow-2xs transition-all hover:bg-[#f8f9fa] focus:border-[#006e2f] focus:outline-none"
+              className={`${adminFilterControlClass} appearance-none pr-8 font-medium`}
             >
               <option value="all">Tất cả sân bóng</option>
               {courts.map((court) => (
@@ -462,7 +463,7 @@ export default function AdminSchedulePage() {
               onChange={(e) =>
                 setViewMode(e.target.value as 'week' | 'day' | 'month' | 'year')
               }
-              className="w-full appearance-none rounded-lg border border-[#dadce0] bg-white py-2 pl-3.5 pr-8 text-sm font-medium text-[#006e2f] shadow-2xs transition-all hover:bg-[#f8f9fa] focus:border-[#006e2f] focus:outline-none"
+              className={`${adminFilterControlClass} appearance-none pr-8 font-medium`}
             >
               <option value="week">Tuần</option>
               <option value="day">Ngày</option>

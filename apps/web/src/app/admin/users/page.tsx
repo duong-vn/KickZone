@@ -4,7 +4,12 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { fetchAdminUsers, updateAdminUserStatus } from '@/lib/api';
+import {
+  AdminFilterBar,
+  adminFilterControlClass,
+} from '@/components/admin/admin-filter-bar';
 import {
   Search,
   UserPlus,
@@ -16,6 +21,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
 } from 'lucide-react';
 
 // Types aligned with database/init.sql
@@ -76,15 +82,18 @@ export default function AdminUsersPage() {
   });
 
   const [localUsers, setLocalUsers] = useState<AdminUserItem[] | null>(null);
-  const users: AdminUserItem[] = localUsers || apiResponse?.data || [];
+  const users: AdminUserItem[] = useMemo(
+    () => localUsers || apiResponse?.data || [],
+    [localUsers, apiResponse?.data],
+  );
 
   // Modal states
   const [viewingUser, setViewingUser] = useState<AdminUserItem | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+    if (/^(Lỗi|Không thể|Có lỗi)/.test(msg)) toast.error(msg);
+    else if (/^(Vui lòng|Cảnh báo)/.test(msg)) toast.warning(msg);
+    else toast.success(msg);
   };
 
   const formatDateVN = (dateStr: string) => {
@@ -148,6 +157,16 @@ export default function AdminUsersPage() {
     Math.max(1, Math.ceil(totalRecords / pageSize));
   const startRecord = totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRecord = Math.min(currentPage * pageSize, totalRecords);
+  const userSummary = useMemo(
+    () => ({
+      active: users.filter((item) => item.status === 'ACTIVE').length,
+      inactive: users.filter((item) => item.status === 'INACTIVE').length,
+      admins: users.filter(
+        (item) => item.role === 'ADMIN' || item.role === 'MANAGER',
+      ).length,
+    }),
+    [users],
+  );
 
   const getPageNumbers = () => {
     if (totalPages <= 5) {
@@ -274,106 +293,118 @@ export default function AdminUsersPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="flex items-center justify-between rounded-xl border border-[#22c55e]/40 bg-[#22c55e]/15 px-4 py-3 text-sm font-semibold text-[#004b1e] shadow-sm animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-[#006e2f]" />
-            <span>{toastMessage}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setToastMessage(null)}
-            className="rounded p-1 hover:bg-[#22c55e]/20"
-          >
-            <X className="h-4 w-4" />
-          </button>
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="mb-1 text-sm font-semibold text-[#006e2f]">Tài khoản</p>
+          <h1 className="font-(family-name:--font-manrope) text-2xl font-extrabold tracking-tight text-[#191c1d]">
+            Quản lý người dùng
+          </h1>
+          <p className="mt-1 text-sm text-[#575e70]">
+            Theo dõi vai trò và trạng thái tài khoản trong hệ thống.
+          </p>
         </div>
-      )}
+        <Link
+          href="/admin/users/new"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#006e2f] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#004b1e]"
+        >
+          <UserPlus className="h-4 w-4" /> Thêm người dùng
+        </Link>
+      </section>
 
-      {/* Toolbar / Filters */}
-      <div className="rounded-2xl border border-[#bccbb9] bg-white p-4 md:p-6 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <div className="flex flex-col gap-4 justify-between items-start md:flex-row md:items-end">
-          <div className="w-full flex-1 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {/* Search */}
-            <div>
-              <label
-                htmlFor="search-user"
-                className="mb-2 block text-xs sm:text-sm font-semibold text-[#575e70]"
-              >
-                Tìm kiếm
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
-                <input
-                  id="search-user"
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tìm theo tên hoặc email..."
-                  className="w-full rounded-xl border border-[#bccbb9] bg-white py-2.5 pl-9 pr-4 text-xs sm:text-sm text-[#191c1d] shadow-sm transition-all focus:border-[#006e2f] focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-                />
-              </div>
+      <section
+        aria-label="Tổng quan người dùng"
+        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        {[
+          {
+            label: 'Tổng người dùng',
+            value: totalRecords,
+            icon: UserPlus,
+            tone: 'bg-[#dce2f3] text-[#585f6c]',
+          },
+          {
+            label: 'Hoạt động trên trang',
+            value: userSummary.active,
+            icon: CheckCircle2,
+            tone: 'bg-[#dcfce7] text-[#006e2f]',
+          },
+          {
+            label: 'Vô hiệu hóa trên trang',
+            value: userSummary.inactive,
+            icon: Ban,
+            tone: 'bg-[#ffdad6] text-[#ba1a1a]',
+          },
+          {
+            label: 'Quản trị trên trang',
+            value: userSummary.admins,
+            icon: ShieldCheck,
+            tone: 'bg-[#fff1d6] text-[#8a4f00]',
+          },
+        ].map(({ label, value, icon: Icon, tone }) => (
+          <div
+            key={label}
+            className="flex items-center gap-3 rounded-2xl border border-[#bccbb9] bg-white p-4 shadow-[0_2px_5px_rgba(0,0,0,0.04)]"
+          >
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-xl ${tone}`}
+            >
+              <Icon className="h-5 w-5" />
             </div>
-
-            {/* Status Filter */}
             <div>
-              <label
-                htmlFor="filter-status"
-                className="mb-2 block text-xs sm:text-sm font-semibold text-[#575e70]"
-              >
-                Trạng thái tài khoản
-              </label>
-              <div className="relative">
-                <select
-                  id="filter-status"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-[#bccbb9] bg-white py-2.5 pl-4 pr-10 text-xs sm:text-sm text-[#191c1d] shadow-sm transition-all focus:border-[#006e2f] focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-                >
-                  <option value="all">Tất cả trạng thái</option>
-                  <option value="active">Hoạt động</option>
-                  <option value="disabled">Vô hiệu hóa</option>
-                  <option value="pending">Chờ kích hoạt</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
-              </div>
-            </div>
-
-            {/* Role Filter */}
-            <div className="hidden lg:block">
-              <label
-                htmlFor="filter-role"
-                className="mb-2 block text-xs sm:text-sm font-semibold text-[#575e70]"
-              >
-                Vai trò
-              </label>
-              <div className="relative">
-                <select
-                  id="filter-role"
-                  value={roleFilter}
-                  onChange={(e) => setRoleFilter(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-[#bccbb9] bg-white py-2.5 pl-4 pr-10 text-xs sm:text-sm text-[#191c1d] shadow-sm transition-all focus:border-[#006e2f] focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-                >
-                  <option value="all">Tất cả vai trò</option>
-                  <option value="customer">Khách hàng</option>
-                  <option value="manager">Chủ sân</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
-              </div>
+              <p className="text-xs font-semibold text-[#575e70]">{label}</p>
+              <p className="font-(family-name:--font-manrope) text-xl font-extrabold text-[#191c1d]">
+                {value}
+              </p>
             </div>
           </div>
+        ))}
+      </section>
 
-          {/* Add User Button */}
-          <Link
-            href="/admin/users/new"
-            className="flex w-full md:w-auto items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[#006e2f] px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm transition-all hover:bg-[#004b1e] active:scale-95"
-          >
-            <UserPlus className="h-4 w-4" />
-            <span>Thêm người dùng</span>
-          </Link>
+      <AdminFilterBar className="md:grid-cols-[minmax(240px,1fr)_190px_190px]">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
+          <input
+            id="search-user"
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Tìm theo tên hoặc email..."
+            className={`${adminFilterControlClass} pl-9`}
+            aria-label="Tìm kiếm người dùng"
+          />
         </div>
-      </div>
+
+        <div className="relative">
+          <select
+            id="filter-status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className={`${adminFilterControlClass} appearance-none pr-10`}
+            aria-label="Lọc trạng thái tài khoản"
+          >
+            <option value="all">Tất cả trạng thái</option>
+            <option value="active">Hoạt động</option>
+            <option value="disabled">Vô hiệu hóa</option>
+            <option value="pending">Chờ kích hoạt</option>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
+        </div>
+
+        <div className="relative">
+          <select
+            id="filter-role"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className={`${adminFilterControlClass} appearance-none pr-10`}
+            aria-label="Lọc vai trò người dùng"
+          >
+            <option value="all">Tất cả vai trò</option>
+            <option value="customer">Khách hàng</option>
+            <option value="manager">Chủ sân</option>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
+        </div>
+      </AdminFilterBar>
 
       {/* Data Table */}
       <div className="overflow-hidden rounded-2xl border border-[#bccbb9] bg-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)]">

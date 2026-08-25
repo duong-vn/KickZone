@@ -33,7 +33,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
     <html lang="vi" className={`${inter.variable} ${manrope.variable}`}>
       <body>
         <QueryProvider>{children}</QueryProvider>
-        <Toaster richColors />
+        <Toaster richColors position="top-right" closeButton duration={4000} />
       </body>
     </html>
   );
