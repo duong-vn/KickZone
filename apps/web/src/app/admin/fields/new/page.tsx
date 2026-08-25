@@ -5,30 +5,29 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   fetchFieldTypes,
   createAdminField,
   uploadAdminFieldImages,
 } from '@/lib/api';
 import {
-  CloudUpload,
-  Trash2,
+  FieldImageEditor,
+  type FieldEditorImage,
+} from '@/components/admin/field-image-editor';
+import {
   MapPin,
   Wifi,
   Car,
   Store,
   Shirt,
-  CheckCircle2,
-  X,
   Save,
   ChevronDown,
   Pin,
 } from 'lucide-react';
 
-interface UploadedImage {
-  id: string;
-  url: string;
-  isCover: boolean;
+interface UploadedImage extends FieldEditorImage {
+  file: File;
 }
 
 export default function AdminNewFieldPage() {
@@ -42,7 +41,6 @@ export default function AdminNewFieldPage() {
   const [address, setAddress] = useState('');
   const [district, setDistrict] = useState('tb');
   const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
-  const [rawFiles, setRawFiles] = useState<File[]>([]);
 
   const { data: fieldTypes } = useQuery<{ id: string; name: string }[]>({
     queryKey: ['field-types'],
@@ -60,21 +58,30 @@ export default function AdminNewFieldPage() {
   // Images State
   const [images, setImages] = useState<UploadedImage[]>([]);
 
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+  const performRemoveImage = (id: string) => {
+    setImages((prev) => {
+      const filtered = prev.filter((img) => img.id !== id);
+      if (filtered.length > 0 && !filtered.some((img) => img.isPrimary)) {
+        return filtered.map((img, index) => ({
+          ...img,
+          isPrimary: index === 0,
+        }));
+      }
+      return filtered;
+    });
+    toast.success('Đã xóa ảnh khỏi danh sách tải lên.');
   };
 
   const handleRemoveImage = (id: string) => {
-    setImages((prev) => {
-      const filtered = prev.filter((img) => img.id !== id);
-      if (filtered.length > 0 && !filtered.some((img) => img.isCover)) {
-        filtered[0].isCover = true;
-      }
-      return filtered;
+    toast.warning('Bạn có chắc muốn bỏ ảnh này?', {
+      action: {
+        label: 'Xóa ảnh',
+        onClick: () => performRemoveImage(id),
+      },
+      cancel: { label: 'Hủy', onClick: () => undefined },
+      duration: 8000,
     });
   };
 
@@ -82,36 +89,33 @@ export default function AdminNewFieldPage() {
     setImages((prev) =>
       prev.map((img) => ({
         ...img,
-        isCover: img.id === id,
+        isPrimary: img.id === id,
       })),
     );
+    toast.success('Đã chọn ảnh bìa mới.');
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const fileList = Array.from(files);
+  const handleFileUpload = (fileList: File[]) => {
     if (images.length + fileList.length > 5) {
-      alert('Tối đa chỉ được tải lên 5 hình ảnh.');
+      toast.warning('Tối đa chỉ được tải lên 5 hình ảnh.');
       return;
     }
-
-    setRawFiles((prev) => [...prev, ...fileList]);
 
     const newImgs: UploadedImage[] = fileList.map((file, idx) => ({
       id: `img-uploaded-${Date.now()}-${idx}`,
       url: URL.createObjectURL(file),
-      isCover: images.length === 0 && idx === 0,
+      isPrimary: images.length === 0 && idx === 0,
+      file,
     }));
 
     setImages((prev) => [...prev, ...newImgs]);
+    toast.success(`Đã thêm ${newImgs.length} ảnh vào thư viện.`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fieldName.trim() || !address.trim()) {
-      alert('Vui lòng nhập đầy đủ tên sân và địa chỉ.');
+      toast.warning('Vui lòng nhập đầy đủ tên sân và địa chỉ.');
       return;
     }
 
@@ -135,7 +139,7 @@ export default function AdminNewFieldPage() {
       ) || fieldTypes?.[0];
 
     if (!targetType) {
-      alert('Không tìm thấy loại sân tương ứng trong hệ thống');
+      toast.error('Không tìm thấy loại sân tương ứng trong hệ thống');
       return;
     }
 
@@ -152,13 +156,18 @@ export default function AdminNewFieldPage() {
         status,
       });
 
-      if (rawFiles.length > 0) {
+      if (images.length > 0) {
         const formData = new FormData();
-        rawFiles.forEach((f) => formData.append('images', f));
+        const orderedImages = [...images].sort(
+          (a, b) => Number(b.isPrimary) - Number(a.isPrimary),
+        );
+        orderedImages.forEach((image) => formData.append('images', image.file));
         await uploadAdminFieldImages(created.id, formData);
       }
 
-      showToast(`Đã lưu sân bóng "${fieldName}" thành công vào cơ sở dữ liệu!`);
+      toast.success(
+        `Đã lưu sân bóng "${fieldName}" thành công vào cơ sở dữ liệu!`,
+      );
       setTimeout(() => {
         router.push('/admin/fields');
       }, 1000);
@@ -167,29 +176,12 @@ export default function AdminNewFieldPage() {
       const errorMsg =
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message || 'Có lỗi xảy ra khi tạo sân bóng';
-      alert(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="flex items-center justify-between rounded-xl border border-[#22c55e]/40 bg-[#22c55e]/15 px-4 py-3 text-sm font-semibold text-[#004b1e] shadow-sm animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-[#006e2f]" />
-            <span>{toastMessage}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setToastMessage(null)}
-            className="rounded p-1 hover:bg-[#22c55e]/20"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
       {/* Main Form */}
       <form
         onSubmit={handleSubmit}
@@ -291,76 +283,22 @@ export default function AdminNewFieldPage() {
 
           {/* Section: Hình ảnh */}
           <section className="rounded-xl border border-[#bccbb9] bg-white p-6 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-4">
               <h3 className="font-(family-name:--font-manrope) text-lg font-bold text-[#191c1d]">
-                Hình ảnh
+                Hình ảnh sân bóng
               </h3>
-              <span className="text-xs text-[#575e70]">Tối đa 5 ảnh</span>
+              <p className="mt-1 text-xs text-[#575e70]">
+                Ảnh bìa sẽ được hiển thị đầu tiên trên trang tìm kiếm và chi
+                tiết sân.
+              </p>
             </div>
-
-            <div className="space-y-4">
-              {/* Upload Area */}
-              <label className="group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#bccbb9] bg-[#f8f9fa] p-8 text-center transition-colors hover:bg-[#e7e8e9]/50">
-                <CloudUpload className="mb-2 h-10 w-10 text-[#575e70] transition-colors group-hover:text-[#006e2f]" />
-                <p className="text-xs sm:text-sm font-semibold text-[#191c1d]">
-                  Kéo thả hình ảnh vào đây hoặc click để tải lên
-                </p>
-                <p className="mt-1 text-[11px] text-[#575e70]">
-                  Định dạng hỗ trợ: JPG, PNG, WEBP (Tối đa 5MB)
-                </p>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-              </label>
-
-              {/* Preview Grid */}
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-                {images.map((img) => (
-                  <div
-                    key={img.id}
-                    className="group relative aspect-square overflow-hidden rounded-xl border border-[#bccbb9] bg-[#edeeef]"
-                  >
-                    <img
-                      src={img.url}
-                      alt="Xem trước ảnh sân"
-                      className="h-full w-full object-cover"
-                    />
-
-                    {/* Actions Overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-                      {!img.isCover && (
-                        <button
-                          type="button"
-                          onClick={() => handleSetCover(img.id)}
-                          className="rounded-lg bg-white px-2 py-1 text-[10px] font-bold text-[#006e2f] shadow-sm hover:bg-[#f3f4f5]"
-                        >
-                          Đặt ảnh bìa
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveImage(img.id)}
-                        className="rounded-full bg-[#ba1a1a] p-1.5 text-white transition-colors hover:bg-[#93000a]"
-                        title="Xóa ảnh"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Cover Badge */}
-                    {img.isCover && (
-                      <div className="absolute left-2 top-2 rounded bg-[#006e2f] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-sm">
-                        Ảnh bìa
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <FieldImageEditor
+              images={images}
+              onFilesSelected={handleFileUpload}
+              onRemove={(image) => handleRemoveImage(image.id)}
+              onSetPrimary={(image) => handleSetCover(image.id)}
+              maxImages={5}
+            />
           </section>
         </div>
 
@@ -432,7 +370,9 @@ export default function AdminNewFieldPage() {
                 <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px]">
                   <button
                     type="button"
-                    onClick={() => showToast('Đã lưu tọa độ vị trí của sân.')}
+                    onClick={() =>
+                      toast.success('Đã lưu tọa độ vị trí của sân.')
+                    }
                     className="flex items-center gap-1.5 rounded-full border border-[#bccbb9] bg-white px-3.5 py-1.5 text-xs font-bold text-[#006e2f] shadow-sm hover:bg-[#f8f9fa]"
                   >
                     <Pin className="h-3.5 w-3.5" />

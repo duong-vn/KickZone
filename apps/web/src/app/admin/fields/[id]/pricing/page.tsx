@@ -4,6 +4,7 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   fetchAdminFieldById,
   createAdminPriceRule,
@@ -131,7 +132,6 @@ export default function AdminFieldPricingPage({
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<PriceRuleItem | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Form State
   const [ruleName, setRuleName] = useState('');
@@ -146,8 +146,9 @@ export default function AdminFieldPricingPage({
   };
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+    if (/^(Lỗi|Không thể|Có lỗi)/.test(msg)) toast.error(msg);
+    else if (/^(Vui lòng|Cảnh báo)/.test(msg)) toast.warning(msg);
+    else toast.success(msg);
   };
 
   const handleOpenCreateModal = () => {
@@ -172,25 +173,35 @@ export default function AdminFieldPricingPage({
     setIsModalOpen(true);
   };
 
-  const handleDeleteRule = async (ruleId: string) => {
-    if (confirm('Bạn có chắc chắn muốn xóa mức giá này?')) {
-      setLocalFieldData((prev) => ({
-        ...(prev || {}),
-        priceRules: (prev?.priceRules || fieldData.priceRules).filter(
-          (r) => r.id !== ruleId,
-        ),
-      }));
-      try {
-        await deleteAdminPriceRule(fieldId, ruleId);
-        queryClient.invalidateQueries({
-          queryKey: ['admin-field-pricing', fieldId],
-        });
-        queryClient.invalidateQueries({ queryKey: ['admin-field', fieldId] });
-        showToast('Đã xóa mức giá thành công.');
-      } catch (err) {
-        showToast(`Lỗi khi xóa quy tắc: ${(err as Error).message}`);
-      }
+  const performDeleteRule = async (ruleId: string) => {
+    setLocalFieldData((prev) => ({
+      ...(prev || {}),
+      priceRules: (prev?.priceRules || fieldData.priceRules).filter(
+        (rule) => rule.id !== ruleId,
+      ),
+    }));
+    try {
+      await deleteAdminPriceRule(fieldId, ruleId);
+      queryClient.invalidateQueries({
+        queryKey: ['admin-field-pricing', fieldId],
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-field', fieldId] });
+      showToast('Đã xóa mức giá thành công.');
+    } catch (err) {
+      showToast(`Lỗi khi xóa quy tắc: ${(err as Error).message}`);
     }
+  };
+
+  const handleDeleteRule = (ruleId: string) => {
+    toast.warning('Bạn có chắc chắn muốn xóa mức giá này?', {
+      description: 'Thao tác này không thể hoàn tác.',
+      action: {
+        label: 'Xóa mức giá',
+        onClick: () => void performDeleteRule(ruleId),
+      },
+      cancel: { label: 'Hủy', onClick: () => undefined },
+      duration: 8000,
+    });
   };
 
   const toggleDay = (dayVal: number) => {
@@ -204,11 +215,11 @@ export default function AdminFieldPricingPage({
   const handleSaveRule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ruleName.trim()) {
-      alert('Vui lòng nhập tên mức giá.');
+      toast.warning('Vui lòng nhập tên mức giá.');
       return;
     }
     if (selectedDays.length === 0) {
-      alert('Vui lòng chọn ít nhất một ngày áp dụng.');
+      toast.warning('Vui lòng chọn ít nhất một ngày áp dụng.');
       return;
     }
 
@@ -351,23 +362,6 @@ export default function AdminFieldPricingPage({
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="flex items-center justify-between rounded-xl border border-[#22c55e]/40 bg-[#22c55e]/15 px-4 py-3 text-sm font-semibold text-[#004b1e] shadow-sm animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-[#006e2f]" />
-            <span>{toastMessage}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setToastMessage(null)}
-            className="rounded p-1 hover:bg-[#22c55e]/20"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-xs sm:text-sm text-[#575e70]">
         <Link

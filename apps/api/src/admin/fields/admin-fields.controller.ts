@@ -94,6 +94,21 @@ export class AdminFieldsController {
     return this.adminFieldsService.uploadFieldImages(fieldId, files);
   }
 
+  @Patch(':id/images/:imageId/primary')
+  @ApiOperation({ summary: 'Admin: Set a field image as primary' })
+  setPrimaryImage(
+    @Param('id') fieldId: string,
+    @Param('imageId') imageId: string,
+  ) {
+    return this.adminFieldsService.setPrimaryImage(fieldId, imageId);
+  }
+
+  @Delete(':id/images/:imageId')
+  @ApiOperation({ summary: 'Admin: Delete a field image' })
+  deleteImage(@Param('id') fieldId: string, @Param('imageId') imageId: string) {
+    return this.adminFieldsService.deleteFieldImage(fieldId, imageId);
+  }
+
   @Patch(':id/status')
   @ApiOperation({ summary: 'Admin: Update field active/inactive status' })
   updateStatus(
@@ -116,6 +131,7 @@ export class AdminFieldsController {
       basePricePerHour?: number;
       description?: string;
       status?: 'ACTIVE' | 'INACTIVE';
+      fieldTypeId?: string;
     },
   ) {
     return this.adminFieldsService.updateField(id, body);

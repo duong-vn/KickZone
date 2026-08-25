@@ -70,7 +70,6 @@ export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
 
   function readFormValues(form: HTMLFormElement): RegistrationValues {
     const formData = new FormData(form);
@@ -86,6 +85,12 @@ export function RegisterForm() {
   }
 
   function validateRegistration(values: RegistrationValues) {
+    if (!values.fullName) {
+      return 'Vui lòng nhập họ và tên.';
+    }
+    if (!values.email) {
+      return 'Vui lòng nhập địa chỉ email.';
+    }
     const emailDomain = values.email.split('@')[1]?.toLowerCase();
     if (
       !emailDomain ||
@@ -116,12 +121,10 @@ export function RegisterForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setErrorMessage('');
-
     const values = readFormValues(event.currentTarget);
     const validationError = validateRegistration(values);
     if (validationError) {
-      setErrorMessage(validationError);
+      toast.error(validationError);
       return;
     }
 
@@ -141,12 +144,12 @@ export function RegisterForm() {
       });
 
       if (error) {
-        setErrorMessage(getRegistrationErrorMessage(error.message));
+        toast.error(getRegistrationErrorMessage(error.message));
         return;
       }
 
       if (!data.session) {
-        setErrorMessage(
+        toast.warning(
           'Supabase đang bật xác nhận email nên chưa thể đăng nhập ngay. Hãy tắt Confirm Email trong cấu hình Auth rồi thử lại bằng email khác.',
         );
         return;
@@ -156,7 +159,7 @@ export function RegisterForm() {
       router.replace('/');
       router.refresh();
     } catch {
-      setErrorMessage('Thiếu cấu hình Supabase hoặc kết nối đang gián đoạn.');
+      toast.error('Thiếu cấu hình Supabase hoặc kết nối đang gián đoạn.');
     } finally {
       setIsSubmitting(false);
     }
@@ -180,7 +183,7 @@ export function RegisterForm() {
         </p>
       </div>
 
-      <form className="space-y-4" onSubmit={handleSubmit}>
+      <form className="space-y-4" onSubmit={handleSubmit} noValidate>
         <div className="space-y-2">
           <Label htmlFor="fullName">Họ và tên</Label>
           <Input
@@ -271,16 +274,6 @@ export function RegisterForm() {
             của KickZone.
           </Label>
         </div>
-
-        {errorMessage && (
-          <p
-            role="alert"
-            aria-live="polite"
-            className="rounded-lg border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-sm text-destructive"
-          >
-            {errorMessage}
-          </p>
-        )}
 
         <Button
           type="submit"

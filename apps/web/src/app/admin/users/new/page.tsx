@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { createAdminUser, uploadAdminUserAvatar } from '@/lib/api';
 import {
   ChevronRight,
@@ -18,9 +19,7 @@ import {
   Shield,
   CheckCircle2,
   Camera,
-  X,
   Check,
-  AlertCircle,
 } from 'lucide-react';
 
 export default function AdminNewUserPage() {
@@ -40,23 +39,22 @@ export default function AdminNewUserPage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
-        setErrorMessage('Vui lòng chọn file hình ảnh hợp lệ (PNG, JPG, WEBP)');
+        toast.warning('Vui lòng chọn file hình ảnh hợp lệ (PNG, JPG, WEBP)');
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        setErrorMessage('Kích thước ảnh không được vượt quá 5MB');
+        toast.warning('Kích thước ảnh không được vượt quá 5MB');
         return;
       }
-      setErrorMessage(null);
       setAvatarFile(file);
       setAvatarPreview(URL.createObjectURL(file));
+      toast.success('Đã chọn ảnh đại diện.');
     }
   };
 
@@ -80,22 +78,20 @@ export default function AdminNewUserPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
-
     if (!formData.fullName.trim()) {
-      setErrorMessage('Vui lòng nhập họ và tên');
+      toast.warning('Vui lòng nhập họ và tên');
       return;
     }
     if (!formData.email.trim()) {
-      setErrorMessage('Vui lòng nhập địa chỉ email');
+      toast.warning('Vui lòng nhập địa chỉ email');
       return;
     }
     if (!formData.password) {
-      setErrorMessage('Vui lòng nhập mật khẩu');
+      toast.warning('Vui lòng nhập mật khẩu');
       return;
     }
     if (!validatePassword(formData.password)) {
-      setErrorMessage(
+      toast.warning(
         'Mật khẩu phải có ít nhất 8 ký tự và thỏa mãn ít nhất 3 trong 4 tiêu chuẩn: chữ hoa, chữ thường, chữ số, ký tự đặc biệt.',
       );
       return;
@@ -121,6 +117,9 @@ export default function AdminNewUserPage() {
           await uploadAdminUserAvatar(createdUser.id, avatarFormData);
         } catch (uploadErr) {
           console.warn('Lỗi khi tải ảnh đại diện:', uploadErr);
+          toast.warning(
+            'Đã tạo người dùng nhưng chưa thể tải ảnh đại diện lên.',
+          );
         }
       }
 
@@ -128,13 +127,14 @@ export default function AdminNewUserPage() {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
 
       // Navigate back to user list
+      toast.success('Đã tạo người dùng mới thành công.');
       router.push('/admin/users');
     } catch (err: unknown) {
       const anyErr = err as {
         response?: { data?: { message?: string } };
         message?: string;
       };
-      setErrorMessage(
+      toast.error(
         anyErr?.response?.data?.message ||
           anyErr?.message ||
           'Có lỗi xảy ra khi tạo người dùng',
@@ -172,23 +172,6 @@ export default function AdminNewUserPage() {
           <span>Quay lại danh sách</span>
         </Link>
       </div>
-
-      {/* Error Alert */}
-      {errorMessage && (
-        <div className="flex items-center justify-between rounded-xl border border-[#ba1a1a]/30 bg-[#ffdad6]/40 px-4 py-3 text-xs sm:text-sm font-semibold text-[#ba1a1a] shadow-sm animate-in fade-in">
-          <div className="flex items-center gap-2.5">
-            <AlertCircle className="h-5 w-5 shrink-0 text-[#ba1a1a]" />
-            <span>{errorMessage}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setErrorMessage(null)}
-            className="rounded p-1 hover:bg-[#ba1a1a]/10"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
       {/* Main Form */}
       <form onSubmit={handleSubmit} className="space-y-6">

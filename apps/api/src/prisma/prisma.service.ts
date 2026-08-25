@@ -21,6 +21,11 @@ export class PrismaService
 
     const caCertPath = process.env.DATABASE_CA_CERT_PATH;
     const databaseUrl = new URL(connectionString);
+    const configuredPoolMax = Number(process.env.DATABASE_POOL_MAX ?? 2);
+    const poolMax =
+      Number.isInteger(configuredPoolMax) && configuredPoolMax > 0
+        ? configuredPoolMax
+        : 2;
     const poolConfig: PoolConfig = {
       ...(caCertPath
         ? {
@@ -36,7 +41,7 @@ export class PrismaService
             },
           }
         : { connectionString }),
-      max: 5,
+      max: poolMax,
       idleTimeoutMillis: 10000,
       connectionTimeoutMillis: 10000,
     };

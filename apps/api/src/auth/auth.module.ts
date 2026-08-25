@@ -9,7 +9,6 @@ import { AuthController } from './auth.controller';
 import { PasswordResetService } from './password-reset.service';
 import { OAuthService } from './oauth.service';
 import { EmailService } from '../email/email.service';
-import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
   controllers: [UsersController, AuthController],
@@ -22,7 +21,6 @@ import { PrismaService } from '../prisma/prisma.service';
     RolesGuard,
     SupabaseAuthService,
     SupabaseAuthGuard,
-    PrismaService,
   ],
   exports: [
     AuthService,

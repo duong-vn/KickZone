@@ -4,12 +4,17 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   fetchAdminFields,
   updateAdminFieldStatus,
   updateAdminField,
   deleteAdminField,
 } from '@/lib/api';
+import {
+  AdminFilterBar,
+  adminFilterControlClass,
+} from '@/components/admin/admin-filter-bar';
 import {
   Search,
   Plus,
@@ -20,12 +25,12 @@ import {
   Ban,
   CheckCircle2,
   X,
-  DollarSign,
   Check,
   Trash2,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Trophy,
 } from 'lucide-react';
 
 // Types aligned directly with database/init.sql
@@ -76,13 +81,15 @@ export default function AdminFieldsPage() {
   });
 
   const [localFields, setLocalFields] = useState<AdminFieldItem[] | null>(null);
-  const fields: AdminFieldItem[] = localFields || apiResponse?.data || [];
+  const fields: AdminFieldItem[] = useMemo(
+    () => localFields || apiResponse?.data || [],
+    [localFields, apiResponse?.data],
+  );
 
   // Modals state
   const [viewingField, setViewingField] = useState<AdminFieldItem | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingField, setEditingField] = useState<AdminFieldItem | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Form state for Create/Edit
   const [formData, setFormData] = useState({
@@ -97,8 +104,9 @@ export default function AdminFieldsPage() {
   });
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+    if (/^(Lỗi|Không thể|Có lỗi)/.test(msg)) toast.error(msg);
+    else if (/^(Vui lòng|Cảnh báo)/.test(msg)) toast.warning(msg);
+    else toast.success(msg);
   };
 
   const formatVND = (value: number) => {
@@ -143,6 +151,16 @@ export default function AdminFieldsPage() {
     Math.max(1, Math.ceil(totalRecords / pageSize));
   const startRecord = totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRecord = Math.min(currentPage * pageSize, totalRecords);
+  const fieldSummary = useMemo(() => {
+    const active = fields.filter((item) => item.status === 'ACTIVE').length;
+    const inactive = fields.filter((item) => item.status === 'INACTIVE').length;
+    const averageRating = fields.length
+      ? (
+          fields.reduce((sum, item) => sum + item.rating, 0) / fields.length
+        ).toFixed(1)
+      : '0.0';
+    return { active, inactive, averageRating };
+  }, [fields]);
 
   const getPageNumbers = () => {
     if (totalPages <= 5) {
@@ -232,7 +250,7 @@ export default function AdminFieldsPage() {
   const handleSaveField = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.address.trim()) {
-      alert('Vui lòng điền đầy đủ tên sân và địa chỉ.');
+      toast.warning('Vui lòng điền đầy đủ tên sân và địa chỉ.');
       return;
     }
 
@@ -312,8 +330,7 @@ export default function AdminFieldsPage() {
     setIsCreateModalOpen(false);
   };
 
-  const handleDeleteField = async (fieldId: string, fieldName: string) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa sân "${fieldName}"?`)) return;
+  const performDeleteField = async (fieldId: string, fieldName: string) => {
     try {
       await deleteAdminField(fieldId);
       queryClient.invalidateQueries({ queryKey: ['admin-fields'] });
@@ -328,31 +345,29 @@ export default function AdminFieldsPage() {
     }
   };
 
+  const handleDeleteField = (fieldId: string, fieldName: string) => {
+    toast.warning(`Bạn có chắc chắn muốn xóa sân "${fieldName}"?`, {
+      description: 'Thao tác này không thể hoàn tác.',
+      action: {
+        label: 'Xóa sân',
+        onClick: () => void performDeleteField(fieldId, fieldName),
+      },
+      cancel: { label: 'Hủy', onClick: () => undefined },
+      duration: 8000,
+    });
+  };
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="flex items-center justify-between rounded-xl border border-[#22c55e]/40 bg-[#22c55e]/15 px-4 py-3 text-sm font-semibold text-[#004b1e] shadow-sm animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-[#006e2f]" />
-            <span>{toastMessage}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setToastMessage(null)}
-            className="rounded p-1 hover:bg-[#22c55e]/20"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
       {/* Page Header & Actions */}
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <h2 className="font-(family-name:--font-manrope) text-2xl sm:text-3xl font-extrabold tracking-tight text-[#191c1d]">
-            Danh sách Sân bóng
-          </h2>
+          <p className="mb-1 text-sm font-semibold text-[#006e2f]">
+            Danh mục sân
+          </p>
+          <h1 className="font-(family-name:--font-manrope) text-2xl font-extrabold tracking-tight text-[#191c1d]">
+            Quản lý sân bóng
+          </h1>
           <p className="mt-1 text-sm text-[#575e70]">
             Quản lý thông tin, trạng thái và giá cả của các sân bóng.
           </p>
@@ -360,15 +375,63 @@ export default function AdminFieldsPage() {
 
         <Link
           href="/admin/fields/new"
-          className="flex items-center gap-2 rounded-lg bg-[#006e2f] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#004b1e] active:scale-95"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#006e2f] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#004b1e]"
         >
           <Plus className="h-4 w-4" />
           <span>Thêm sân mới</span>
         </Link>
       </div>
 
-      {/* Filters & Search Bar */}
-      <div className="flex flex-col gap-4 rounded-xl border border-[#bccbb9] bg-white p-4 shadow-sm md:flex-row">
+      <section
+        aria-label="Tổng quan sân bóng"
+        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        {[
+          {
+            label: 'Tổng sân',
+            value: totalRecords,
+            icon: Trophy,
+            tone: 'bg-[#dce2f3] text-[#585f6c]',
+          },
+          {
+            label: 'Đang hoạt động trên trang',
+            value: fieldSummary.active,
+            icon: CheckCircle2,
+            tone: 'bg-[#dcfce7] text-[#006e2f]',
+          },
+          {
+            label: 'Tạm ngưng trên trang',
+            value: fieldSummary.inactive,
+            icon: Ban,
+            tone: 'bg-[#ffdad6] text-[#ba1a1a]',
+          },
+          {
+            label: 'Đánh giá trung bình',
+            value: fieldSummary.averageRating,
+            icon: Star,
+            tone: 'bg-[#fff1d6] text-[#8a4f00]',
+          },
+        ].map(({ label, value, icon: Icon, tone }) => (
+          <div
+            key={label}
+            className="flex items-center gap-3 rounded-2xl border border-[#bccbb9] bg-white p-4 shadow-[0_2px_5px_rgba(0,0,0,0.04)]"
+          >
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-xl ${tone}`}
+            >
+              <Icon className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[#575e70]">{label}</p>
+              <p className="font-(family-name:--font-manrope) text-xl font-extrabold text-[#191c1d]">
+                {value}
+              </p>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <AdminFilterBar className="md:grid-cols-[minmax(240px,1fr)_190px_190px]">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
           <input
@@ -376,39 +439,40 @@ export default function AdminFieldsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Tìm kiếm theo tên sân hoặc địa chỉ..."
-            className="w-full rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-9 pr-4 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
+            className={`${adminFilterControlClass} pl-9`}
+            aria-label="Tìm kiếm sân bóng"
           />
         </div>
 
-        <div className="flex gap-3">
-          <div className="relative">
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="min-w-[140px] appearance-none rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-3 pr-8 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-            >
-              <option value="">Loại sân</option>
-              <option value="5">Sân 5 người</option>
-              <option value="7">Sân 7 người</option>
-              <option value="11">Sân 11 người</option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
-          </div>
-
-          <div className="relative">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="min-w-[140px] appearance-none rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-3 pr-8 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-            >
-              <option value="">Trạng thái</option>
-              <option value="active">Hoạt động</option>
-              <option value="disabled">Vô hiệu hóa</option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
-          </div>
+        <div className="relative">
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className={`${adminFilterControlClass} appearance-none pr-10`}
+            aria-label="Lọc loại sân"
+          >
+            <option value="">Tất cả loại sân</option>
+            <option value="5">Sân 5 người</option>
+            <option value="7">Sân 7 người</option>
+            <option value="11">Sân 11 người</option>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
         </div>
-      </div>
+
+        <div className="relative">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className={`${adminFilterControlClass} appearance-none pr-10`}
+            aria-label="Lọc trạng thái sân"
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="active">Hoạt động</option>
+            <option value="disabled">Vô hiệu hóa</option>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
+        </div>
+      </AdminFilterBar>
 
       {/* Data Table */}
       <div className="overflow-hidden rounded-xl border border-[#bccbb9] bg-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)]">
