@@ -1,22 +1,187 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { AdminSidebar } from '@/components/layout/admin-sidebar';
 import {
   Menu,
   X,
-  Search,
   Bell,
-  HelpCircle,
   ShieldAlert,
   Home,
   LogIn,
   Loader2,
+  PlusCircle,
+  XCircle,
+  CheckCircle2,
+  UserPlus,
+  Star,
+  Activity,
 } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
-import { fetchCurrentUserProfile } from '@/lib/api';
+import { fetchCurrentUserProfile, fetchAdminDashboardStats } from '@/lib/api';
+
+interface ActivityItem {
+  id: string;
+  type:
+    | 'NEW_BOOKING'
+    | 'CANCEL_BOOKING'
+    | 'CONFIRM_BOOKING'
+    | 'REJECT_BOOKING'
+    | 'NEW_USER'
+    | 'NEW_REVIEW';
+  title: string;
+  subject: string;
+  timestamp: string;
+}
+
+function formatTimeAgoVN(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return 'Vừa xong';
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) return `${diffInMinutes} phút trước`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours} giờ trước`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 30) return `${diffInDays} ngày trước`;
+    return date.toLocaleDateString('vi-VN');
+  } catch {
+    return dateString;
+  }
+}
+
+function AdminNotificationDropdown() {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const { data: statsData } = useQuery({
+    queryKey: ['admin-dashboard-stats'],
+    queryFn: () => fetchAdminDashboardStats(),
+    staleTime: 30000,
+  });
+
+  const recentActivities: ActivityItem[] = statsData?.recentActivities || [];
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className={`relative rounded-full p-2 transition-colors cursor-pointer ${
+          isOpen
+            ? 'bg-[#e7e8e9] text-[#006e2f]'
+            : 'text-[#575e70] hover:bg-[#e7e8e9] hover:text-[#006e2f]'
+        }`}
+        aria-label="Thông báo"
+      >
+        <Bell className="h-5 w-5" />
+        {recentActivities.length > 0 && (
+          <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ba1a1a] opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ba1a1a]" />
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-[#bccbb9] bg-white shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-[#bccbb9]/60 px-4 py-3 bg-[#f8f9fa]">
+            <div className="flex items-center gap-2">
+              <span className="font-(family-name:--font-manrope) text-sm font-bold text-[#191c1d]">
+                Hoạt động gần đây
+              </span>
+              <span className="rounded-full bg-[#22c55e]/20 px-2 py-0.5 text-[11px] font-bold text-[#006e2f]">
+                {recentActivities.length}
+              </span>
+            </div>
+            <span className="text-[11px] text-[#575e70]">Mới nhất</span>
+          </div>
+
+          {/* Activities List (height shows 3 items directly, scrollable for more) */}
+          <div className="max-h-[225px] overflow-y-auto divide-y divide-[#bccbb9]/30">
+            {recentActivities.length === 0 ? (
+              <div className="py-8 text-center text-xs text-[#575e70]">
+                Chưa có hoạt động mới nào.
+              </div>
+            ) : (
+              recentActivities.map((act) => {
+                let iconEl = <PlusCircle className="h-3.5 w-3.5" />;
+                let badgeStyle = 'bg-[#22c55e]/20 text-[#006e2f]';
+
+                if (
+                  act.type === 'CANCEL_BOOKING' ||
+                  act.type === 'REJECT_BOOKING'
+                ) {
+                  iconEl = <XCircle className="h-3.5 w-3.5" />;
+                  badgeStyle = 'bg-[#ffdad6] text-[#ba1a1a]';
+                } else if (act.type === 'CONFIRM_BOOKING') {
+                  iconEl = <CheckCircle2 className="h-3.5 w-3.5" />;
+                  badgeStyle = 'bg-[#22c55e]/20 text-[#006e2f]';
+                } else if (act.type === 'NEW_USER') {
+                  iconEl = <UserPlus className="h-3.5 w-3.5" />;
+                  badgeStyle = 'bg-[#dce2f3] text-[#585f6c]';
+                } else if (act.type === 'NEW_REVIEW') {
+                  iconEl = <Star className="h-3.5 w-3.5" />;
+                  badgeStyle = 'bg-[#fef08a] text-[#854d0e]';
+                }
+
+                return (
+                  <div
+                    key={act.id}
+                    className="flex items-center justify-between p-3 transition-colors hover:bg-[#f8f9fa] gap-3"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${badgeStyle}`}
+                      >
+                        {iconEl}
+                      </div>
+                      <div className="min-w-0 text-xs">
+                        <p className="truncate text-[#191c1d]">
+                          <span className="font-bold text-[#191c1d]">
+                            {act.subject}
+                          </span>{' '}
+                          <span className="text-[#575e70]">{act.title}</span>
+                        </p>
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-[10px] font-medium text-[#575e70]">
+                      {formatTimeAgoVN(act.timestamp)}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminLayout({
   children,
@@ -232,7 +397,7 @@ export default function AdminLayout({
 
   // 3. Authorized Admin Layout
   return (
-    <div className="flex min-h-screen bg-[#f8f9fa] text-[#191c1d]">
+    <div className="flex min-h-screen bg-[#f8f9fa] text-[#191c1d] font-sans antialiased">
       <div className="hidden md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-64">
         <AdminSidebar />
       </div>
@@ -272,28 +437,8 @@ export default function AdminLayout({
             </h2>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="relative hidden sm:block">
-              <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
-              <input
-                type="text"
-                placeholder="Tìm kiếm..."
-                className="h-9 w-60 rounded-full border border-[#bccbb9] bg-[#f3f4f5] pl-9 pr-4 text-xs text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none"
-              />
-            </div>
-
-            <button
-              type="button"
-              className="rounded-full p-2 text-[#575e70] transition-colors hover:bg-[#e7e8e9] hover:text-[#006e2f]"
-            >
-              <Bell className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              className="rounded-full p-2 text-[#575e70] transition-colors hover:bg-[#e7e8e9] hover:text-[#006e2f]"
-            >
-              <HelpCircle className="h-5 w-5" />
-            </button>
+          <div className="flex items-center gap-3">
+            <AdminNotificationDropdown />
 
             {adminUser?.avatarUrl ? (
               <img

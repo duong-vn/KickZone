@@ -531,7 +531,7 @@ export default function AdminBookingsPage() {
       <section className="flex flex-col overflow-hidden rounded-xl border border-[#bccbb9] bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left whitespace-nowrap text-sm">
-            <thead className="border-b border-[#bccbb9] bg-[#f3f4f5] text-xs font-semibold uppercase tracking-wider text-[#575e70]">
+            <thead className="border-b border-[#bccbb9] bg-[#f3f4f5] text-xs font-semibold text-[#575e70]">
               <tr>
                 <th className="px-4 py-3.5">Mã đơn</th>
                 <th className="px-4 py-3.5">Khách hàng</th>

@@ -522,6 +522,67 @@ export async function fetchCurrentUserProfile() {
   return res.data;
 }
 
+export async function updateCurrentUserProfile(dto: {
+  fullName?: string;
+  phone?: string;
+}) {
+  const token = await getAuthToken();
+  if (!token) {
+    throw new ApiError({
+      status: 401,
+      code: 'AUTH_REQUIRED',
+      message: 'Vui lòng đăng nhập.',
+    });
+  }
+  const res = await api.patch('/users/me', dto, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}
+
+export interface ActivityItem {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  time: string;
+  code?: string;
+  linkHref?: string;
+  linkText?: string;
+}
+
+export interface UserActivitiesResponse {
+  data: ActivityItem[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export async function fetchUserActivities(params?: {
+  search?: string;
+  type?: string;
+  sort?: string;
+  page?: number;
+  limit?: number;
+}): Promise<UserActivitiesResponse> {
+  const token = await getAuthToken();
+  if (!token) {
+    throw new ApiError({
+      status: 401,
+      code: 'AUTH_REQUIRED',
+      message: 'Vui lòng đăng nhập.',
+    });
+  }
+  const res = await api.get<UserActivitiesResponse>('/users/me/activities', {
+    params,
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+}
+
 export async function updateAdminUserStatus(
   id: string,
   status: 'ACTIVE' | 'INACTIVE',

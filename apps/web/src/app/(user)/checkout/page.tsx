@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -27,9 +27,12 @@ import {
   validateVoucher,
 } from '@/lib/api';
 import {
+  businessDateKey,
+  durationMinutes,
   formatBusinessDate,
   formatBusinessTime,
-  durationMinutes,
+  getContiguousAvailableSlots,
+  parseBusinessInterval,
 } from '@/lib/booking-time';
 import { useRequireAuth } from '@/hooks/use-require-auth';
 
@@ -42,13 +45,8 @@ function CheckoutContent() {
   const fieldId = params.get('fieldId') ?? '';
   const startTime = params.get('startTime') ?? '';
   const endTime = params.get('endTime') ?? '';
-  const validDraft = Boolean(
-    fieldId &&
-    startTime &&
-    endTime &&
-    !Number.isNaN(new Date(startTime).getTime()) &&
-    !Number.isNaN(new Date(endTime).getTime()),
-  );
+  const interval = parseBusinessInterval(startTime, endTime);
+  const validDraft = Boolean(fieldId && interval);
 
   const fieldQuery = useQuery({
     queryKey: ['field', fieldId],
@@ -57,14 +55,7 @@ function CheckoutContent() {
     retry: false,
   });
 
-  const date = startTime
-    ? new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date(startTime))
-    : '';
+  const date = interval ? businessDateKey(interval.start) : '';
 
   const availabilityQuery = useQuery({
     queryKey: ['availability', fieldId, date],
@@ -75,15 +66,14 @@ function CheckoutContent() {
 
   const field = fieldQuery.data?.data;
   const availableSlots = availabilityQuery.data?.data.slots ?? [];
-  const selectedSlots = availableSlots.filter(
-    (slot) =>
-      new Date(slot.startTime) >= new Date(startTime) &&
-      new Date(slot.endTime) <= new Date(endTime),
-  );
-  const originalPrice = selectedSlots.reduce(
-    (sum, slot) => sum + slot.price,
-    0,
-  );
+  const selectedSlots = interval
+    ? getContiguousAvailableSlots(availableSlots, startTime, endTime)
+    : [];
+  const isSelectionValid =
+    availabilityQuery.data?.data.date === date && selectedSlots.length > 0;
+  const originalPrice = isSelectionValid
+    ? selectedSlots.reduce((sum, slot) => sum + slot.price, 0)
+    : 0;
 
   const voucherParam = (
     params.get('voucher') ??
@@ -96,9 +86,19 @@ function CheckoutContent() {
     code: string;
     discountAmount: number;
     finalPrice: number;
+    startTime: string;
+    endTime: string;
+    originalPrice: number;
   } | null>(null);
   const [isVoucherLoading, setVoucherLoading] = useState(false);
   const autoAppliedRef = useRef(false);
+
+  const activeVoucher =
+    voucher?.startTime === startTime &&
+    voucher.endTime === endTime &&
+    voucher.originalPrice === originalPrice
+      ? voucher
+      : null;
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -106,7 +106,7 @@ function CheckoutContent() {
         fieldId,
         startTime,
         endTime,
-        voucherCode: voucher?.code,
+        voucherCode: activeVoucher?.code,
       }),
     onSuccess: async ({ data }) => {
       await queryClient.invalidateQueries({ queryKey: ['bookings', 'me'] });
@@ -118,6 +118,7 @@ function CheckoutContent() {
     },
     onError: (error: ApiError) => {
       if (error.code === 'BOOKING_OVERLAP') {
+        setVoucher(null);
         void queryClient.invalidateQueries({
           queryKey: ['availability', fieldId, date],
         });
@@ -128,9 +129,12 @@ function CheckoutContent() {
     },
   });
 
-  const applyVoucher = async (codeToApply?: string) => {
+  const applyVoucher = useCallback(async (codeToApply?: string) => {
     const code = (codeToApply ?? voucherCode).trim().toUpperCase();
     if (!code) return toast.error('Vui lòng nhập mã voucher.');
+    if (!isSelectionValid || originalPrice <= 0) {
+      return toast.error('Khung giờ đã chọn không còn khả dụng.');
+    }
     setVoucherLoading(true);
     try {
       const response = await validateVoucher({
@@ -138,7 +142,7 @@ function CheckoutContent() {
         startTime,
         endTime,
         code,
-        originalPrice: originalPrice || field?.basePricePerHour || 0,
+        originalPrice,
       });
       const result =
         (
@@ -168,14 +172,14 @@ function CheckoutContent() {
         const effectiveDiscount = result.discountAmount ?? 0;
         const effectiveFinalPrice =
           result.finalPrice ??
-          Math.max(
-            0,
-            (originalPrice || field?.basePricePerHour || 0) - effectiveDiscount,
-          );
+          Math.max(0, originalPrice - effectiveDiscount);
         setVoucher({
           code: effectiveCode,
           discountAmount: effectiveDiscount,
           finalPrice: effectiveFinalPrice,
+          startTime,
+          endTime,
+          originalPrice,
         });
         toast.success(result.message || 'Áp dụng mã giảm giá thành công!');
       } else {
@@ -190,14 +194,16 @@ function CheckoutContent() {
     } finally {
       setVoucherLoading(false);
     }
-  };
+  }, [endTime, fieldId, isSelectionValid, originalPrice, startTime, voucherCode]);
 
   useEffect(() => {
     if (
       voucherParam &&
       !autoAppliedRef.current &&
       fieldQuery.data &&
-      (availabilityQuery.data || !date)
+      availabilityQuery.isSuccess &&
+      isSelectionValid &&
+      originalPrice > 0
     ) {
       autoAppliedRef.current = true;
       void applyVoucher(voucherParam);
@@ -206,9 +212,10 @@ function CheckoutContent() {
     voucherParam,
     fieldQuery.data,
     availabilityQuery.data,
-    date,
+    availabilityQuery.isSuccess,
+    isSelectionValid,
     originalPrice,
-    field?.basePricePerHour,
+    applyVoucher,
   ]);
 
   if (!authReady) return <State message="Đang kiểm tra đăng nhập..." />;
@@ -233,7 +240,18 @@ function CheckoutContent() {
         : (field.image ?? field.primary_image_url ?? null);
 
   const duration = durationMinutes(startTime, endTime);
-  const total = voucher?.finalPrice ?? originalPrice;
+  const total = activeVoucher?.finalPrice ?? originalPrice;
+
+  const handleCreateBooking = async () => {
+    const freshAvailability = await availabilityQuery.refetch();
+    const freshSlots = freshAvailability.data?.data.slots ?? [];
+    if (!getContiguousAvailableSlots(freshSlots, startTime, endTime).length) {
+      setVoucher(null);
+      toast.error('Khung giờ không còn khả dụng. Vui lòng chọn lại.');
+      return;
+    }
+    createMutation.mutate();
+  };
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] pb-16 text-[#191c1d] font-sans">
@@ -307,7 +325,7 @@ function CheckoutContent() {
             <div className="flex gap-2">
               <input
                 value={voucherCode}
-                disabled={Boolean(voucher)}
+                disabled={Boolean(activeVoucher)}
                 onChange={(event) => {
                   setVoucherCode(event.target.value);
                   setVoucher(null);
@@ -315,10 +333,10 @@ function CheckoutContent() {
                 placeholder="Nhập mã voucher (vd: KICKZONE50, KZ10)"
                 className={cn(
                   'flex-1 rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] px-3 py-2 text-xs uppercase outline-none focus:border-[#006e2f]',
-                  voucher && 'bg-gray-100 text-gray-500 cursor-not-allowed',
+                  activeVoucher && 'bg-gray-100 text-gray-500 cursor-not-allowed',
                 )}
               />
-              {voucher ? (
+              {activeVoucher ? (
                 <Button
                   type="button"
                   onClick={() => {
@@ -334,17 +352,17 @@ function CheckoutContent() {
               ) : (
                 <Button
                   onClick={() => void applyVoucher()}
-                  disabled={isVoucherLoading}
+                  disabled={isVoucherLoading || !isSelectionValid}
                   className="rounded-xl bg-[#006e2f] text-xs font-bold"
                 >
                   {isVoucherLoading ? 'Đang kiểm tra...' : 'Áp dụng'}
                 </Button>
               )}
             </div>
-            {voucher && (
+            {activeVoucher && (
               <p className="mt-3 flex items-center gap-1 text-xs font-semibold text-[#006e2f]">
                 <CheckCircle2 className="h-4 w-4" />
-                Giảm {voucher.discountAmount.toLocaleString('vi-VN')}đ
+                Giảm {activeVoucher.discountAmount.toLocaleString('vi-VN')}đ
               </p>
             )}
           </div>
@@ -361,10 +379,10 @@ function CheckoutContent() {
                   {originalPrice.toLocaleString('vi-VN')}đ
                 </b>
               </div>
-              {voucher && (
+              {activeVoucher && (
                 <div className="flex justify-between text-[#006e2f]">
                   <span>Voucher</span>
-                  <b>-{voucher.discountAmount.toLocaleString('vi-VN')}đ</b>
+                  <b>-{activeVoucher.discountAmount.toLocaleString('vi-VN')}đ</b>
                 </div>
               )}
               <div className="flex justify-between border-t border-[#bccbb9]/40 pt-3 text-sm">
@@ -374,13 +392,22 @@ function CheckoutContent() {
                 </b>
               </div>
             </div>
+            {!isSelectionValid && (
+              <p className="mt-4 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+                Khung giờ không còn khả dụng hoặc dữ liệu đặt sân không hợp lệ.
+              </p>
+            )}
             <Button
-              onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending || !selectedSlots.length}
+              onClick={() => void handleCreateBooking()}
+              disabled={
+                createMutation.isPending ||
+                availabilityQuery.isFetching ||
+                !isSelectionValid
+              }
               className="mt-6 w-full rounded-xl bg-[#006e2f] py-6 text-base font-bold hover:bg-[#005321] cursor-pointer"
             >
-              {createMutation.isPending
-                ? 'Đang gửi yêu cầu...'
+              {createMutation.isPending || availabilityQuery.isFetching
+                ? 'Đang kiểm tra lịch...'
                 : 'Xác nhận & Gửi yêu cầu'}
             </Button>
             <Button

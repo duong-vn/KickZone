@@ -20,6 +20,10 @@ import {
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import {
+  fetchCurrentUserProfile,
+  updateCurrentUserProfile,
+} from '@/lib/api';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 
 function validatePassword(password: string): boolean {
@@ -64,6 +68,20 @@ export default function ProfilePage() {
         }
 
         if (!isMounted) return;
+
+        try {
+          const profile = await fetchCurrentUserProfile();
+          if (profile && isMounted) {
+            setEmail(profile.email || data.user.email || '');
+            setFullName(profile.fullName || '');
+            setPhone(profile.phone || '');
+            setAvatarUrl(profile.avatarUrl || '');
+            return;
+          }
+        } catch {
+          // Fallback to Supabase metadata if API is offline
+        }
+
         const metadata = data.user.user_metadata;
         setEmail(data.user.email ?? '');
         setFullName(
@@ -103,14 +121,17 @@ export default function ProfilePage() {
 
     setIsSavingInfo(true);
     try {
+      // 1. Cập nhật bảng profiles qua API backend
+      await updateCurrentUserProfile({
+        fullName: normalizedName,
+        phone: normalizedPhone,
+      });
+
+      // 2. Đồng bộ user_metadata trên Supabase Auth
       const supabase = getSupabaseBrowserClient();
-      const { error } = await supabase.auth.updateUser({
+      await supabase.auth.updateUser({
         data: { full_name: normalizedName, phone: normalizedPhone },
       });
-      if (error) {
-        toast.error('Không thể cập nhật hồ sơ. Vui lòng thử lại.');
-        return;
-      }
 
       setFullName(normalizedName);
       setPhone(normalizedPhone);
@@ -254,7 +275,8 @@ export default function ProfilePage() {
                         required
                         value={fullName}
                         onChange={(event) => setFullName(event.target.value)}
-                        className="profile-input"
+                        placeholder="Nhập họ và tên"
+                        className="w-full bg-[#f8f9fa] border border-[#bccbb9]/60 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-[#191c1d] outline-none focus:border-[#006e2f] transition-colors"
                       />
                     </ProfileField>
                     <ProfileField
@@ -270,7 +292,8 @@ export default function ProfilePage() {
                         required
                         value={phone}
                         onChange={(event) => setPhone(event.target.value)}
-                        className="profile-input"
+                        placeholder="Nhập số điện thoại"
+                        className="w-full bg-[#f8f9fa] border border-[#bccbb9]/60 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-[#191c1d] outline-none focus:border-[#006e2f] transition-colors"
                       />
                     </ProfileField>
                     <div className="space-y-1.5">
@@ -372,8 +395,8 @@ function ProfileField({
       <label htmlFor={id} className="block text-xs font-bold text-[#191c1d]">
         {label}
       </label>
-      <div className="relative">
-        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#575e70]">
+      <div className="relative flex items-center">
+        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#575e70] pointer-events-none z-10">
           {icon}
         </span>
         {children}

@@ -23,6 +23,9 @@ import {
   DollarSign,
   Check,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 
 // Types aligned directly with database/init.sql
@@ -132,6 +135,53 @@ export default function AdminFieldsPage() {
       return true;
     });
   }, [fields, searchQuery, typeFilter, statusFilter]);
+
+  const [pageSize, setPageSize] = useState(10);
+  const totalRecords = apiResponse?.meta?.total ?? filteredFields.length ?? 0;
+  const totalPages =
+    apiResponse?.meta?.totalPages ??
+    Math.max(1, Math.ceil(totalRecords / pageSize));
+  const startRecord = totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endRecord = Math.min(currentPage * pageSize, totalRecords);
+
+  const getPageNumbers = () => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (currentPage <= 3) {
+      return [1, 2, 3, 4, '...', totalPages];
+    }
+    if (currentPage >= totalPages - 2) {
+      return [
+        1,
+        '...',
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      ];
+    }
+    return [
+      1,
+      '...',
+      currentPage - 1,
+      currentPage,
+      currentPage + 1,
+      '...',
+      totalPages,
+    ];
+  };
+
+  // Filtered and paginated fields
+  const displayFields = useMemo(() => {
+    if (filteredFields.length > pageSize) {
+      return filteredFields.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize,
+      );
+    }
+    return filteredFields;
+  }, [filteredFields, currentPage, pageSize]);
 
   // Toggle field status (Hoạt động <-> Vô hiệu hóa)
   const handleToggleStatus = async (fieldId: string) => {
@@ -331,26 +381,32 @@ export default function AdminFieldsPage() {
         </div>
 
         <div className="flex gap-3">
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="min-w-[140px] appearance-none rounded-lg border border-[#bccbb9] bg-[#f8f9fa] px-3 py-2 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-          >
-            <option value="">Loại sân</option>
-            <option value="5">Sân 5 người</option>
-            <option value="7">Sân 7 người</option>
-            <option value="11">Sân 11 người</option>
-          </select>
+          <div className="relative">
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="min-w-[140px] appearance-none rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-3 pr-8 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
+            >
+              <option value="">Loại sân</option>
+              <option value="5">Sân 5 người</option>
+              <option value="7">Sân 7 người</option>
+              <option value="11">Sân 11 người</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
+          </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="min-w-[140px] appearance-none rounded-lg border border-[#bccbb9] bg-[#f8f9fa] px-3 py-2 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-          >
-            <option value="">Trạng thái</option>
-            <option value="active">Hoạt động</option>
-            <option value="disabled">Vô hiệu hóa</option>
-          </select>
+          <div className="relative">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="min-w-[140px] appearance-none rounded-lg border border-[#bccbb9] bg-[#f8f9fa] py-2 pl-3 pr-8 text-xs sm:text-sm text-[#191c1d] transition-all focus:border-[#006e2f] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
+            >
+              <option value="">Trạng thái</option>
+              <option value="active">Hoạt động</option>
+              <option value="disabled">Vô hiệu hóa</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
+          </div>
         </div>
       </div>
 
@@ -367,11 +423,11 @@ export default function AdminFieldsPage() {
                 <th className="p-4">Giá cơ bản</th>
                 <th className="p-4">Đánh giá</th>
                 <th className="p-4">Trạng thái</th>
-                <th className="p-4 text-right">Hành động</th>
+                <th className="p-4 text-center">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#bccbb9]/50 text-xs sm:text-sm text-[#191c1d]">
-              {filteredFields.length === 0 ? (
+              {displayFields.length === 0 ? (
                 <tr>
                   <td
                     colSpan={8}
@@ -381,7 +437,7 @@ export default function AdminFieldsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredFields.map((field) => (
+                displayFields.map((field) => (
                   <tr
                     key={field.id}
                     className={`group transition-colors hover:bg-[#f8f9fa] ${
@@ -441,89 +497,27 @@ export default function AdminFieldsPage() {
                     {/* Trạng thái */}
                     <td className="p-4">
                       {field.status === 'ACTIVE' ? (
-                        <span className="inline-flex items-center rounded-full bg-[#22c55e] px-2.5 py-0.5 text-xs font-semibold text-white">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#006e2f]/20 bg-[#22c55e]/20 px-2.5 py-1 text-xs font-semibold text-[#004b1e]">
+                          <span className="h-2 w-2 rounded-full bg-[#006e2f]" />
                           Hoạt động
                         </span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full border border-[#bccbb9] bg-[#e1e3e4] px-2.5 py-0.5 text-xs font-semibold text-[#575e70]">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#bccbb9] bg-[#e1e3e4] px-2.5 py-1 text-xs font-semibold text-[#575e70]">
+                          <span className="h-2 w-2 rounded-full bg-[#575e70]" />
                           Vô hiệu hóa
                         </span>
                       )}
                     </td>
 
-                    {/* Hành động */}
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5 opacity-90 transition-opacity group-hover:opacity-100">
-                        {/* Xem */}
-                        <Link
-                          href={`/admin/fields/${field.id}`}
-                          className="rounded p-1.5 text-[#575e70] transition-colors hover:bg-[#e7e8e9] hover:text-[#006e2f]"
-                          title="Xem chi tiết sân"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Link>
-
-                        {/* Sửa */}
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditModal(field)}
-                          className="rounded p-1.5 text-[#575e70] transition-colors hover:bg-[#e7e8e9] hover:text-[#006e2f]"
-                          title="Sửa thông tin"
-                        >
-                          <Edit3 className="h-4 w-4" />
-                        </button>
-
-                        {/* Quản lý giá */}
-                        <Link
-                          href={`/admin/fields/${field.id}/pricing`}
-                          className="rounded p-1.5 text-[#575e70] transition-colors hover:bg-[#e7e8e9] hover:text-[#006e2f]"
-                          title="Quản lý bảng giá"
-                        >
-                          <DollarSign className="h-4 w-4" />
-                        </Link>
-
-                        {/* Lịch */}
-                        <Link
-                          href={`/admin/schedule?fieldId=${field.id}`}
-                          className="rounded p-1.5 text-[#575e70] transition-colors hover:bg-[#e7e8e9] hover:text-[#006e2f]"
-                          title="Xem lịch sân"
-                        >
-                          <Calendar className="h-4 w-4" />
-                        </Link>
-
-                        {/* Toggle Status (Block / Re-activate) */}
-                        {field.status === 'ACTIVE' ? (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStatus(field.id)}
-                            className="rounded p-1.5 text-[#ba1a1a] transition-colors hover:bg-[#ffdad6]"
-                            title="Vô hiệu hóa sân"
-                          >
-                            <Ban className="h-4 w-4" />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStatus(field.id)}
-                            className="rounded p-1.5 text-[#006e2f] transition-colors hover:bg-[#22c55e]/20"
-                            title="Kích hoạt lại sân"
-                          >
-                            <CheckCircle2 className="h-4 w-4" />
-                          </button>
-                        )}
-
-                        {/* Xóa Sân */}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDeleteField(field.id, field.name)
-                          }
-                          className="rounded p-1.5 text-[#ba1a1a] transition-colors hover:bg-[#ffdad6]"
-                          title="Xóa sân"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                    {/* Hành động: Chỉ hiển thị icon con mắt */}
+                    <td className="p-4 text-center">
+                      <Link
+                        href={`/admin/fields/${field.id}`}
+                        className="inline-flex items-center justify-center rounded-lg p-2 text-[#575e70] transition-colors hover:bg-[#e7e8e9] hover:text-[#006e2f]"
+                        title="Xem chi tiết sân"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Link>
                     </td>
                   </tr>
                 ))
@@ -532,57 +526,75 @@ export default function AdminFieldsPage() {
           </table>
         </div>
 
-        {/* Pagination */}
-        <div className="flex flex-col items-center justify-between gap-3 border-t border-[#bccbb9] bg-white px-6 py-4 sm:flex-row text-xs sm:text-sm text-[#575e70]">
-          <span>Hiển thị 1 - {filteredFields.length} của 24 sân bóng</span>
-          <div className="flex items-center gap-1.5">
+        {/* Pagination Footer */}
+        <div className="flex flex-col items-center justify-between gap-3 border-t border-[#bccbb9] bg-white px-4 py-3.5 sm:flex-row sm:px-6">
+          <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-[#575e70]">
+            <span>
+              {totalRecords === 0
+                ? 'Không có sân nào'
+                : `Hiển thị ${startRecord} - ${endRecord} của ${totalRecords} sân`}
+            </span>
+            <div className="flex items-center gap-1.5 border-l border-[#bccbb9]/60 pl-3">
+              <span className="text-xs text-[#575e70]">Hiển thị:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="rounded-lg border border-[#bccbb9] bg-[#f8f9fa] px-2 py-1 text-xs font-semibold text-[#191c1d] transition-colors focus:border-[#006e2f] focus:outline-none"
+              >
+                <option value={5}>5 sân / trang</option>
+                <option value={10}>10 sân / trang</option>
+                <option value={20}>20 sân / trang</option>
+                <option value={50}>50 sân / trang</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              className="rounded border border-[#bccbb9] px-3 py-1 text-xs font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9] disabled:opacity-50"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bccbb9] text-[#575e70] transition-colors hover:bg-[#e7e8e9] disabled:opacity-40 disabled:pointer-events-none"
+              title="Trang trước"
             >
-              Trước
+              <ChevronLeft className="h-4 w-4" />
             </button>
+
+            {getPageNumbers().map((pageNum, idx) =>
+              pageNum === '...' ? (
+                <span
+                  key={`ellipsis-${idx}`}
+                  className="flex h-8 w-8 items-center justify-center text-xs text-[#575e70]"
+                >
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={`page-${pageNum}`}
+                  type="button"
+                  onClick={() => setCurrentPage(Number(pageNum))}
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                    currentPage === pageNum
+                      ? 'bg-[#006e2f] text-white shadow-sm'
+                      : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ),
+            )}
+
             <button
               type="button"
-              onClick={() => setCurrentPage(1)}
-              className={`rounded px-3 py-1 text-xs font-bold ${
-                currentPage === 1
-                  ? 'bg-[#006e2f] text-white'
-                  : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
-              }`}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages || totalPages === 0}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bccbb9] text-[#575e70] transition-colors hover:bg-[#e7e8e9] disabled:opacity-40 disabled:pointer-events-none"
+              title="Trang sau"
             >
-              1
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentPage(2)}
-              className={`rounded px-3 py-1 text-xs font-semibold ${
-                currentPage === 2
-                  ? 'bg-[#006e2f] text-white'
-                  : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
-              }`}
-            >
-              2
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentPage(3)}
-              className={`rounded px-3 py-1 text-xs font-semibold ${
-                currentPage === 3
-                  ? 'bg-[#006e2f] text-white'
-                  : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
-              }`}
-            >
-              3
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((prev) => prev + 1)}
-              className="rounded border border-[#bccbb9] px-3 py-1 text-xs font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9]"
-            >
-              Sau
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </div>

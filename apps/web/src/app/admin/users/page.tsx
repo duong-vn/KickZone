@@ -141,6 +141,53 @@ export default function AdminUsersPage() {
     });
   }, [users, searchQuery, statusFilter, roleFilter]);
 
+  const [pageSize, setPageSize] = useState(10);
+  const totalRecords = apiResponse?.meta?.total ?? filteredUsers.length ?? 0;
+  const totalPages =
+    apiResponse?.meta?.totalPages ??
+    Math.max(1, Math.ceil(totalRecords / pageSize));
+  const startRecord = totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endRecord = Math.min(currentPage * pageSize, totalRecords);
+
+  const getPageNumbers = () => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (currentPage <= 3) {
+      return [1, 2, 3, 4, '...', totalPages];
+    }
+    if (currentPage >= totalPages - 2) {
+      return [
+        1,
+        '...',
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      ];
+    }
+    return [
+      1,
+      '...',
+      currentPage - 1,
+      currentPage,
+      currentPage + 1,
+      '...',
+      totalPages,
+    ];
+  };
+
+  // Filtered and paginated users
+  const displayUsers = useMemo(() => {
+    if (filteredUsers.length > pageSize) {
+      return filteredUsers.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize,
+      );
+    }
+    return filteredUsers;
+  }, [filteredUsers, currentPage, pageSize]);
+
   // Toggle user status
   const handleToggleStatus = async (userId: string) => {
     const target = users.find((u) => u.id === userId);
@@ -347,7 +394,7 @@ export default function AdminUsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#bccbb9]/50 text-xs sm:text-sm text-[#191c1d]">
-              {filteredUsers.length === 0 ? (
+              {displayUsers.length === 0 ? (
                 <tr>
                   <td
                     colSpan={6}
@@ -357,7 +404,7 @@ export default function AdminUsersPage() {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user) => (
+                displayUsers.map((user) => (
                   <tr
                     key={user.id}
                     className="group transition-colors hover:bg-[#f8f9fa]"
@@ -464,84 +511,74 @@ export default function AdminUsersPage() {
           </table>
         </div>
 
-        {/* Pagination */}
-        <div className="flex flex-col items-center justify-between gap-3 border-t border-[#bccbb9] bg-white px-6 py-4 sm:flex-row text-xs sm:text-sm text-[#575e70]">
-          <div className="hidden sm:block">
-            Hiển thị <span className="font-bold text-[#191c1d]">1</span> đến{' '}
-            <span className="font-bold text-[#191c1d]">
-              {filteredUsers.length}
-            </span>{' '}
-            trong số <span className="font-bold text-[#191c1d]">120</span> người
-            dùng
+        {/* Pagination Footer */}
+        <div className="flex flex-col items-center justify-between gap-3 border-t border-[#bccbb9] bg-white px-4 py-3.5 sm:flex-row sm:px-6">
+          <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-[#575e70]">
+            <span>
+              {totalRecords === 0
+                ? 'Không có người dùng nào'
+                : `Hiển thị ${startRecord} - ${endRecord} của ${totalRecords} người`}
+            </span>
+            <div className="flex items-center gap-1.5 border-l border-[#bccbb9]/60 pl-3">
+              <span className="text-xs text-[#575e70]">Hiển thị:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="rounded-lg border border-[#bccbb9] bg-[#f8f9fa] px-2 py-1 text-xs font-semibold text-[#191c1d] transition-colors focus:border-[#006e2f] focus:outline-none"
+              >
+                <option value={5}>5 người / trang</option>
+                <option value={10}>10 người / trang</option>
+                <option value={20}>20 người / trang</option>
+                <option value={50}>50 người / trang</option>
+              </select>
+            </div>
           </div>
 
-          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              className="flex h-9 items-center gap-1 rounded-lg border border-[#bccbb9] px-3 text-xs font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9] disabled:opacity-50"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bccbb9] text-[#575e70] transition-colors hover:bg-[#e7e8e9] disabled:opacity-40 disabled:pointer-events-none"
+              title="Trang trước"
             >
               <ChevronLeft className="h-4 w-4" />
-              <span>Trước</span>
             </button>
 
-            <div className="hidden sm:flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setCurrentPage(1)}
-                className={`flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold shadow-sm ${
-                  currentPage === 1
-                    ? 'bg-[#006e2f] text-white'
-                    : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
-                }`}
-              >
-                1
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentPage(2)}
-                className={`flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold ${
-                  currentPage === 2
-                    ? 'bg-[#006e2f] text-white'
-                    : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
-                }`}
-              >
-                2
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentPage(3)}
-                className={`flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold ${
-                  currentPage === 3
-                    ? 'bg-[#006e2f] text-white'
-                    : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
-                }`}
-              >
-                3
-              </button>
-              <span className="flex h-9 w-9 items-center justify-center text-xs text-[#575e70]">
-                ...
-              </span>
-              <button
-                type="button"
-                onClick={() => setCurrentPage(12)}
-                className={`flex h-9 w-9 items-center justify-center rounded-lg text-xs font-semibold ${
-                  currentPage === 12
-                    ? 'bg-[#006e2f] text-white'
-                    : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
-                }`}
-              >
-                12
-              </button>
-            </div>
+            {getPageNumbers().map((pageNum, idx) =>
+              pageNum === '...' ? (
+                <span
+                  key={`ellipsis-${idx}`}
+                  className="flex h-8 w-8 items-center justify-center text-xs text-[#575e70]"
+                >
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={`page-${pageNum}`}
+                  type="button"
+                  onClick={() => setCurrentPage(Number(pageNum))}
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                    currentPage === pageNum
+                      ? 'bg-[#006e2f] text-white shadow-sm'
+                      : 'border border-[#bccbb9] text-[#575e70] hover:bg-[#e7e8e9]'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ),
+            )}
 
             <button
               type="button"
-              onClick={() => setCurrentPage((prev) => prev + 1)}
-              className="flex h-9 items-center gap-1 rounded-lg border border-[#bccbb9] px-3 text-xs font-semibold text-[#575e70] transition-colors hover:bg-[#e7e8e9]"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages || totalPages === 0}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#bccbb9] text-[#575e70] transition-colors hover:bg-[#e7e8e9] disabled:opacity-40 disabled:pointer-events-none"
+              title="Trang sau"
             >
-              <span>Sau</span>
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
