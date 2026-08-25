@@ -1,8 +1,14 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import React, { useState, use } from 'react';
+import React, { useState, use, useMemo } from 'react';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  fetchAdminFieldById,
+  updateAdminFieldStatus,
+  updateAdminField,
+} from '@/lib/api';
 import {
   ArrowLeft,
   Edit,
@@ -44,6 +50,7 @@ export interface FieldDetailFullData {
   upcomingBookingsCount: number;
   description: string;
   imageUrl: string;
+  images?: string[];
   priceRules: PriceRuleItem[];
 }
 
@@ -115,11 +122,24 @@ export default function AdminFieldDetailPage({
 }) {
   const resolvedParams = use(params);
   const fieldId = resolvedParams.id;
+  const queryClient = useQueryClient();
 
-  const [field, setField] = useState<FieldDetailFullData>({
-    ...MOCK_FIELD_DATA,
-    id: fieldId,
+  const { data: apiField, isLoading } = useQuery({
+    queryKey: ['admin-field', fieldId],
+    queryFn: () => fetchAdminFieldById(fieldId),
+    retry: false,
   });
+
+  const [localField, setLocalField] =
+    useState<Partial<FieldDetailFullData> | null>(null);
+  const field: FieldDetailFullData = useMemo(() => {
+    return {
+      ...MOCK_FIELD_DATA,
+      ...(apiField || {}),
+      ...(localField || {}),
+      id: fieldId,
+    };
+  }, [apiField, localField, fieldId]);
 
   // Modal states
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -130,11 +150,11 @@ export default function AdminFieldDetailPage({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Field Edit Form State
-  const [editName, setEditName] = useState(field.name);
-  const [editAddress, setEditAddress] = useState(field.address);
-  const [editDimensions, setEditDimensions] = useState(field.dimensions);
-  const [editPrice, setEditPrice] = useState(field.basePricePerHour.toString());
-  const [editDesc, setEditDesc] = useState(field.description);
+  const [editName, setEditName] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editDimensions, setEditDimensions] = useState('20m x 40m');
+  const [editPrice, setEditPrice] = useState('300000');
+  const [editDesc, setEditDesc] = useState('');
 
   // Price Rule Form State
   const [ruleName, setRuleName] = useState('');
@@ -158,29 +178,49 @@ export default function AdminFieldDetailPage({
   };
 
   // Toggle field status (Active / Disabled)
-  const handleToggleStatus = () => {
+  const handleToggleStatus = async () => {
+    if (!field) return;
     const nextStatus = field.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-    setField((prev) => ({ ...prev, status: nextStatus }));
-    showToast(
-      nextStatus === 'ACTIVE'
-        ? `Đã kích hoạt hoạt động sân "${field.name}"!`
-        : `Đã vô hiệu hóa sân "${field.name}".`,
-    );
+    setLocalField((prev) => ({ ...(prev || {}), status: nextStatus }));
+    try {
+      await updateAdminFieldStatus(fieldId, nextStatus);
+      queryClient.invalidateQueries({ queryKey: ['admin-field', fieldId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-fields'] });
+      showToast(
+        nextStatus === 'ACTIVE'
+          ? `Đã kích hoạt hoạt động sân "${field.name}"!`
+          : `Đã vô hiệu hóa sân "${field.name}".`,
+      );
+    } catch (err) {
+      showToast(`Lỗi cập nhật trạng thái: ${(err as Error).message}`);
+    }
   };
 
   // Save Field Info
-  const handleSaveFieldInfo = (e: React.FormEvent) => {
+  const handleSaveFieldInfo = async (e: React.FormEvent) => {
     e.preventDefault();
-    setField((prev) => ({
-      ...prev,
+    if (!field) return;
+    const priceNum = parseInt(editPrice, 10) || field.basePricePerHour;
+    const updatedData = {
       name: editName,
       address: editAddress,
-      dimensions: editDimensions,
-      basePricePerHour: parseInt(editPrice, 10) || prev.basePricePerHour,
+      basePricePerHour: priceNum,
       description: editDesc,
+    };
+    setLocalField((prev) => ({
+      ...(prev || {}),
+      ...updatedData,
+      dimensions: editDimensions,
     }));
-    setIsEditFieldModalOpen(false);
-    showToast('Cập nhật thông tin sân bóng thành công!');
+    try {
+      await updateAdminField(fieldId, updatedData);
+      queryClient.invalidateQueries({ queryKey: ['admin-field', fieldId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-fields'] });
+      setIsEditFieldModalOpen(false);
+      showToast('Cập nhật thông tin sân bóng thành công!');
+    } catch (err) {
+      showToast(`Lỗi cập nhật: ${(err as Error).message}`);
+    }
   };
 
   // Price Rule Actions
@@ -208,9 +248,11 @@ export default function AdminFieldDetailPage({
 
   const handleDeletePriceRule = (ruleId: string) => {
     if (confirm('Bạn có chắc chắn muốn xóa mức giá này?')) {
-      setField((prev) => ({
-        ...prev,
-        priceRules: prev.priceRules.filter((r) => r.id !== ruleId),
+      setLocalField((prev) => ({
+        ...(prev || {}),
+        priceRules: (prev?.priceRules || field.priceRules).filter(
+          (r) => r.id !== ruleId,
+        ),
       }));
       showToast('Đã xóa mức giá.');
     }
@@ -253,9 +295,9 @@ export default function AdminFieldDetailPage({
     }
 
     if (editingPriceRule) {
-      setField((prev) => ({
-        ...prev,
-        priceRules: prev.priceRules.map((r) =>
+      setLocalField((prev) => ({
+        ...(prev || {}),
+        priceRules: (prev?.priceRules || field.priceRules).map((r) =>
           r.id === editingPriceRule.id
             ? {
                 ...r,
@@ -283,15 +325,56 @@ export default function AdminFieldDetailPage({
         pricePerHour: priceNumber,
         isActive: isRuleActive,
       };
-      setField((prev) => ({
-        ...prev,
-        priceRules: [...prev.priceRules, newRule],
+      setLocalField((prev) => ({
+        ...(prev || {}),
+        priceRules: [...(prev?.priceRules || field.priceRules), newRule],
       }));
       showToast(`Đã thêm mức giá "${ruleName}"!`);
     }
 
     setIsPriceModalOpen(false);
   };
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto w-full max-w-7xl space-y-6">
+        <div className="h-6 w-32 bg-slate-200 animate-pulse rounded" />
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <div className="h-8 w-64 bg-slate-200 animate-pulse rounded" />
+            <div className="h-4 w-48 bg-slate-200 animate-pulse rounded" />
+          </div>
+          <div className="h-10 w-32 bg-slate-200 animate-pulse rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 h-96 bg-slate-200 animate-pulse rounded-2xl" />
+          <div className="h-96 bg-slate-200 animate-pulse rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!apiField && fieldId !== 'f-1') {
+    return (
+      <div className="mx-auto w-full max-w-7xl py-16 flex flex-col items-center justify-center text-center">
+        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4 text-slate-400">
+          <Ban className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 mb-2">
+          Không tìm thấy sân bóng
+        </h2>
+        <p className="text-slate-500 text-sm max-w-md mb-6">
+          Sân bóng không tồn tại hoặc đã bị xóa khỏi hệ thống.
+        </p>
+        <Link
+          href="/admin/fields"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">

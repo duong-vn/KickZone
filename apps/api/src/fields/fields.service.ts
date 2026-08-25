@@ -102,10 +102,23 @@ export class FieldsService {
       };
     }
 
-    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+    const minPrice =
+      query.minPrice !== undefined &&
+      Number.isFinite(Number(query.minPrice)) &&
+      Number(query.minPrice) >= 0
+        ? Number(query.minPrice)
+        : undefined;
+    const maxPrice =
+      query.maxPrice !== undefined &&
+      Number.isFinite(Number(query.maxPrice)) &&
+      Number(query.maxPrice) >= 0
+        ? Number(query.maxPrice)
+        : undefined;
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
       where.base_price_per_hour = {
-        ...(query.minPrice !== undefined && { gte: Number(query.minPrice) }),
-        ...(query.maxPrice !== undefined && { lte: Number(query.maxPrice) }),
+        ...(minPrice !== undefined && { gte: minPrice }),
+        ...(maxPrice !== undefined && { lte: maxPrice }),
       };
     }
 

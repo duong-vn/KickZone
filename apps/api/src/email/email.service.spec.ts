@@ -42,6 +42,7 @@ const booking: BookingResponse = {
 };
 
 describe('EmailService', () => {
+  // eslint-disable-next-line @typescript-eslint/unbound-method
   const createTransport = jest.mocked(nodemailer.createTransport);
   const spawnPreview = jest.mocked(spawn);
   const writePreview = jest.mocked(writeFile);
@@ -61,7 +62,7 @@ describe('EmailService', () => {
       sentMessage = options;
       return Promise.resolve({ messageId: 'message-id' });
     });
-    createTransport.mockReturnValue({ sendMail } as never);
+    createTransport.mockReturnValue({ sendMail });
     spawnPreview.mockReturnValue({
       once: jest.fn(),
       unref: jest.fn(),

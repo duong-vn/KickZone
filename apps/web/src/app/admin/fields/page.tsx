@@ -3,6 +3,13 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  fetchAdminFields,
+  updateAdminFieldStatus,
+  updateAdminField,
+  deleteAdminField,
+} from '@/lib/api';
 import {
   Search,
   Plus,
@@ -15,6 +22,7 @@ import {
   X,
   DollarSign,
   Check,
+  Trash2,
 } from 'lucide-react';
 
 // Types aligned directly with database/init.sql
@@ -39,76 +47,33 @@ export interface AdminFieldItem {
   createdAt: string;
 }
 
-// Initial mock data based on design mockup and PostgreSQL schema
-const INITIAL_FIELDS: AdminFieldItem[] = [
-  {
-    id: 'f-1',
-    name: 'Sân Chảo Lửa 1',
-    slug: 'san-chao-lua-1',
-    fieldTypeId: 'ft-5',
-    fieldType: '5-a-side',
-    fieldTypeLabel: 'Sân 5 người',
-    address: '30 Phan Thúc Duyện, Tân Bình',
-    district: 'Tân Bình',
-    city: 'Hồ Chí Minh',
-    basePricePerHour: 250000,
-    rating: 4.8,
-    reviewCount: 36,
-    status: 'ACTIVE',
-    imageUrl:
-      'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
-    description:
-      'Sân cỏ nhân tạo chất lượng cao chuẩn FIFA, hệ thống chiếu sáng LED hiện đại, có khán đài và căng tin phục vụ giải khát.',
-    createdAt: '2023-08-15',
-  },
-  {
-    id: 'f-2',
-    name: 'Sân K34 - Số 2',
-    slug: 'san-k34-so-2',
-    fieldTypeId: 'ft-7',
-    fieldType: '7-a-side',
-    fieldTypeLabel: 'Sân 7 người',
-    address: 'K34 Nguyễn Thái Sơn, Gò Vấp',
-    district: 'Gò Vấp',
-    city: 'Hồ Chí Minh',
-    basePricePerHour: 400000,
-    rating: 4.5,
-    reviewCount: 28,
-    status: 'ACTIVE',
-    imageUrl:
-      'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
-    description:
-      'Sân 7 người thoáng mát, thoát nước tốt ngay cả khi mưa lớn, bãi đỗ xe ô tô và xe máy rộng rãi.',
-    createdAt: '2023-09-01',
-  },
-  {
-    id: 'f-3',
-    name: 'Sân Tao Đàn',
-    slug: 'san-tao-dan',
-    fieldTypeId: 'ft-11',
-    fieldType: '11-a-side',
-    fieldTypeLabel: 'Sân 11 người',
-    address: '1 Huyền Trân Công Chúa, Q1',
-    district: 'Quận 1',
-    city: 'Hồ Chí Minh',
-    basePricePerHour: 1200000,
-    rating: 4.0,
-    reviewCount: 14,
-    status: 'INACTIVE',
-    imageUrl:
-      'https://images.unsplash.com/photo-1556056504-5c7696c4c28d?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
-    description:
-      'Sân cỏ tự nhiên kích thước tiêu chuẩn 11 người trung tâm Quận 1, hiện đang tạm ngưng để bảo dưỡng phục hồi mặt cỏ.',
-    createdAt: '2023-07-20',
-  },
-];
-
 export default function AdminFieldsPage() {
-  const [fields, setFields] = useState<AdminFieldItem[]>(INITIAL_FIELDS);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+
+  const { data: apiResponse } = useQuery({
+    queryKey: [
+      'admin-fields',
+      searchQuery,
+      typeFilter,
+      statusFilter,
+      currentPage,
+    ],
+    queryFn: () =>
+      fetchAdminFields({
+        search: searchQuery || undefined,
+        type: typeFilter || undefined,
+        status: statusFilter || undefined,
+        page: currentPage,
+      }),
+    retry: false,
+  });
+
+  const [localFields, setLocalFields] = useState<AdminFieldItem[] | null>(null);
+  const fields: AdminFieldItem[] = localFields || apiResponse?.data || [];
 
   // Modals state
   const [viewingField, setViewingField] = useState<AdminFieldItem | null>(null);
@@ -169,22 +134,32 @@ export default function AdminFieldsPage() {
   }, [fields, searchQuery, typeFilter, statusFilter]);
 
   // Toggle field status (Hoạt động <-> Vô hiệu hóa)
-  const handleToggleStatus = (fieldId: string) => {
-    setFields((prev) =>
-      prev.map((f) => {
+  const handleToggleStatus = async (fieldId: string) => {
+    const target = fields.find((f) => f.id === fieldId);
+    if (!target) return;
+    const nextStatus: FieldStatus =
+      target.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+
+    setLocalFields((prev) =>
+      (prev || apiResponse?.data || []).map((f: AdminFieldItem) => {
         if (f.id === fieldId) {
-          const nextStatus: FieldStatus =
-            f.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-          showToast(
-            nextStatus === 'ACTIVE'
-              ? `Đã kích hoạt hoạt động cho ${f.name}!`
-              : `Đã chuyển ${f.name} sang trạng thái Vô hiệu hóa.`,
-          );
           return { ...f, status: nextStatus };
         }
         return f;
       }),
     );
+
+    try {
+      await updateAdminFieldStatus(fieldId, nextStatus);
+      queryClient.invalidateQueries({ queryKey: ['admin-fields'] });
+      showToast(
+        nextStatus === 'ACTIVE'
+          ? `Đã kích hoạt hoạt động cho ${target.name}!`
+          : `Đã chuyển ${target.name} sang trạng thái Vô hiệu hóa.`,
+      );
+    } catch (err) {
+      showToast(`Lỗi cập nhật trạng thái: ${(err as Error).message}`);
+    }
   };
 
   // Open Edit Modal
@@ -204,7 +179,7 @@ export default function AdminFieldsPage() {
   };
 
   // Handle Save (Create or Update)
-  const handleSaveField = (e: React.FormEvent) => {
+  const handleSaveField = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.address.trim()) {
       alert('Vui lòng điền đầy đủ tên sân và địa chỉ.');
@@ -219,8 +194,8 @@ export default function AdminFieldsPage() {
 
     if (editingField) {
       // Update existing
-      setFields((prev) =>
-        prev.map((f) =>
+      setLocalFields((prev) =>
+        (prev || apiResponse?.data || []).map((f: AdminFieldItem) =>
           f.id === editingField.id
             ? {
                 ...f,
@@ -237,9 +212,24 @@ export default function AdminFieldsPage() {
             : f,
         ),
       );
-      showToast(`Đã cập nhật thông tin ${formData.name} thành công!`);
+
+      try {
+        await updateAdminField(editingField.id, {
+          name: formData.name,
+          address: formData.address,
+          district: formData.district,
+          city: formData.city,
+          basePricePerHour: formData.basePricePerHour,
+          description: formData.description,
+          status: formData.status,
+        });
+        queryClient.invalidateQueries({ queryKey: ['admin-fields'] });
+        showToast(`Đã cập nhật thông tin ${formData.name} thành công!`);
+      } catch (err) {
+        showToast(`Lỗi lưu thông tin: ${(err as Error).message}`);
+      }
     } else {
-      // Create new
+      // Create new (optimistic)
       const newField: AdminFieldItem = {
         id: `f-${Date.now()}`,
         name: formData.name,
@@ -262,11 +252,30 @@ export default function AdminFieldsPage() {
         description: formData.description,
         createdAt: new Date().toISOString().split('T')[0],
       };
-      setFields((prev) => [newField, ...prev]);
+      setLocalFields((prev) => [
+        newField,
+        ...(prev || apiResponse?.data || []),
+      ]);
       showToast(`Đã thêm sân mới "${formData.name}" thành công!`);
     }
 
     setIsCreateModalOpen(false);
+  };
+
+  const handleDeleteField = async (fieldId: string, fieldName: string) => {
+    if (!confirm(`Bạn có chắc chắn muốn xóa sân "${fieldName}"?`)) return;
+    try {
+      await deleteAdminField(fieldId);
+      queryClient.invalidateQueries({ queryKey: ['admin-fields'] });
+      setLocalFields((prev) =>
+        (prev || apiResponse?.data || []).filter(
+          (f: AdminFieldItem) => f.id !== fieldId,
+        ),
+      );
+      showToast(`Đã xóa sân "${fieldName}" thành công.`);
+    } catch (err) {
+      showToast(`Không thể xóa sân: ${(err as Error).message}`);
+    }
   };
 
   return (
@@ -502,6 +511,18 @@ export default function AdminFieldsPage() {
                             <CheckCircle2 className="h-4 w-4" />
                           </button>
                         )}
+
+                        {/* Xóa Sân */}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleDeleteField(field.id, field.name)
+                          }
+                          className="rounded p-1.5 text-[#ba1a1a] transition-colors hover:bg-[#ffdad6]"
+                          title="Xóa sân"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>

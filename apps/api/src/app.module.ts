@@ -14,9 +14,17 @@ import { FieldsService } from './fields/fields.service';
 import { VouchersController } from './vouchers/vouchers.controller';
 import { VouchersService } from './vouchers/vouchers.service';
 import { PrismaService } from './prisma/prisma.service';
+import { StorageModule } from './storage/storage.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), AuthModule, FavoritesModule],
+  imports: [
+    ScheduleModule.forRoot(),
+    AuthModule,
+    FavoritesModule,
+    StorageModule,
+    AdminModule,
+  ],
   controllers: [
     AppController,
     FieldsController,

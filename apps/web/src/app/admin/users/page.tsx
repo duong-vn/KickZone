@@ -3,6 +3,8 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchAdminUsers, updateAdminUserStatus } from '@/lib/api';
 import {
   Search,
   UserPlus,
@@ -34,82 +36,51 @@ export interface AdminUserItem {
   totalBookings?: number;
 }
 
-// Initial mock data based on design mockup and PostgreSQL schema
-const INITIAL_USERS: AdminUserItem[] = [
-  {
-    id: 'u-1',
-    authUserId: 'auth-1',
-    fullName: 'Nguyễn Văn An',
-    email: 'nguyenvanan@email.com',
-    phone: '0901 234 567',
-    role: 'USER',
-    roleLabel: 'Khách hàng',
-    status: 'ACTIVE',
-    avatarUrl:
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-    createdAt: '2023-10-10',
-    totalBookings: 12,
-  },
-  {
-    id: 'u-2',
-    authUserId: 'auth-2',
-    fullName: 'Trần Thị Bình',
-    email: 'binh.tran@email.com',
-    phone: '0912 345 678',
-    role: 'USER',
-    roleLabel: 'Khách hàng',
-    status: 'INACTIVE',
-    createdAt: '2023-10-12',
-    totalBookings: 5,
-  },
-  {
-    id: 'u-3',
-    authUserId: 'auth-3',
-    fullName: 'Lê Hoàng Nam',
-    email: 'nam.le.sport@email.com',
-    phone: '0987 654 321',
-    role: 'MANAGER',
-    roleLabel: 'Chủ sân',
-    status: 'PENDING',
-    avatarUrl:
-      'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&auto=format&fit=crop&q=80',
-    createdAt: '2023-10-15',
-    totalBookings: 0,
-  },
-  {
-    id: 'u-4',
-    authUserId: 'auth-4',
-    fullName: 'Phạm Thị Mai',
-    email: 'mai.pham99@email.com',
-    phone: '0934 567 890',
-    role: 'USER',
-    roleLabel: 'Khách hàng',
-    status: 'ACTIVE',
-    createdAt: '2023-10-16',
-    totalBookings: 8,
-  },
-];
-
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<AdminUserItem[]>(INITIAL_USERS);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
 
+  const {
+    data: apiResponse,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: [
+      'admin-users',
+      searchQuery,
+      statusFilter,
+      roleFilter,
+      currentPage,
+    ],
+    queryFn: () =>
+      fetchAdminUsers({
+        search: searchQuery || undefined,
+        status:
+          statusFilter !== 'all'
+            ? statusFilter === 'active'
+              ? 'ACTIVE'
+              : 'INACTIVE'
+            : undefined,
+        role:
+          roleFilter !== 'all'
+            ? roleFilter === 'customer'
+              ? 'USER'
+              : 'ADMIN'
+            : undefined,
+        page: currentPage,
+      }),
+    retry: false,
+  });
+
+  const [localUsers, setLocalUsers] = useState<AdminUserItem[] | null>(null);
+  const users: AdminUserItem[] = localUsers || apiResponse?.data || [];
+
   // Modal states
   const [viewingUser, setViewingUser] = useState<AdminUserItem | null>(null);
-  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // New user form state
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    role: 'USER' as UserRole,
-    status: 'ACTIVE' as UserStatus,
-  });
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -171,74 +142,58 @@ export default function AdminUsersPage() {
   }, [users, searchQuery, statusFilter, roleFilter]);
 
   // Toggle user status
-  const handleToggleStatus = (userId: string) => {
-    setUsers((prev) =>
-      prev.map((u) => {
+  const handleToggleStatus = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+    const nextStatus: UserStatus =
+      target.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+
+    setLocalUsers((prev) =>
+      (prev || apiResponse?.data || []).map((u: AdminUserItem) => {
         if (u.id === userId) {
-          const nextStatus: UserStatus =
-            u.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-          showToast(
-            nextStatus === 'ACTIVE'
-              ? `Đã kích hoạt tài khoản cho ${u.fullName}!`
-              : `Đã vô hiệu hóa tài khoản của ${u.fullName}.`,
-          );
           return { ...u, status: nextStatus };
         }
         return u;
       }),
     );
+
+    try {
+      await updateAdminUserStatus(
+        userId,
+        nextStatus === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+      );
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      showToast(
+        nextStatus === 'ACTIVE'
+          ? `Đã kích hoạt tài khoản cho ${target.fullName}!`
+          : `Đã vô hiệu hóa tài khoản của ${target.fullName}.`,
+      );
+    } catch (err) {
+      showToast(`Lỗi cập nhật trạng thái: ${(err as Error).message}`);
+    }
   };
 
   // Approve pending user
-  const handleApproveUser = (userId: string) => {
-    setUsers((prev) =>
-      prev.map((u) => {
+  const handleApproveUser = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+
+    setLocalUsers((prev) =>
+      (prev || apiResponse?.data || []).map((u: AdminUserItem) => {
         if (u.id === userId) {
-          showToast(`Đã duyệt kích hoạt tài khoản cho ${u.fullName}!`);
           return { ...u, status: 'ACTIVE' };
         }
         return u;
       }),
     );
-  };
 
-  // Add User submit
-  const handleAddUserSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.fullName.trim() || !formData.email.trim()) {
-      alert('Vui lòng nhập họ tên và email.');
-      return;
+    try {
+      await updateAdminUserStatus(userId, 'ACTIVE');
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      showToast(`Đã duyệt kích hoạt tài khoản cho ${target.fullName}!`);
+    } catch (err) {
+      showToast(`Lỗi cập nhật: ${(err as Error).message}`);
     }
-
-    const roleMap: Record<UserRole, string> = {
-      USER: 'Khách hàng',
-      MANAGER: 'Chủ sân',
-      ADMIN: 'Quản trị viên',
-    };
-
-    const newUser: AdminUserItem = {
-      id: `u-${Date.now()}`,
-      authUserId: `auth-${Date.now()}`,
-      fullName: formData.fullName,
-      email: formData.email,
-      phone: formData.phone || '0900 000 000',
-      role: formData.role,
-      roleLabel: roleMap[formData.role],
-      status: formData.status,
-      createdAt: new Date().toISOString().split('T')[0],
-      totalBookings: 0,
-    };
-
-    setUsers((prev) => [newUser, ...prev]);
-    showToast(`Đã thêm người dùng mới "${formData.fullName}" thành công!`);
-    setIsAddUserModalOpen(false);
-    setFormData({
-      fullName: '',
-      email: '',
-      phone: '',
-      role: 'USER',
-      status: 'ACTIVE',
-    });
   };
 
   // Render Status Badge
@@ -363,14 +318,13 @@ export default function AdminUsersPage() {
           </div>
 
           {/* Add User Button */}
-          <button
-            type="button"
-            onClick={() => setIsAddUserModalOpen(true)}
+          <Link
+            href="/admin/users/new"
             className="flex w-full md:w-auto items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[#006e2f] px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm transition-all hover:bg-[#004b1e] active:scale-95"
           >
             <UserPlus className="h-4 w-4" />
             <span>Thêm người dùng</span>
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -679,141 +633,6 @@ export default function AdminUsersPage() {
                 Đóng
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add User Modal */}
-      {isAddUserModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#191c1d]/40 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl border border-[#bccbb9] bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="flex items-start justify-between border-b border-[#bccbb9]/60 pb-3">
-              <div>
-                <h4 className="font-(family-name:--font-manrope) text-lg font-bold text-[#191c1d]">
-                  Thêm người dùng mới
-                </h4>
-                <p className="text-xs text-[#575e70]">
-                  Tạo hồ sơ người dùng trong hệ thống KickZone.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsAddUserModalOpen(false)}
-                className="rounded-lg p-1.5 text-[#575e70] hover:bg-[#e7e8e9]"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form
-              onSubmit={handleAddUserSubmit}
-              className="my-4 space-y-3.5 text-xs sm:text-sm"
-            >
-              <div>
-                <label className="mb-1 block font-semibold text-[#191c1d]">
-                  Họ và tên <span className="text-[#ba1a1a]">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.fullName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, fullName: e.target.value })
-                  }
-                  placeholder="Ví dụ: Nguyễn Văn A"
-                  className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block font-semibold text-[#191c1d]">
-                  Email <span className="text-[#ba1a1a]">*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  placeholder="name@example.com"
-                  className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block font-semibold text-[#191c1d]">
-                  Số điện thoại
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  placeholder="0901 234 567"
-                  className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none focus:ring-1 focus:ring-[#006e2f]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block font-semibold text-[#191c1d]">
-                    Vai trò
-                  </label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        role: e.target.value as UserRole,
-                      })
-                    }
-                    className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none"
-                  >
-                    <option value="USER">Khách hàng</option>
-                    <option value="MANAGER">Chủ sân</option>
-                    <option value="ADMIN">Quản trị viên</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block font-semibold text-[#191c1d]">
-                    Trạng thái
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        status: e.target.value as UserStatus,
-                      })
-                    }
-                    className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none"
-                  >
-                    <option value="ACTIVE">Hoạt động</option>
-                    <option value="INACTIVE">Vô hiệu hóa</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddUserModalOpen(false)}
-                  className="rounded-xl border border-[#bccbb9] px-4 py-2 text-xs font-semibold text-[#575e70] hover:bg-[#e7e8e9]"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="flex items-center gap-1.5 rounded-xl bg-[#006e2f] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#004b1e]"
-                >
-                  <Check className="h-4 w-4" />
-                  <span>Lưu người dùng</span>
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

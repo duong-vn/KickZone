@@ -4,6 +4,12 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import {
+  fetchFieldTypes,
+  createAdminField,
+  uploadAdminFieldImages,
+} from '@/lib/api';
 import {
   CloudUpload,
   Trash2,
@@ -36,6 +42,12 @@ export default function AdminNewFieldPage() {
   const [address, setAddress] = useState('');
   const [district, setDistrict] = useState('tb');
   const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
+  const [rawFiles, setRawFiles] = useState<File[]>([]);
+
+  const { data: fieldTypes } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['field-types'],
+    queryFn: fetchFieldTypes,
+  });
 
   // Amenities State
   const [amenities, setAmenities] = useState({
@@ -46,18 +58,7 @@ export default function AdminNewFieldPage() {
   });
 
   // Images State
-  const [images, setImages] = useState<UploadedImage[]>([
-    {
-      id: 'img-1',
-      url: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600&auto=format&fit=crop&q=80',
-      isCover: true,
-    },
-    {
-      id: 'img-2',
-      url: 'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&auto=format&fit=crop&q=80',
-      isCover: false,
-    },
-  ]);
+  const [images, setImages] = useState<UploadedImage[]>([]);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,12 +91,15 @@ export default function AdminNewFieldPage() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    if (images.length + files.length > 5) {
+    const fileList = Array.from(files);
+    if (images.length + fileList.length > 5) {
       alert('Tối đa chỉ được tải lên 5 hình ảnh.');
       return;
     }
 
-    const newImgs: UploadedImage[] = Array.from(files).map((file, idx) => ({
+    setRawFiles((prev) => [...prev, ...fileList]);
+
+    const newImgs: UploadedImage[] = fileList.map((file, idx) => ({
       id: `img-uploaded-${Date.now()}-${idx}`,
       url: URL.createObjectURL(file),
       isCover: images.length === 0 && idx === 0,
@@ -104,19 +108,67 @@ export default function AdminNewFieldPage() {
     setImages((prev) => [...prev, ...newImgs]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fieldName.trim() || !address.trim()) {
       alert('Vui lòng nhập đầy đủ tên sân và địa chỉ.');
       return;
     }
 
-    setIsSubmitting(true);
-    showToast(`Đã lưu sân bóng "${fieldName}" thành công!`);
+    const districtMap: Record<string, string> = {
+      q1: 'Quận 1',
+      q3: 'Quận 3',
+      q7: 'Quận 7',
+      q10: 'Quận 10',
+      tb: 'Tân Bình',
+      bt: 'Bình Thạnh',
+      gv: 'Gò Vấp',
+      td: 'TP. Thủ Đức',
+    };
 
-    setTimeout(() => {
-      router.push('/admin/fields');
-    }, 1200);
+    // Find matching field_type
+    const targetType =
+      fieldTypes?.find((ft) =>
+        ft.name
+          .toLowerCase()
+          .includes(fieldType === '5' ? '5' : fieldType === '7' ? '7' : '11'),
+      ) || fieldTypes?.[0];
+
+    if (!targetType) {
+      alert('Không tìm thấy loại sân tương ứng trong hệ thống');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const created = await createAdminField({
+        name: fieldName,
+        fieldTypeId: targetType.id,
+        description: description || undefined,
+        address,
+        city: 'Hồ Chí Minh',
+        district: districtMap[district] || 'Tân Bình',
+        basePricePerHour: Number(basePrice) || 250000,
+        status,
+      });
+
+      if (rawFiles.length > 0) {
+        const formData = new FormData();
+        rawFiles.forEach((f) => formData.append('images', f));
+        await uploadAdminFieldImages(created.id, formData);
+      }
+
+      showToast(`Đã lưu sân bóng "${fieldName}" thành công vào cơ sở dữ liệu!`);
+      setTimeout(() => {
+        router.push('/admin/fields');
+      }, 1000);
+    } catch (err: unknown) {
+      setIsSubmitting(false);
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || 'Có lỗi xảy ra khi tạo sân bóng';
+      alert(errorMsg);
+    }
   };
 
   return (
