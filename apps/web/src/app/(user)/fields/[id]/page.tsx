@@ -54,24 +54,15 @@ import {
   updateReview,
   deleteReview,
   checkReviewEligibility,
+  createReviewComment,
+  updateReviewComment,
+  deleteReviewComment,
+  fetchCurrentUserProfile,
 } from '@/lib/api';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 
-// Helper to format field type to clean Vietnamese
-export function formatFieldTypeName(
-  name?: string | { name?: string } | null,
-): string {
-  if (!name) return 'Sân 7 người';
-  if (typeof name === 'object') return name.name || 'Sân 7 người';
-  const clean = name.toLowerCase().trim();
-  if (clean === '5-a-side' || clean === '5' || clean.includes('5'))
-    return 'Sân 5 người';
-  if (clean === '7-a-side' || clean === '7' || clean.includes('7'))
-    return 'Sân 7 người';
-  if (clean === '11-a-side' || clean === '11' || clean.includes('11'))
-    return 'Sân 11 người';
-  return name;
-}
+import { formatFieldTypeName } from '@/lib/utils';
+export { formatFieldTypeName };
 
 const DEFAULT_AMENITIES = [
   {
@@ -354,6 +345,8 @@ export default function FieldDetailPage({
   const [currentUser, setCurrentUser] = useState<{
     id: string;
     email?: string;
+    avatarUrl?: string | null;
+    fullName?: string;
   } | null>(null);
   const [showEligibilityDialog, setShowEligibilityDialog] = useState(false);
   const [eligibilityReason, setEligibilityReason] = useState<
@@ -370,9 +363,16 @@ export default function FieldDetailPage({
         const supabase = getSupabaseBrowserClient();
         const { data } = await supabase.auth.getSession();
         if (isMounted && data.session?.user) {
+          const userMeta = data.session.user.user_metadata || {};
           setCurrentUser({
             id: data.session.user.id,
             email: data.session.user.email,
+            avatarUrl: userMeta.avatar_url || userMeta.picture || null,
+            fullName:
+              userMeta.full_name ||
+              userMeta.name ||
+              data.session.user.email?.split('@')[0] ||
+              'Người dùng',
           });
         }
       } catch {
@@ -395,10 +395,93 @@ export default function FieldDetailPage({
     retry: false,
   });
 
-  const effectiveCurrentUserId =
-    eligibilityData?.currentProfileId || currentUser?.id;
+  // Fetch current user profile
+  const { data: userProfileData } = useQuery({
+    queryKey: ['currentUserProfile', currentUser?.id],
+    queryFn: () => fetchCurrentUserProfile(),
+    enabled: !!currentUser,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // Mutations
+  const profileFromApi = userProfileData?.data ?? userProfileData;
+  const currentProfile = profileFromApi?.id
+    ? {
+        id: profileFromApi.id,
+        authUserId: profileFromApi.authUserId || currentUser?.id,
+        fullName:
+          profileFromApi.fullName || currentUser?.fullName || 'Người dùng',
+        avatarUrl: profileFromApi.avatarUrl || currentUser?.avatarUrl || null,
+        role: profileFromApi.role || 'USER',
+      }
+    : currentUser
+      ? {
+          id: currentUser.id,
+          authUserId: currentUser.id,
+          fullName: currentUser.fullName || 'Người dùng',
+          avatarUrl: currentUser.avatarUrl || null,
+          role: 'USER',
+        }
+      : null;
+
+  const effectiveCurrentUserId = currentUser
+    ? currentProfile?.id || eligibilityData?.currentProfileId || currentUser.id
+    : null;
+
+  // Comment Mutations
+  const createCommentMutation = useMutation({
+    mutationFn: ({
+      reviewId,
+      content,
+      parentId,
+    }: {
+      reviewId: string;
+      content: string;
+      parentId?: string;
+    }) => createReviewComment(reviewId, { content, parentId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã gửi bình luận thành công!');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể gửi bình luận.';
+      toast.error(message);
+    },
+  });
+
+  const updateCommentMutation = useMutation({
+    mutationFn: ({
+      commentId,
+      content,
+    }: {
+      commentId: string;
+      content: string;
+    }) => updateReviewComment(commentId, { content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã cập nhật bình luận.');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể cập nhật bình luận.';
+      toast.error(message);
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: (commentId: string) => deleteReviewComment(commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã xóa bình luận.');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể xóa bình luận.';
+      toast.error(message);
+    },
+  });
+
+  // Review Mutations
   const createReviewMutation = useMutation({
     mutationFn: (data: {
       rating: number;
@@ -746,39 +829,20 @@ export default function FieldDetailPage({
     reviewId: string,
     content: string,
     parentId?: string,
-    replyToUserName?: string,
   ) => {
-    const newComment = {
-      id: `comm-${Date.now()}`,
-      reviewId,
-      userId: currentUser?.id || CURRENT_USER.id,
-      parentId: parentId || null,
-      replyToUserName: replyToUserName || null,
-      content,
-      createdAt: new Date().toISOString(),
-      user: CURRENT_USER,
-    };
+    if (!currentUser) {
+      toast.error('Vui lòng đăng nhập để gửi bình luận.');
+      return;
+    }
+    createCommentMutation.mutate({ reviewId, content, parentId });
+  };
 
-    setLocalReviews((prev) => {
-      const base = prev ?? reviewsList;
-      return base.map((rev) => {
-        if (rev.id !== reviewId) return rev;
+  const handleEditComment = (commentId: string, content: string) => {
+    updateCommentMutation.mutate({ commentId, content });
+  };
 
-        if (parentId) {
-          const updatedComments = rev.comments.map((c) => {
-            if (c.id === parentId) {
-              return { ...c, replies: [...(c.replies || []), newComment] };
-            }
-            return c;
-          });
-          return { ...rev, comments: updatedComments };
-        }
-
-        return { ...rev, comments: [...rev.comments, newComment] };
-      });
-    });
-
-    toast.success('Đã gửi phản hồi thành công!');
+  const handleDeleteComment = (commentId: string) => {
+    deleteCommentMutation.mutate(commentId);
   };
 
   if (isLoading) {
@@ -1278,12 +1342,15 @@ export default function FieldDetailPage({
                       review={rev}
                       fieldId={fieldId}
                       currentUserId={effectiveCurrentUserId}
+                      currentUser={currentProfile}
                       onEdit={(r) => {
                         setEditingReview(r);
                         setIsWriteReviewOpen(true);
                       }}
                       onDelete={(r) => setDeletingReview(r)}
                       onAddComment={handleAddComment}
+                      onEditComment={handleEditComment}
+                      onDeleteComment={handleDeleteComment}
                     />
                   ))}
                 </div>

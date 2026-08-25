@@ -40,6 +40,10 @@ import {
   updateReview,
   deleteReview,
   checkReviewEligibility,
+  createReviewComment,
+  updateReviewComment,
+  deleteReviewComment,
+  fetchCurrentUserProfile,
 } from '@/lib/api';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 
@@ -82,6 +86,8 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
   const [currentUser, setCurrentUser] = useState<{
     id: string;
     email?: string;
+    avatarUrl?: string | null;
+    fullName?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -92,9 +98,16 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
         const { data } = await supabase.auth.getUser();
         if (!isMounted) return;
         if (data.user) {
+          const userMeta = data.user.user_metadata || {};
           setCurrentUser({
             id: data.user.id,
             email: data.user.email,
+            avatarUrl: userMeta.avatar_url || userMeta.picture || null,
+            fullName:
+              userMeta.full_name ||
+              userMeta.name ||
+              data.user.email?.split('@')[0] ||
+              'Người dùng',
           });
         } else {
           setCurrentUser(null);
@@ -119,15 +132,98 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
     retry: false,
   });
 
-  const effectiveCurrentUserId =
-    eligibilityData?.currentProfileId || currentUser?.id;
+  // Fetch current user profile
+  const { data: userProfileData } = useQuery({
+    queryKey: ['currentUserProfile', currentUser?.id],
+    queryFn: () => fetchCurrentUserProfile(),
+    enabled: !!currentUser,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const profileFromApi = userProfileData?.data ?? userProfileData;
+  const currentProfile = profileFromApi?.id
+    ? {
+        id: profileFromApi.id,
+        authUserId: profileFromApi.authUserId || currentUser?.id,
+        fullName:
+          profileFromApi.fullName || currentUser?.fullName || 'Người dùng',
+        avatarUrl: profileFromApi.avatarUrl || currentUser?.avatarUrl || null,
+        role: profileFromApi.role || 'USER',
+      }
+    : currentUser
+      ? {
+          id: currentUser.id,
+          authUserId: currentUser.id,
+          fullName: currentUser.fullName || 'Người dùng',
+          avatarUrl: currentUser.avatarUrl || null,
+          role: 'USER',
+        }
+      : null;
+
+  const effectiveCurrentUserId = currentUser
+    ? currentProfile?.id || eligibilityData?.currentProfileId || currentUser.id
+    : null;
 
   const [showEligibilityDialog, setShowEligibilityDialog] = useState(false);
   const [eligibilityReason, setEligibilityReason] = useState<
     'not_logged_in' | 'no_completed_booking' | 'already_reviewed'
   >('not_logged_in');
 
-  // Mutations
+  // Comment Mutations
+  const createCommentMutation = useMutation({
+    mutationFn: ({
+      reviewId,
+      content,
+      parentId,
+    }: {
+      reviewId: string;
+      content: string;
+      parentId?: string;
+    }) => createReviewComment(reviewId, { content, parentId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã gửi bình luận thành công!');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể gửi bình luận.';
+      toast.error(message);
+    },
+  });
+
+  const updateCommentMutation = useMutation({
+    mutationFn: ({
+      commentId,
+      content,
+    }: {
+      commentId: string;
+      content: string;
+    }) => updateReviewComment(commentId, { content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã cập nhật bình luận.');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể cập nhật bình luận.';
+      toast.error(message);
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: (commentId: string) => deleteReviewComment(commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã xóa bình luận.');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể xóa bình luận.';
+      toast.error(message);
+    },
+  });
+
+  // Review Mutations
   const createReviewMutation = useMutation({
     mutationFn: (data: {
       rating: number;
@@ -284,8 +380,24 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
     await deleteReviewMutation.mutateAsync(deletingReview.id);
   };
 
-  const handleAddComment = () => {
-    toast.info('Tính năng bình luận chi tiết sẽ sớm được cập nhật!');
+  const handleAddComment = (
+    reviewId: string,
+    content: string,
+    parentId?: string,
+  ) => {
+    if (!currentUser) {
+      toast.error('Vui lòng đăng nhập để bình luận.');
+      return;
+    }
+    createCommentMutation.mutate({ reviewId, content, parentId });
+  };
+
+  const handleEditComment = (commentId: string, content: string) => {
+    updateCommentMutation.mutate({ commentId, content });
+  };
+
+  const handleDeleteComment = (commentId: string) => {
+    deleteCommentMutation.mutate(commentId);
   };
 
   if (isFieldLoading || isReviewsLoading) {
@@ -430,12 +542,15 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
                     review={rev}
                     fieldId={fieldId}
                     currentUserId={effectiveCurrentUserId}
+                    currentUser={currentProfile}
                     onEdit={(r) => {
                       setEditingReview(r);
                       setIsWriteModalOpen(true);
                     }}
                     onDelete={(r) => setDeletingReview(r)}
                     onAddComment={handleAddComment}
+                    onEditComment={handleEditComment}
+                    onDeleteComment={handleDeleteComment}
                   />
                 ))}
               </div>

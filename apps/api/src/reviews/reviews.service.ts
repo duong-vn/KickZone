@@ -7,9 +7,28 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedProfile } from '../auth/supabase-auth.guard';
 import { CreateReviewDto, UpdateReviewDto } from './dto/reviews.dto';
+import {
+  CreateReviewCommentDto,
+  UpdateReviewCommentDto,
+} from './dto/comments.dto';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function formatFieldTypeName(name?: string | null): string {
+  if (!name) return 'Sân tiêu chuẩn';
+  const clean = name.trim().toLowerCase();
+  if (clean === '5-a-side' || clean === '5' || clean.includes('5')) {
+    return 'Sân 5 người';
+  }
+  if (clean === '7-a-side' || clean === '7' || clean.includes('7')) {
+    return 'Sân 7 người';
+  }
+  if (clean === '11-a-side' || clean === '11' || clean.includes('11')) {
+    return 'Sân 11 người';
+  }
+  return name;
+}
 
 export interface ReviewUserData {
   id: string;
@@ -28,6 +47,19 @@ export interface ReviewBookingProofData {
   fieldTypeName: string;
 }
 
+export interface ReviewCommentData {
+  id: string;
+  reviewId: string;
+  userId: string;
+  parentId?: string | null;
+  content: string;
+  createdAt: string;
+  updatedAt?: string;
+  user: ReviewUserData;
+  replyToUserName?: string | null;
+  replies?: ReviewCommentData[];
+}
+
 export interface ReviewData {
   id: string;
   userId: string;
@@ -41,12 +73,95 @@ export interface ReviewData {
   verifiedBooking: boolean;
   user: ReviewUserData;
   booking?: ReviewBookingProofData;
-  comments: unknown[];
+  comments: ReviewCommentData[];
 }
 
 export interface ReviewResponse {
   data: ReviewData;
   message: string;
+}
+
+export interface ReviewCommentResponse {
+  data: ReviewCommentData;
+  message: string;
+}
+
+export interface DeleteCommentResponse {
+  success: boolean;
+  message: string;
+  id: string;
+}
+
+export interface RawReviewCommentWithProfile {
+  id: string;
+  review_id: string;
+  user_id: string;
+  parent_id: string | null;
+  content: string;
+  created_at: Date;
+  updated_at: Date;
+  profiles?: {
+    id: string;
+    full_name: string | null;
+    avatar_path: string | null;
+    role: string;
+  } | null;
+}
+
+export function buildCommentsTree(
+  rawComments: RawReviewCommentWithProfile[],
+  currentUserId?: string,
+): ReviewCommentData[] {
+  const userNamesMap = new Map<string, string>();
+  for (const c of rawComments) {
+    userNamesMap.set(c.id, c.profiles?.full_name || 'Người dùng');
+  }
+
+  const map = new Map<string, ReviewCommentData>();
+  const roots: ReviewCommentData[] = [];
+
+  for (const c of rawComments) {
+    const formatted: ReviewCommentData = {
+      id: c.id,
+      reviewId: c.review_id,
+      userId: c.user_id,
+      parentId: c.parent_id,
+      content: c.content,
+      createdAt: c.created_at
+        ? new Date(c.created_at).toISOString()
+        : new Date().toISOString(),
+      updatedAt: c.updated_at
+        ? new Date(c.updated_at).toISOString()
+        : undefined,
+      user: {
+        id: c.profiles?.id || c.user_id,
+        fullName: c.profiles?.full_name || 'Người dùng',
+        avatarUrl: c.profiles?.avatar_path || null,
+        role: c.profiles?.role || 'USER',
+        isCurrentUser: currentUserId
+          ? c.profiles?.id === currentUserId || c.user_id === currentUserId
+          : undefined,
+      },
+      replyToUserName: c.parent_id
+        ? userNamesMap.get(c.parent_id) || null
+        : null,
+      replies: [],
+    };
+    map.set(c.id, formatted);
+  }
+
+  for (const c of rawComments) {
+    const node = map.get(c.id);
+    if (!node) continue;
+    if (c.parent_id && map.has(c.parent_id)) {
+      const parentNode = map.get(c.parent_id);
+      parentNode?.replies?.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  return roots;
 }
 
 export interface DeleteReviewResponse {
@@ -229,7 +344,9 @@ export class ReviewsService {
           fullName: review.profiles.full_name || 'Khách hàng',
           avatarUrl: review.profiles.avatar_path,
           role: review.profiles.role,
-          isCurrentUser: true,
+          isCurrentUser: profile
+            ? review.profiles.id === profile.id
+            : undefined,
         },
         booking: review.bookings
           ? {
@@ -238,8 +355,9 @@ export class ReviewsService {
               fieldName: review.fields.name,
               matchDate: review.bookings.start_time.toISOString().split('T')[0],
               timeSlot: `${review.bookings.start_time.toISOString().substring(11, 16)} - ${review.bookings.end_time.toISOString().substring(11, 16)}`,
-              fieldTypeName:
-                review.fields.field_types?.name || 'Sân tiêu chuẩn',
+              fieldTypeName: formatFieldTypeName(
+                review.fields.field_types?.name,
+              ),
             }
           : undefined,
         comments: [],
@@ -355,7 +473,9 @@ export class ReviewsService {
           fullName: updated.profiles.full_name || 'Khách hàng',
           avatarUrl: updated.profiles.avatar_path,
           role: updated.profiles.role,
-          isCurrentUser: true,
+          isCurrentUser: profile
+            ? updated.profiles.id === profile.id
+            : undefined,
         },
         booking: updated.bookings
           ? {
@@ -366,8 +486,9 @@ export class ReviewsService {
                 .toISOString()
                 .split('T')[0],
               timeSlot: `${updated.bookings.start_time.toISOString().substring(11, 16)} - ${updated.bookings.end_time.toISOString().substring(11, 16)}`,
-              fieldTypeName:
-                updated.fields.field_types?.name || 'Sân tiêu chuẩn',
+              fieldTypeName: formatFieldTypeName(
+                updated.fields.field_types?.name,
+              ),
             }
           : undefined,
         comments: [],
@@ -476,8 +597,255 @@ export class ReviewsService {
         fieldName: field.name,
         matchDate: eligibleBooking.start_time.toISOString().split('T')[0],
         timeSlot: `${eligibleBooking.start_time.toISOString().substring(11, 16)} - ${eligibleBooking.end_time.toISOString().substring(11, 16)}`,
-        fieldTypeName: field.field_types?.name || 'Sân tiêu chuẩn',
+        fieldTypeName: formatFieldTypeName(field.field_types?.name),
       },
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Nested Review Comments
+  // ---------------------------------------------------------------------------
+
+  async createComment(
+    reviewId: string,
+    dto: CreateReviewCommentDto,
+    profile: AuthenticatedProfile,
+  ): Promise<ReviewCommentResponse> {
+    if (!reviewId || !UUID_REGEX.test(reviewId)) {
+      throw new NotFoundException('Không tìm thấy bài đánh giá.');
+    }
+
+    const review = await this.prisma.reviews.findUnique({
+      where: { id: reviewId },
+      select: { id: true },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Bài đánh giá không tồn tại.');
+    }
+
+    let parentComment: {
+      id: string;
+      review_id: string;
+      profiles?: { full_name: string | null } | null;
+    } | null = null;
+
+    if (dto.parentId) {
+      if (!UUID_REGEX.test(dto.parentId)) {
+        throw new BadRequestException('Parent ID không hợp lệ.');
+      }
+
+      parentComment = await this.prisma.review_comments.findUnique({
+        where: { id: dto.parentId },
+        select: {
+          id: true,
+          review_id: true,
+          profiles: { select: { full_name: true } },
+        },
+      });
+
+      if (!parentComment) {
+        throw new NotFoundException(
+          'Không tìm thấy bình luận gốc được phản hồi.',
+        );
+      }
+
+      if (parentComment.review_id !== reviewId) {
+        throw new BadRequestException(
+          'Bình luận được phản hồi không thuộc bài đánh giá này.',
+        );
+      }
+    }
+
+    const comment = await this.prisma.review_comments.create({
+      data: {
+        review_id: reviewId,
+        user_id: profile.id,
+        parent_id: dto.parentId || null,
+        content: dto.content,
+      },
+      include: {
+        profiles: {
+          select: {
+            id: true,
+            full_name: true,
+            avatar_path: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    return {
+      data: {
+        id: comment.id,
+        reviewId: comment.review_id,
+        userId: comment.user_id,
+        parentId: comment.parent_id,
+        content: comment.content,
+        createdAt: comment.created_at.toISOString(),
+        updatedAt: comment.updated_at.toISOString(),
+        user: {
+          id: comment.profiles?.id || comment.user_id,
+          fullName: comment.profiles?.full_name || 'Khách hàng',
+          avatarUrl: comment.profiles?.avatar_path || null,
+          role: comment.profiles?.role || 'USER',
+          isCurrentUser: profile
+            ? comment.profiles?.id === profile.id ||
+              comment.user_id === profile.id
+            : undefined,
+        },
+        replyToUserName: parentComment?.profiles?.full_name || null,
+        replies: [],
+      },
+      message: 'Gửi bình luận thành công!',
+    };
+  }
+
+  async getComments(
+    reviewId: string,
+    profile?: AuthenticatedProfile,
+  ): Promise<{ data: ReviewCommentData[] }> {
+    if (!reviewId || !UUID_REGEX.test(reviewId)) {
+      throw new NotFoundException('Không tìm thấy bài đánh giá.');
+    }
+
+    const review = await this.prisma.reviews.findUnique({
+      where: { id: reviewId },
+      select: { id: true },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Bài đánh giá không tồn tại.');
+    }
+
+    const comments = await this.prisma.review_comments.findMany({
+      where: { review_id: reviewId },
+      orderBy: { created_at: 'asc' },
+      include: {
+        profiles: {
+          select: {
+            id: true,
+            full_name: true,
+            avatar_path: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    return {
+      data: buildCommentsTree(comments, profile?.id),
+    };
+  }
+
+  async updateComment(
+    commentId: string,
+    dto: UpdateReviewCommentDto,
+    profile: AuthenticatedProfile,
+  ): Promise<ReviewCommentResponse> {
+    if (!commentId || !UUID_REGEX.test(commentId)) {
+      throw new NotFoundException('Không tìm thấy bình luận.');
+    }
+
+    const comment = await this.prisma.review_comments.findUnique({
+      where: { id: commentId },
+      include: {
+        parent: {
+          select: {
+            profiles: { select: { full_name: true } },
+          },
+        },
+      },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Không tìm thấy bình luận.');
+    }
+
+    if (comment.user_id !== profile.id && profile.role !== 'ADMIN') {
+      throw new ForbiddenException(
+        'Bạn không có quyền chỉnh sửa bình luận này.',
+      );
+    }
+
+    const updated = await this.prisma.review_comments.update({
+      where: { id: commentId },
+      data: {
+        content: dto.content,
+        updated_at: new Date(),
+      },
+      include: {
+        profiles: {
+          select: {
+            id: true,
+            full_name: true,
+            avatar_path: true,
+            role: true,
+          },
+        },
+        parent: {
+          select: {
+            profiles: { select: { full_name: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      data: {
+        id: updated.id,
+        reviewId: updated.review_id,
+        userId: updated.user_id,
+        parentId: updated.parent_id,
+        content: updated.content,
+        createdAt: updated.created_at.toISOString(),
+        updatedAt: updated.updated_at.toISOString(),
+        user: {
+          id: updated.profiles?.id || updated.user_id,
+          fullName: updated.profiles?.full_name || 'Khách hàng',
+          avatarUrl: updated.profiles?.avatar_path || null,
+          role: updated.profiles?.role || 'USER',
+          isCurrentUser: profile
+            ? updated.profiles?.id === profile.id ||
+              updated.user_id === profile.id
+            : undefined,
+        },
+        replyToUserName: updated.parent?.profiles?.full_name || null,
+        replies: [],
+      },
+      message: 'Cập nhật bình luận thành công!',
+    };
+  }
+
+  async deleteComment(
+    commentId: string,
+    profile: AuthenticatedProfile,
+  ): Promise<DeleteCommentResponse> {
+    if (!commentId || !UUID_REGEX.test(commentId)) {
+      throw new NotFoundException('Không tìm thấy bình luận.');
+    }
+
+    const comment = await this.prisma.review_comments.findUnique({
+      where: { id: commentId },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Không tìm thấy bình luận.');
+    }
+
+    if (comment.user_id !== profile.id && profile.role !== 'ADMIN') {
+      throw new ForbiddenException('Bạn không có quyền xóa bình luận này.');
+    }
+
+    await this.prisma.review_comments.delete({
+      where: { id: commentId },
+    });
+
+    return {
+      success: true,
+      message: 'Đã xóa bình luận thành công.',
+      id: commentId,
     };
   }
 }

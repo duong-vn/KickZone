@@ -5,6 +5,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Heart, MapPin, Star, Users } from 'lucide-react';
 import { Field } from '@/types/field';
+import { formatFieldTypeName } from '@/lib/utils';
+import {
+  useFavoritesQuery,
+  useToggleFavoriteMutation,
+} from '@/hooks/use-favorites';
 
 export const DEFAULT_FIELD_IMAGE =
   'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80';
@@ -22,7 +27,9 @@ export function formatVND(amount: number): string {
 // Helper to format field type display
 export function formatFieldTypes(field: Field): string {
   if (field.supported_types && field.supported_types.length > 0) {
-    return field.supported_types.join(' • ');
+    return field.supported_types
+      .map((name) => formatFieldTypeName(name))
+      .join(' • ');
   }
 
   const rawTypes =
@@ -37,16 +44,7 @@ export function formatFieldTypes(field: Field): string {
             : [];
 
   if (rawTypes.length > 0) {
-    return rawTypes
-      .map((name) => {
-        if (!name) return 'Sân 7 người';
-        const clean = name.toLowerCase().trim();
-        if (clean.includes('5')) return 'Sân 5 người';
-        if (clean.includes('7')) return 'Sân 7 người';
-        if (clean.includes('11')) return 'Sân 11 người';
-        return name;
-      })
-      .join(' • ');
+    return rawTypes.map((name) => formatFieldTypeName(name)).join(' • ');
   }
 
   return 'Sân 7 người';
@@ -61,11 +59,22 @@ interface FieldCardProps {
 
 export function FieldCard({
   field,
-  isFavorite = false,
+  isFavorite,
   onToggleFavorite,
   showFavoriteButton = true,
 }: FieldCardProps) {
-  const [favorite, setFavorite] = useState(isFavorite);
+  const { data: favoritesData } = useFavoritesQuery();
+  const toggleFavMutation = useToggleFavoriteMutation(field?.id || '');
+
+  const isFavorited =
+    isFavorite !== undefined
+      ? isFavorite
+      : Boolean(
+          favoritesData?.data?.some(
+            (fav) => fav.field_id === field?.id || fav.field?.id === field?.id,
+          ),
+        );
+
   const [imgSrc, setImgSrc] = useState(
     field.primary_image_url || field.image || DEFAULT_FIELD_IMAGE,
   );
@@ -81,10 +90,10 @@ export function FieldCard({
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const nextState = !favorite;
-    setFavorite(nextState);
     if (onToggleFavorite) {
       onToggleFavorite(field);
+    } else if (field?.id) {
+      toggleFavMutation.mutate();
     }
   };
 
@@ -112,13 +121,14 @@ export function FieldCard({
           <button
             type="button"
             onClick={handleFavoriteClick}
-            title={favorite ? 'Bỏ khỏi yêu thích' : 'Thêm vào yêu thích'}
+            disabled={toggleFavMutation.isPending}
+            title={isFavorited ? 'Bỏ khỏi yêu thích' : 'Thêm vào yêu thích'}
             aria-label={`Yêu thích ${field.name}`}
             className="absolute top-2.5 right-2.5 bg-white/90 backdrop-blur-xs rounded-full p-2 flex items-center justify-center cursor-pointer hover:bg-white shadow-xs transition-all hover:scale-110 active:scale-95 z-10"
           >
             <Heart
               className={`w-4 h-4 transition-colors ${
-                favorite
+                isFavorited
                   ? 'fill-[#ba1a1a] text-[#ba1a1a]'
                   : 'text-[#575e70] hover:text-[#ba1a1a]'
               }`}

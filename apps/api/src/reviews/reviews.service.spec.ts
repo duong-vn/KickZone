@@ -33,6 +33,12 @@ describe('ReviewsService', () => {
     const updateReview = jest.fn();
     const deleteReview = jest.fn();
 
+    const findUniqueComment = jest.fn();
+    const findManyComments = jest.fn();
+    const createComment = jest.fn();
+    const updateComment = jest.fn();
+    const deleteComment = jest.fn();
+
     const prisma = {
       fields: {
         findFirst: findFirstField,
@@ -47,6 +53,13 @@ describe('ReviewsService', () => {
         update: updateReview,
         delete: deleteReview,
       },
+      review_comments: {
+        findUnique: findUniqueComment,
+        findMany: findManyComments,
+        create: createComment,
+        update: updateComment,
+        delete: deleteComment,
+      },
     } as unknown as PrismaService;
 
     const service = new ReviewsService(prisma);
@@ -60,6 +73,11 @@ describe('ReviewsService', () => {
       createReview,
       updateReview,
       deleteReview,
+      findUniqueComment,
+      findManyComments,
+      createComment,
+      updateComment,
+      deleteComment,
     };
   };
 
@@ -407,6 +425,236 @@ describe('ReviewsService', () => {
         message:
           'Bạn cần có ít nhất một lượt đặt sân đã hoàn thành tại sân này để viết đánh giá.',
       });
+    });
+  });
+
+  describe('createComment', () => {
+    const commentId = '66666666-6666-4666-8666-666666666666';
+    const parentCommentId = '77777777-7777-4777-8777-777777777777';
+
+    it('throws NotFoundException when review does not exist', async () => {
+      const { service, findUniqueReview } = createService();
+      findUniqueReview.mockResolvedValue(null);
+
+      await expect(
+        service.createComment(
+          reviewId,
+          { content: 'Bình luận thử nghiệm' },
+          mockUser,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws NotFoundException when parent comment is not found', async () => {
+      const { service, findUniqueReview, findUniqueComment } = createService();
+      findUniqueReview.mockResolvedValue({ id: reviewId });
+      findUniqueComment.mockResolvedValue(null);
+
+      await expect(
+        service.createComment(
+          reviewId,
+          { content: 'Bình luận trả lời', parentId: parentCommentId },
+          mockUser,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('creates a root comment successfully', async () => {
+      const { service, findUniqueReview, createComment } = createService();
+      findUniqueReview.mockResolvedValue({ id: reviewId });
+      createComment.mockResolvedValue({
+        id: commentId,
+        review_id: reviewId,
+        user_id: mockUser.id,
+        parent_id: null,
+        content: 'Bình luận gốc',
+        created_at: new Date('2026-08-25T10:00:00Z'),
+        updated_at: new Date('2026-08-25T10:00:00Z'),
+        profiles: {
+          id: mockUser.id,
+          full_name: 'Nguyễn Văn A',
+          avatar_path: '/avatars/a.jpg',
+          role: 'USER',
+        },
+      });
+
+      const res = await service.createComment(
+        reviewId,
+        { content: 'Bình luận gốc' },
+        mockUser,
+      );
+
+      expect(res.data.id).toBe(commentId);
+      expect(res.data.content).toBe('Bình luận gốc');
+      expect(res.data.user.fullName).toBe('Nguyễn Văn A');
+      expect(res.data.parentId).toBeNull();
+    });
+
+    it('creates a nested reply comment successfully with replyToUserName', async () => {
+      const { service, findUniqueReview, findUniqueComment, createComment } =
+        createService();
+      findUniqueReview.mockResolvedValue({ id: reviewId });
+      findUniqueComment.mockResolvedValue({
+        id: parentCommentId,
+        review_id: reviewId,
+        profiles: { full_name: 'Trần Thị B' },
+      });
+      createComment.mockResolvedValue({
+        id: commentId,
+        review_id: reviewId,
+        user_id: mockUser.id,
+        parent_id: parentCommentId,
+        content: 'Phản hồi cho bạn B',
+        created_at: new Date('2026-08-25T10:05:00Z'),
+        updated_at: new Date('2026-08-25T10:05:00Z'),
+        profiles: {
+          id: mockUser.id,
+          full_name: 'Nguyễn Văn A',
+          avatar_path: null,
+          role: 'USER',
+        },
+      });
+
+      const res = await service.createComment(
+        reviewId,
+        { content: 'Phản hồi cho bạn B', parentId: parentCommentId },
+        mockUser,
+      );
+
+      expect(res.data.parentId).toBe(parentCommentId);
+      expect(res.data.replyToUserName).toBe('Trần Thị B');
+    });
+  });
+
+  describe('getComments', () => {
+    it('returns a hierarchical tree of comments', async () => {
+      const { service, findUniqueReview, findManyComments } = createService();
+      findUniqueReview.mockResolvedValue({ id: reviewId });
+
+      const c1Id = '11111111-0000-0000-0000-000000000001';
+      const c2Id = '11111111-0000-0000-0000-000000000002';
+
+      findManyComments.mockResolvedValue([
+        {
+          id: c1Id,
+          review_id: reviewId,
+          user_id: mockUser.id,
+          parent_id: null,
+          content: 'Comment 1',
+          created_at: new Date('2026-08-25T10:00:00Z'),
+          updated_at: new Date('2026-08-25T10:00:00Z'),
+          profiles: {
+            id: mockUser.id,
+            full_name: 'User 1',
+            avatar_path: null,
+            role: 'USER',
+          },
+        },
+        {
+          id: c2Id,
+          review_id: reviewId,
+          user_id: mockOtherUser.id,
+          parent_id: c1Id,
+          content: 'Reply to 1',
+          created_at: new Date('2026-08-25T10:05:00Z'),
+          updated_at: new Date('2026-08-25T10:05:00Z'),
+          profiles: {
+            id: mockOtherUser.id,
+            full_name: 'User 2',
+            avatar_path: null,
+            role: 'USER',
+          },
+        },
+      ]);
+
+      const res = await service.getComments(reviewId, mockUser);
+      expect(res.data).toHaveLength(1);
+      expect(res.data[0].id).toBe(c1Id);
+      expect(res.data[0].replies).toHaveLength(1);
+      expect(res.data[0].replies?.[0].id).toBe(c2Id);
+      expect(res.data[0].replies?.[0].replyToUserName).toBe('User 1');
+    });
+  });
+
+  describe('updateComment', () => {
+    const commentId = '66666666-6666-4666-8666-666666666666';
+
+    it('throws ForbiddenException when user does not own comment and is not ADMIN', async () => {
+      const { service, findUniqueComment } = createService();
+      findUniqueComment.mockResolvedValue({
+        id: commentId,
+        user_id: mockOtherUser.id,
+        content: 'Original',
+      });
+
+      await expect(
+        service.updateComment(
+          commentId,
+          { content: 'Hacked content' },
+          mockUser,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('updates comment when user is owner', async () => {
+      const { service, findUniqueComment, updateComment } = createService();
+      findUniqueComment.mockResolvedValue({
+        id: commentId,
+        user_id: mockUser.id,
+        content: 'Original',
+      });
+      updateComment.mockResolvedValue({
+        id: commentId,
+        review_id: reviewId,
+        user_id: mockUser.id,
+        parent_id: null,
+        content: 'Updated content',
+        created_at: new Date('2026-08-25T10:00:00Z'),
+        updated_at: new Date('2026-08-25T10:10:00Z'),
+        profiles: {
+          id: mockUser.id,
+          full_name: 'Nguyễn Văn A',
+          avatar_path: null,
+          role: 'USER',
+        },
+      });
+
+      const res = await service.updateComment(
+        commentId,
+        { content: 'Updated content' },
+        mockUser,
+      );
+
+      expect(res.data.content).toBe('Updated content');
+    });
+  });
+
+  describe('deleteComment', () => {
+    const commentId = '66666666-6666-4666-8666-666666666666';
+
+    it('throws ForbiddenException when deleting someone else comment', async () => {
+      const { service, findUniqueComment } = createService();
+      findUniqueComment.mockResolvedValue({
+        id: commentId,
+        user_id: mockOtherUser.id,
+      });
+
+      await expect(service.deleteComment(commentId, mockUser)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('deletes comment successfully when owner requests', async () => {
+      const { service, findUniqueComment, deleteComment } = createService();
+      findUniqueComment.mockResolvedValue({
+        id: commentId,
+        user_id: mockUser.id,
+      });
+      deleteComment.mockResolvedValue({ id: commentId });
+
+      const res = await service.deleteComment(commentId, mockUser);
+      expect(res.success).toBe(true);
+      expect(res.id).toBe(commentId);
     });
   });
 });
