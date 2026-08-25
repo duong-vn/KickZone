@@ -72,7 +72,9 @@ Các phần này chỉ làm sau khi flow Login → Field → Booking → Admin a
 
 ```text
 database/
+├── README.md       # Danh mục dữ liệu mẫu và hướng dẫn seed
 ├── init.sql        # Tạo toàn bộ schema core trên Supabase project mới
+├── seed.sql        # Dữ liệu demo dùng chung, có thể chạy lại an toàn
 └── migrations/     # Mỗi thay đổi schema sau baseline là một file SQL mới
 ```
 
@@ -89,6 +91,14 @@ database/
 - Comment cho bảng/cột quan trọng.
 
 Script không có `DROP TABLE`, không truncate và không xóa dữ liệu. Có thể chạy lại để tạo object còn thiếu, nhưng `CREATE TABLE IF NOT EXISTS` không tự nâng cấp bảng cũ. Sau lần khởi tạo đầu, mọi thay đổi phải đi qua migration mới.
+
+`database/seed.sql` khác migration: file này chỉ chứa dữ liệu demo và dùng `ON CONFLICT` để có thể chạy lại mà không nhân đôi record. Sau khi chạy `init.sql`, Database Owner seed lên Supabase development bằng:
+
+```bash
+npm run db:seed --workspace @kickzone/api
+```
+
+Danh sách chính xác các record demo nằm trong [`database/README.md`](./database/README.md).
 
 ## 3. Cách tạo database trên Supabase
 
@@ -351,13 +361,15 @@ where trigger_schema = 'public'
 order by event_object_table, trigger_name;
 ```
 
-Kiểm tra seed:
+Kiểm tra reference data từ `init.sql`:
 
 ```sql
 select id, name
 from public.field_types
 order by name;
 ```
+
+Để thêm và kiểm tra toàn bộ dữ liệu demo, chạy `npm run db:seed --workspace @kickzone/api`. Script sẽ in số lượng profile, sân, voucher, booking, review và favorites đã seed trên Supabase.
 
 ### Bootstrap ADMIN đầu tiên
 

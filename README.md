@@ -130,6 +130,14 @@ Owner/Tech Lead thực hiện một lần:
 9. Dùng Session pooler của role `kickzone_app` làm `DATABASE_URL` trong `apps/api/.env`.
 10. Lấy Project URL và anon key cho `apps/web/.env.local`; service-role key chỉ điền ở backend.
 
+Sau khi schema đã sẵn sàng, Database Owner có thể thêm dữ liệu demo dùng chung trên Supabase:
+
+```bash
+npm run db:seed --workspace @kickzone/api
+```
+
+Danh mục dữ liệu và quy tắc seed được mô tả tại [`database/README.md`](./database/README.md). Dữ liệu mẫu nằm trong `database/seed.sql`, không nằm trong migration.
+
 Không tạo 11 bảng nghiệp vụ từng cái bằng Table Editor. Lần đầu dùng script đã review trong repo; các thay đổi sau đó phải dùng migration mới.
 
 ## Database workflow
