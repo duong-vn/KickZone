@@ -84,7 +84,11 @@ export function useToggleFavoriteMutation(fieldId: string) {
               meta: favorites.meta
                 ? {
                     ...favorites.meta,
-                    total: Math.max(0, favorites.meta.total - (favorites.data.length - data.length)),
+                    total: Math.max(
+                      0,
+                      favorites.meta.total -
+                        (favorites.data.length - data.length),
+                    ),
                   }
                 : undefined,
             };

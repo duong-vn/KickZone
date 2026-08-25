@@ -129,72 +129,74 @@ function CheckoutContent() {
     },
   });
 
-  const applyVoucher = useCallback(async (codeToApply?: string) => {
-    const code = (codeToApply ?? voucherCode).trim().toUpperCase();
-    if (!code) return toast.error('Vui lòng nhập mã voucher.');
-    if (!isSelectionValid || originalPrice <= 0) {
-      return toast.error('Khung giờ đã chọn không còn khả dụng.');
-    }
-    setVoucherLoading(true);
-    try {
-      const response = await validateVoucher({
-        fieldId,
-        startTime,
-        endTime,
-        code,
-        originalPrice,
-      });
-      const result =
-        (
-          response as {
-            data?: {
-              code?: string;
-              discountAmount?: number;
-              finalPrice?: number;
-              valid?: boolean;
-              message?: string;
-            };
-          }
-        )?.data ||
-        (response as {
-          code?: string;
-          discountAmount?: number;
-          finalPrice?: number;
-          valid?: boolean;
-          message?: string;
-        });
-      if (
-        result &&
-        result.valid !== false &&
-        (result.code || result.discountAmount !== undefined)
-      ) {
-        const effectiveCode = result.code || code;
-        const effectiveDiscount = result.discountAmount ?? 0;
-        const effectiveFinalPrice =
-          result.finalPrice ??
-          Math.max(0, originalPrice - effectiveDiscount);
-        setVoucher({
-          code: effectiveCode,
-          discountAmount: effectiveDiscount,
-          finalPrice: effectiveFinalPrice,
+  const applyVoucher = useCallback(
+    async (codeToApply?: string) => {
+      const code = (codeToApply ?? voucherCode).trim().toUpperCase();
+      if (!code) return toast.error('Vui lòng nhập mã voucher.');
+      if (!isSelectionValid || originalPrice <= 0) {
+        return toast.error('Khung giờ đã chọn không còn khả dụng.');
+      }
+      setVoucherLoading(true);
+      try {
+        const response = await validateVoucher({
+          fieldId,
           startTime,
           endTime,
+          code,
           originalPrice,
         });
-        toast.success(result.message || 'Áp dụng mã giảm giá thành công!');
-      } else {
+        const result =
+          (
+            response as {
+              data?: {
+                code?: string;
+                discountAmount?: number;
+                finalPrice?: number;
+                valid?: boolean;
+                message?: string;
+              };
+            }
+          )?.data ||
+          (response as {
+            code?: string;
+            discountAmount?: number;
+            finalPrice?: number;
+            valid?: boolean;
+            message?: string;
+          });
+        if (
+          result &&
+          result.valid !== false &&
+          (result.code || result.discountAmount !== undefined)
+        ) {
+          const effectiveCode = result.code || code;
+          const effectiveDiscount = result.discountAmount ?? 0;
+          const effectiveFinalPrice =
+            result.finalPrice ?? Math.max(0, originalPrice - effectiveDiscount);
+          setVoucher({
+            code: effectiveCode,
+            discountAmount: effectiveDiscount,
+            finalPrice: effectiveFinalPrice,
+            startTime,
+            endTime,
+            originalPrice,
+          });
+          toast.success(result.message || 'Áp dụng mã giảm giá thành công!');
+        } else {
+          setVoucher(null);
+          toast.error(result?.message || 'Voucher không hợp lệ.');
+        }
+      } catch (error) {
         setVoucher(null);
-        toast.error(result?.message || 'Voucher không hợp lệ.');
+        toast.error(
+          error instanceof ApiError ? error.message : 'Voucher không hợp lệ.',
+        );
+      } finally {
+        setVoucherLoading(false);
       }
-    } catch (error) {
-      setVoucher(null);
-      toast.error(
-        error instanceof ApiError ? error.message : 'Voucher không hợp lệ.',
-      );
-    } finally {
-      setVoucherLoading(false);
-    }
-  }, [endTime, fieldId, isSelectionValid, originalPrice, startTime, voucherCode]);
+    },
+    [endTime, fieldId, isSelectionValid, originalPrice, startTime, voucherCode],
+  );
 
   useEffect(() => {
     if (
@@ -333,7 +335,8 @@ function CheckoutContent() {
                 placeholder="Nhập mã voucher (vd: KICKZONE50, KZ10)"
                 className={cn(
                   'flex-1 rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] px-3 py-2 text-xs uppercase outline-none focus:border-[#006e2f]',
-                  activeVoucher && 'bg-gray-100 text-gray-500 cursor-not-allowed',
+                  activeVoucher &&
+                    'bg-gray-100 text-gray-500 cursor-not-allowed',
                 )}
               />
               {activeVoucher ? (
@@ -382,7 +385,9 @@ function CheckoutContent() {
               {activeVoucher && (
                 <div className="flex justify-between text-[#006e2f]">
                   <span>Voucher</span>
-                  <b>-{activeVoucher.discountAmount.toLocaleString('vi-VN')}đ</b>
+                  <b>
+                    -{activeVoucher.discountAmount.toLocaleString('vi-VN')}đ
+                  </b>
                 </div>
               )}
               <div className="flex justify-between border-t border-[#bccbb9]/40 pt-3 text-sm">

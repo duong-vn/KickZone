@@ -39,10 +39,7 @@ interface PendingBookingItem {
   status: BookingStatus;
 }
 
-import {
-  formatBusinessTime,
-  getBusinessParts,
-} from '@/lib/booking-time';
+import { formatBusinessTime, getBusinessParts } from '@/lib/booking-time';
 
 function formatDateVN(dateStr: string): string {
   if (!dateStr) return '';

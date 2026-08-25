@@ -11,7 +11,10 @@ import {
   CreateReviewCommentDto,
   UpdateReviewCommentDto,
 } from './dto/comments.dto';
-import { formatBusinessDate, formatBusinessTime } from '../bookings/booking-rules';
+import {
+  formatBusinessDate,
+  formatBusinessTime,
+} from '../bookings/booking-rules';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

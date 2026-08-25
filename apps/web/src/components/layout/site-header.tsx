@@ -14,7 +14,6 @@ import {
   Bell,
   ChevronDown,
   LayoutDashboard,
-  Shield,
   CheckCircle2,
   XCircle,
   Ticket,
@@ -25,7 +24,11 @@ import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 
 import { getSupabaseBrowserClient } from '@/lib/supabase';
-import { fetchCurrentUserProfile, fetchUserActivities, type ActivityItem } from '@/lib/api';
+import {
+  fetchCurrentUserProfile,
+  fetchUserActivities,
+  type ActivityItem,
+} from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [

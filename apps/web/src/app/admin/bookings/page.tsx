@@ -9,10 +9,7 @@ import {
   approveAdminBooking,
   rejectAdminBooking,
 } from '@/lib/api';
-import {
-  formatBusinessTime,
-  getBusinessParts,
-} from '@/lib/booking-time';
+import { formatBusinessTime, getBusinessParts } from '@/lib/booking-time';
 import {
   AdminFilterBar,
   adminFilterControlClass,

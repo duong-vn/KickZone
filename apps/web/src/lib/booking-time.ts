@@ -2,7 +2,8 @@ import type { AvailabilitySlot } from '@/types/field';
 
 const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 const HALF_HOUR_MS = 30 * 60 * 1000;
-const OFFSET_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(Z|([+-])(\d{2}):(\d{2}))$/;
+const OFFSET_TIMESTAMP =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(Z|([+-])(\d{2}):(\d{2}))$/;
 
 const dateFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: TIME_ZONE,
@@ -193,15 +194,18 @@ export function getContiguousAvailableSlots(
   endTime?: string,
 ): AvailabilitySlot[] {
   const start = parseOffsetTimestamp(startTime);
-  const requested = endTime
-    ? parseBusinessInterval(startTime, endTime)
-    : null;
+  const requested = endTime ? parseBusinessInterval(startTime, endTime) : null;
   if (!start || (endTime && !requested)) return [];
 
   const normalized = slots
-    .map((slot) => ({ slot, interval: parseBusinessInterval(slot.startTime, slot.endTime) }))
+    .map((slot) => ({
+      slot,
+      interval: parseBusinessInterval(slot.startTime, slot.endTime),
+    }))
     .filter(
-      (entry): entry is { slot: AvailabilitySlot; interval: BusinessInterval } =>
+      (
+        entry,
+      ): entry is { slot: AvailabilitySlot; interval: BusinessInterval } =>
         entry.interval !== null &&
         Number.isFinite(entry.slot.price) &&
         entry.slot.price >= 0,

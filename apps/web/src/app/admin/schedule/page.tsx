@@ -296,10 +296,7 @@ export default function AdminSchedulePage() {
         finalPrice?: number;
       }) => {
         const startParts = getBusinessParts(b.startTime);
-        const endParts = getBusinessParts(b.endTime);
-
         const startHour = startParts.hour + startParts.minute / 60;
-        const endHour = endParts.hour + endParts.minute / 60;
         const duration = Math.max(
           durationMinutes(b.startTime, b.endTime) / 60,
           0.5,

@@ -61,7 +61,10 @@ export function ResetPasswordForm() {
   const [errorMessage, setErrorMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const criteria = useMemo(() => validatePasswordCriteria(password), [password]);
+  const criteria = useMemo(
+    () => validatePasswordCriteria(password),
+    [password],
+  );
   const doPasswordsMatch = useMemo(
     () => password.length > 0 && password === confirmPassword,
     [password, confirmPassword],
@@ -139,7 +142,8 @@ export function ResetPasswordForm() {
             Mật khẩu đã được thay đổi
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Mật khẩu mới của bạn đã được lưu an toàn. Đang tự động chuyển hướng đến trang đăng nhập trong giây lát...
+            Mật khẩu mới của bạn đã được lưu an toàn. Đang tự động chuyển hướng
+            đến trang đăng nhập trong giây lát...
           </p>
 
           <div className="mt-8">
@@ -173,7 +177,8 @@ export function ResetPasswordForm() {
             Thiếu mã xác thực
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Liên kết đặt lại mật khẩu không hợp lệ hoặc thiếu mã xác thực. Vui lòng bấm vào liên kết trong email hoặc gửi yêu cầu khôi phục mới.
+            Liên kết đặt lại mật khẩu không hợp lệ hoặc thiếu mã xác thực. Vui
+            lòng bấm vào liên kết trong email hoặc gửi yêu cầu khôi phục mới.
           </p>
           <div className="mt-6 flex flex-col gap-2.5">
             <Link href="/forgot-password">
@@ -269,7 +274,9 @@ export function ResetPasswordForm() {
               onClick={() => setShowConfirmPassword((visible) => !visible)}
               className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
               aria-label={
-                showConfirmPassword ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'
+                showConfirmPassword
+                  ? 'Ẩn mật khẩu xác nhận'
+                  : 'Hiện mật khẩu xác nhận'
               }
               disabled={isSubmitting}
             >
@@ -304,8 +311,13 @@ export function ResetPasswordForm() {
               ) : (
                 <X className="size-3.5 text-muted-foreground/50" />
               )}
-              <span className={criteria.hasRequiredCategories ? 'text-foreground' : ''}>
-                Chứa ít nhất 3 trong 4 nhóm: Chữ hoa, chữ thường, số, ký tự đặc biệt ({criteria.categoryCount}/3)
+              <span
+                className={
+                  criteria.hasRequiredCategories ? 'text-foreground' : ''
+                }
+              >
+                Chứa ít nhất 3 trong 4 nhóm: Chữ hoa, chữ thường, số, ký tự đặc
+                biệt ({criteria.categoryCount}/3)
               </span>
             </li>
             <li className="flex items-center gap-2">

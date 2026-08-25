@@ -7,7 +7,10 @@ import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { PrismaService } from '../prisma/prisma.service';
 import type { profiles } from '../generated/prisma/client';
-import { formatBusinessDate, formatBusinessTime } from '../bookings/booking-rules';
+import {
+  formatBusinessDate,
+  formatBusinessTime,
+} from '../bookings/booking-rules';
 
 @Injectable()
 export class AuthService {

@@ -11,7 +11,10 @@ import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { formatBusinessDate, formatBusinessTime } from '../../bookings/booking-rules';
+import {
+  formatBusinessDate,
+  formatBusinessTime,
+} from '../../bookings/booking-rules';
 
 @Injectable()
 export class AdminUsersService {

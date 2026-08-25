@@ -22,7 +22,6 @@ import {
   Filter,
   ArrowUpDown,
   Ticket,
-  MapPin,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { fetchUserActivities, type ActivityItem } from '@/lib/api';
@@ -214,7 +213,10 @@ export default function MyActivityPage() {
     if (newPage < 1 || newPage > totalPages || newPage === page) return;
     void loadActivities(newPage, search, activeFilter, activeSort, pageSize);
     if (timelineRef.current) {
-      timelineRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      timelineRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
     }
   };
 

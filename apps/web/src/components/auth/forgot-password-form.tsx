@@ -58,7 +58,9 @@ export function ForgotPasswordForm() {
       return false;
     }
     if (!isValidEmail(trimmed)) {
-      setEmailError('Địa chỉ email không đúng định dạng (ví dụ: ban@example.com).');
+      setEmailError(
+        'Địa chỉ email không đúng định dạng (ví dụ: ban@example.com).',
+      );
       return false;
     }
     setEmailError('');
@@ -136,11 +138,17 @@ export function ForgotPasswordForm() {
         <div className="space-y-4 rounded-xl border border-border/80 bg-card/60 p-4 text-xs leading-5 text-muted-foreground shadow-sm">
           <div className="flex items-start gap-2.5">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
-            <span>Liên kết khôi phục có hiệu lực trong vòng <strong>15 phút</strong>.</span>
+            <span>
+              Liên kết khôi phục có hiệu lực trong vòng <strong>15 phút</strong>
+              .
+            </span>
           </div>
           <div className="flex items-start gap-2.5">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
-            <span>Nếu không thấy trong Hộp thư đến, vui lòng kiểm tra mục <strong>Thư rác (Spam)</strong> hoặc <strong>Quảng cáo</strong>.</span>
+            <span>
+              Nếu không thấy trong Hộp thư đến, vui lòng kiểm tra mục{' '}
+              <strong>Thư rác (Spam)</strong> hoặc <strong>Quảng cáo</strong>.
+            </span>
           </div>
         </div>
 
@@ -230,7 +238,8 @@ export function ForgotPasswordForm() {
           Quên mật khẩu?
         </h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Nhập email đăng ký tài khoản của bạn để nhận liên kết thiết lập lại mật khẩu mới.
+          Nhập email đăng ký tài khoản của bạn để nhận liên kết thiết lập lại
+          mật khẩu mới.
         </p>
       </div>
 
@@ -257,7 +266,11 @@ export function ForgotPasswordForm() {
               }}
               disabled={isSubmitting}
               aria-invalid={emailError || serverError ? true : undefined}
-              className={emailError ? 'border-destructive focus-visible:ring-destructive/30' : ''}
+              className={
+                emailError
+                  ? 'border-destructive focus-visible:ring-destructive/30'
+                  : ''
+              }
             />
           </div>
 
