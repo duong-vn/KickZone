@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
-import { ArrowRight, Eye, EyeOff, LoaderCircle, MailCheck } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { AuthBrand } from '@/components/auth/auth-brand';
@@ -47,6 +47,21 @@ function getRegistrationErrorMessage(message: string) {
     return 'Mật khẩu chưa đáp ứng yêu cầu bảo mật của hệ thống.';
   }
 
+  if (
+    normalizedMessage.includes('invalid email') ||
+    normalizedMessage.includes('email address')
+  ) {
+    return 'Email không hợp lệ. Hãy sử dụng địa chỉ email thật của bạn.';
+  }
+
+  if (normalizedMessage.includes('rate limit')) {
+    return 'Bạn đã đăng ký quá nhiều lần trong thời gian ngắn. Vui lòng thử lại sau.';
+  }
+
+  if (normalizedMessage.includes('signups not allowed')) {
+    return 'Hệ thống hiện đang tắt chức năng đăng ký tài khoản mới.';
+  }
+
   return 'Không thể tạo tài khoản lúc này. Vui lòng thử lại.';
 }
 
@@ -56,7 +71,6 @@ export function RegisterForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [registeredEmail, setRegisteredEmail] = useState('');
 
   function readFormValues(form: HTMLFormElement): RegistrationValues {
     const formData = new FormData(form);
@@ -72,6 +86,14 @@ export function RegisterForm() {
   }
 
   function validateRegistration(values: RegistrationValues) {
+    const emailDomain = values.email.split('@')[1]?.toLowerCase();
+    if (
+      !emailDomain ||
+      ['example.com', 'example.net', 'example.org'].includes(emailDomain)
+    ) {
+      return 'Hãy sử dụng địa chỉ email thật để đăng ký tài khoản.';
+    }
+
     if (!validatePassword(values.password)) {
       return 'Mật khẩu cần ít nhất 8 ký tự và đạt 3/4 nhóm: chữ thường, chữ hoa, số, ký tự đặc biệt.';
     }
@@ -111,7 +133,6 @@ export function RegisterForm() {
         email: values.email,
         password: values.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: values.fullName,
             phone: values.phone.replace(/[\s.-]/g, ''),
@@ -124,47 +145,21 @@ export function RegisterForm() {
         return;
       }
 
-      if (data.session) {
-        toast.success('Tạo tài khoản thành công');
-        router.replace('/');
-        router.refresh();
+      if (!data.session) {
+        setErrorMessage(
+          'Supabase đang bật xác nhận email nên chưa thể đăng nhập ngay. Hãy tắt Confirm Email trong cấu hình Auth rồi thử lại bằng email khác.',
+        );
         return;
       }
 
-      setRegisteredEmail(values.email);
+      toast.success('Tạo tài khoản và đăng nhập thành công');
+      router.replace('/');
+      router.refresh();
     } catch {
       setErrorMessage('Thiếu cấu hình Supabase hoặc kết nối đang gián đoạn.');
     } finally {
       setIsSubmitting(false);
     }
-  }
-
-  if (registeredEmail) {
-    return (
-      <div className="mx-auto w-full max-w-[420px] text-center">
-        <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <MailCheck className="size-8" />
-        </div>
-        <h1 className="mt-6 font-heading text-3xl font-bold tracking-tight text-foreground">
-          Kiểm tra hộp thư của bạn
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          KickZone đã gửi liên kết xác nhận tới{' '}
-          <strong className="font-semibold text-foreground">
-            {registeredEmail}
-          </strong>
-          . Hãy xác nhận email để hoàn tất đăng ký.
-        </p>
-        <Button
-          type="button"
-          size="lg"
-          className="mt-7 h-11 w-full font-bold"
-          onClick={() => router.push('/login')}
-        >
-          Về trang đăng nhập
-        </Button>
-      </div>
-    );
   }
 
   return (
