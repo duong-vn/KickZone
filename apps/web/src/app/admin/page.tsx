@@ -14,12 +14,7 @@ import {
   CheckCircle2,
   Trophy,
   Users,
-  ArrowUp,
   Eye,
-  MoreHorizontal,
-  PlusCircle,
-  XCircle,
-  UserPlus,
   ArrowRight,
   Check,
   X,
@@ -27,80 +22,52 @@ import {
 
 // Types mapping directly to KickZone database schema
 type BookingStatus =
-  'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED';
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'COMPLETED';
 
 interface PendingBookingItem {
   id: string;
   code: string;
   customerName: string;
   customerPhone?: string;
+  customerEmail?: string;
   fieldName: string;
   fieldType: string;
   dateLabel: string;
   timeSlot: string;
   finalPrice: number;
   status: BookingStatus;
-  statusLabel: string;
 }
 
-interface ScheduleTimelineItem {
-  id: string;
-  timeSlot: string;
-  courtName: string;
-  customerName: string;
-  isPending: boolean;
-  status: 'PENDING' | 'CONFIRMED';
+
+function formatDateVN(dateStr: string): string {
+  if (!dateStr) return '';
+  const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  const parts = cleanDate.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
 }
 
-interface ActivityItem {
-  id: string;
-  type: 'NEW_BOOKING' | 'CANCEL_BOOKING' | 'CONFIRM_BOOKING' | 'NEW_USER';
-  title: string;
-  subject: string;
-  timeAgo: string;
+function formatLocalTimeSlot(startTime?: string, endTime?: string): string {
+  if (!startTime) return '00:00 - 00:00';
+  const s = new Date(startTime);
+  const e = endTime ? new Date(endTime) : s;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(s.getHours())}:${pad(s.getMinutes())} - ${pad(e.getHours())}:${pad(e.getMinutes())}`;
 }
 
-const TODAY_SCHEDULE: ScheduleTimelineItem[] = [
-  {
-    id: 'sch-1',
-    timeSlot: '18:00 - 19:30',
-    courtName: 'Sân 1',
-    customerName: 'Trần Văn A',
-    isPending: false,
-    status: 'CONFIRMED',
-  },
-];
-
-const RECENT_ACTIVITIES: ActivityItem[] = [
-  {
-    id: 'act-1',
-    type: 'NEW_BOOKING',
-    title: 'đã đặt Sân 2',
-    subject: 'Hoàng Nam',
-    timeAgo: '10 phút trước',
-  },
-  {
-    id: 'act-2',
-    type: 'CANCEL_BOOKING',
-    title: 'đã hủy đơn #BK-9270',
-    subject: 'Lê Vũ',
-    timeAgo: '45 phút trước',
-  },
-  {
-    id: 'act-3',
-    type: 'CONFIRM_BOOKING',
-    title: 'Bạn đã xác nhận đơn',
-    subject: '#BK-9269',
-    timeAgo: '2 giờ trước',
-  },
-  {
-    id: 'act-4',
-    type: 'NEW_USER',
-    title: 'đăng ký tài khoản',
-    subject: 'Người dùng mới Đặng T',
-    timeAgo: '3 giờ trước',
-  },
-];
+function getLocalDateString(dateInput: string | Date): string {
+  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 export default function AdminDashboardPage() {
   const queryClient = useQueryClient();
@@ -108,18 +75,21 @@ export default function AdminDashboardPage() {
     useState<PendingBookingItem | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
+  // 1. Dashboard Stats Query (KPIs & Recent Activities)
   const { data: statsData } = useQuery({
     queryKey: ['admin-dashboard-stats'],
     queryFn: () => fetchAdminDashboardStats(),
     retry: false,
   });
 
-  const { data: pendingResponse } = useQuery({
+  // 2. Pending Bookings Query (only PENDING status from bookings management)
+  const { data: pendingResponse, isLoading: isLoadingPending } = useQuery({
     queryKey: ['admin-pending-bookings-dashboard'],
-    queryFn: () => fetchAdminBookings({ status: 'PENDING', limit: 5 }),
+    queryFn: () => fetchAdminBookings({ status: 'PENDING', limit: 10 }),
     retry: false,
   });
 
+  // Transform Pending Bookings
   const bookings: PendingBookingItem[] = useMemo(() => {
     if (pendingResponse?.data && pendingResponse.data.length > 0) {
       return pendingResponse.data.map(
@@ -128,9 +98,10 @@ export default function AdminDashboardPage() {
           code: string;
           customerName: string;
           customerPhone?: string;
+          customerEmail?: string;
           fieldName: string;
           fieldTypeLabel?: string;
-          bookingDate: string;
+          bookingDate?: string;
           startTime?: string;
           endTime?: string;
           finalPrice: number;
@@ -140,18 +111,22 @@ export default function AdminDashboardPage() {
           code: b.code,
           customerName: b.customerName,
           customerPhone: b.customerPhone,
+          customerEmail: b.customerEmail,
           fieldName: b.fieldName,
           fieldType: b.fieldTypeLabel || 'Sân bóng',
-          dateLabel: b.bookingDate,
-          timeSlot: `${b.startTime ? b.startTime.substring(11, 16) : '00:00'} - ${b.endTime ? b.endTime.substring(11, 16) : '00:00'}`,
+          dateLabel: formatDateVN(
+            b.bookingDate ||
+              (b.startTime ? getLocalDateString(b.startTime) : ''),
+          ),
+          timeSlot: formatLocalTimeSlot(b.startTime, b.endTime),
           finalPrice: b.finalPrice,
           status: b.status,
-          statusLabel: 'Chờ xác nhận',
         }),
       );
     }
     return [];
   }, [pendingResponse]);
+
 
   const formatVND = (value: number) => {
     return new Intl.NumberFormat('vi-VN').format(value) + 'đ';
@@ -189,8 +164,51 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Status Badge Component consistent with /admin/bookings
+  const renderStatusBadge = (status: BookingStatus) => {
+    switch (status) {
+      case 'PENDING':
+        return (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#585f6c]/20 bg-[#dce2f3] px-2.5 py-1 text-xs font-semibold text-[#151c27]">
+            <span className="h-2 w-2 rounded-full bg-[#585f6c]" />
+            Chờ xác nhận
+          </span>
+        );
+      case 'CONFIRMED':
+        return (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#006e2f]/20 bg-[#22c55e]/20 px-2.5 py-1 text-xs font-semibold text-[#004b1e]">
+            <span className="h-2 w-2 rounded-full bg-[#006e2f]" />
+            Đã xác nhận
+          </span>
+        );
+      case 'COMPLETED':
+        return (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#bccbb9] bg-[#e1e3e4] px-2.5 py-1 text-xs font-semibold text-[#575e70]">
+            <span className="h-2 w-2 rounded-full bg-[#575e70]" />
+            Hoàn thành
+          </span>
+        );
+      case 'CANCELLED':
+        return (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#ba1a1a]/20 bg-[#ffdad6] px-2.5 py-1 text-xs font-semibold text-[#93000a]">
+            <span className="h-2 w-2 rounded-full bg-[#ba1a1a]" />
+            Đã hủy
+          </span>
+        );
+      case 'REJECTED':
+        return (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#ba1a1a]/20 bg-[#ffdad6] px-2.5 py-1 text-xs font-semibold text-[#93000a]">
+            <span className="h-2 w-2 rounded-full bg-[#ba1a1a]" />
+            Bị từ chối
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6">
       {/* Toast Notification */}
       {actionSuccessMsg && (
         <div className="flex items-center justify-between rounded-xl border border-[#22c55e]/30 bg-[#22c55e]/15 px-4 py-3 text-sm font-semibold text-[#004b1e] shadow-sm animate-in fade-in slide-in-from-top-2">
@@ -208,305 +226,200 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Main Grid: 8 Cols Left (KPIs + Table) & 4 Cols Right (Schedule + Recent Activities) */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        {/* Left Column (8 cols on XL) */}
-        <div className="flex flex-col gap-6 xl:col-span-8">
-          {/* KPI Cards Row */}
-          <section
-            aria-label="Thống kê tổng quan"
-            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      {/* Row 1: KPI Cards (Full Width) */}
+      <section
+        aria-label="Thống kê tổng quan"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        {/* KPI 1: Đơn chờ xác nhận */}
+        <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-[#575e70]">
+              Đơn chờ xác nhận
+            </span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ffdad6] text-[#ba1a1a]">
+              <Clock className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-end gap-2">
+            <span className="font-(family-name:--font-manrope) text-3xl font-extrabold tracking-tight text-[#191c1d]">
+              {statsData?.pendingBookingsCount ?? bookings.length}
+            </span>
+            <span className="mb-1 flex items-center text-xs font-semibold text-[#ba1a1a]">
+              Cần duyệt
+            </span>
+          </div>
+        </div>
+
+        {/* KPI 2: Đơn đã xác nhận */}
+        <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-[#575e70]">
+              Đơn đã xác nhận
+            </span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#22c55e]/20 text-[#006e2f]">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-end gap-2">
+            <span className="font-(family-name:--font-manrope) text-3xl font-extrabold tracking-tight text-[#191c1d]">
+              {statsData?.confirmedBookingsCount ?? 0}
+            </span>
+            <span className="mb-1 flex items-center text-xs font-semibold text-[#006e2f]">
+              Hoạt động
+            </span>
+          </div>
+        </div>
+
+        {/* KPI 3: Sân đang hoạt động */}
+        <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-[#575e70]">
+              Sân đang hoạt động
+            </span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d9dff5] text-[#575e70]">
+              <Trophy className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-baseline">
+            <span className="font-(family-name:--font-manrope) text-3xl font-extrabold tracking-tight text-[#191c1d]">
+              {statsData?.activeFieldsCount ?? 0}
+            </span>
+            <span className="font-(family-name:--font-manrope) text-sm font-semibold text-[#575e70] ml-1">
+              sân
+            </span>
+          </div>
+        </div>
+
+        {/* KPI 4: Người dùng */}
+        <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
+          <div className="flex items-start justify-between">
+            <span className="text-xs font-medium text-[#575e70]">
+              Tổng người dùng
+            </span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#dce2f3] text-[#585f6c]">
+              <Users className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-end">
+            <span className="font-(family-name:--font-manrope) text-3xl font-extrabold tracking-tight text-[#191c1d]">
+              {statsData?.totalUsersCount ?? 0}
+            </span>
+            <span className="font-(family-name:--font-manrope) text-sm font-semibold text-[#575e70] ml-1">
+              khách
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* Row 2: Card Đơn đặt sân cần xử lý (Full Width) */}
+      <section className="w-full overflow-hidden rounded-xl border border-[#bccbb9] bg-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <div className="flex items-center justify-between border-b border-[#bccbb9] bg-[#f8f9fa] px-6 py-4">
+          <div>
+            <h3 className="font-(family-name:--font-manrope) text-lg font-bold text-[#191c1d]">
+              Đơn đặt sân cần xử lý
+            </h3>
+            <p className="text-xs text-[#575e70]">
+              Danh sách các đơn đặt sân đang có trạng thái Chờ xác nhận
+            </p>
+          </div>
+          <Link
+            href="/admin/bookings?status=PENDING"
+            className="group inline-flex items-center gap-1 text-sm font-semibold text-[#006e2f] transition-colors hover:text-[#004b1e]"
           >
-            {/* KPI 1: Đơn chờ xác nhận */}
-            <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
-              <div className="flex items-start justify-between">
-                <span className="text-xs font-medium text-[#575e70]">
-                  Đơn chờ xác nhận
-                </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ffdad6] text-[#ba1a1a]">
-                  <Clock className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-end gap-2">
-                <span className="font-(family-name:--font-manrope) text-3xl font-extrabold tracking-tight text-[#191c1d]">
-                  {statsData?.pendingBookingsCount ?? bookings.length}
-                </span>
-                <span className="mb-1 flex items-center text-xs font-semibold text-[#ba1a1a]">
-                  Cần duyệt
-                </span>
-              </div>
-            </div>
-
-            {/* KPI 2: Đơn đã xác nhận */}
-            <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
-              <div className="flex items-start justify-between">
-                <span className="text-xs font-medium text-[#575e70]">
-                  Đơn đã xác nhận
-                </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#22c55e]/20 text-[#006e2f]">
-                  <CheckCircle2 className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-end gap-2">
-                <span className="font-(family-name:--font-manrope) text-3xl font-extrabold tracking-tight text-[#191c1d]">
-                  {statsData?.confirmedBookingsCount ?? 0}
-                </span>
-                <span className="mb-1 flex items-center text-xs font-semibold text-[#006e2f]">
-                  Hoạt động
-                </span>
-              </div>
-            </div>
-
-            {/* KPI 3: Sân đang hoạt động */}
-            <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
-              <div className="flex items-start justify-between">
-                <span className="text-xs font-medium text-[#575e70]">
-                  Sân đang hoạt động
-                </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d9dff5] text-[#575e70]">
-                  <Trophy className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-baseline">
-                <span className="font-(family-name:--font-manrope) text-3xl font-extrabold tracking-tight text-[#191c1d]">
-                  {statsData?.activeFieldsCount ?? 0}
-                </span>
-                <span className="font-(family-name:--font-manrope) text-sm font-semibold text-[#575e70] ml-1">
-                  sân
-                </span>
-              </div>
-            </div>
-
-            {/* KPI 4: Người dùng */}
-            <div className="flex flex-col justify-between rounded-xl border border-[#bccbb9] bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)] transition-all hover:shadow-md">
-              <div className="flex items-start justify-between">
-                <span className="text-xs font-medium text-[#575e70]">
-                  Tổng người dùng
-                </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#dce2f3] text-[#585f6c]">
-                  <Users className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-end">
-                <span className="font-(family-name:--font-manrope) text-3xl font-extrabold tracking-tight text-[#191c1d]">
-                  {statsData?.totalUsersCount ?? 0}
-                </span>
-                <span className="font-(family-name:--font-manrope) text-sm font-semibold text-[#575e70] ml-1">
-                  khách
-                </span>
-              </div>
-            </div>
-          </section>
-
-          {/* Pending Bookings Table */}
-          <section className="flex flex-col overflow-hidden rounded-xl border border-[#bccbb9] bg-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)]">
-            <div className="flex items-center justify-between border-b border-[#bccbb9] bg-[#f8f9fa] px-6 py-4">
-              <h3 className="font-(family-name:--font-manrope) text-lg font-bold text-[#191c1d]">
-                Đơn đặt sân cần xử lý
-              </h3>
-              <Link
-                href="/admin/bookings"
-                className="group inline-flex items-center gap-1 text-sm font-semibold text-[#006e2f] transition-colors hover:text-[#004b1e]"
-              >
-                <span>Xem tất cả</span>
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-              </Link>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#bccbb9] bg-[#f3f4f5] text-xs font-semibold text-[#575e70]">
-                    <th className="px-6 py-3.5">Mã đơn</th>
-                    <th className="px-6 py-3.5">Khách hàng</th>
-                    <th className="px-6 py-3.5">Sân</th>
-                    <th className="px-6 py-3.5">Thời gian</th>
-                    <th className="px-6 py-3.5">Tổng tiền</th>
-                    <th className="px-6 py-3.5">Trạng thái</th>
-                    <th className="px-6 py-3.5 text-center">Tác vụ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#bccbb9]/50 text-xs sm:text-sm text-[#191c1d]">
-                  {bookings.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={7}
-                        className="py-12 text-center text-sm text-[#575e70]"
-                      >
-                        Không có đơn đặt sân nào đang chờ duyệt.
-                      </td>
-                    </tr>
-                  ) : (
-                    bookings.map((booking) => (
-                      <tr
-                        key={booking.id}
-                        className="transition-colors hover:bg-[#f8f9fa]/80"
-                      >
-                        <td className="px-6 py-4 font-bold text-[#191c1d]">
-                          {booking.code}
-                        </td>
-                        <td className="px-6 py-4 font-medium text-[#191c1d]">
-                          {booking.customerName}
-                        </td>
-                        <td className="px-6 py-4 text-[#575e70]">
-                          <span className="font-semibold text-[#191c1d]">
-                            {booking.fieldName}
-                          </span>{' '}
-                          <span>({booking.fieldType})</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-[#191c1d]">
-                              {booking.dateLabel}
-                            </span>
-                            <span className="text-xs text-[#575e70]">
-                              {booking.timeSlot}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 font-bold text-[#006e2f]">
-                          {formatVND(booking.finalPrice)}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="inline-flex items-center rounded-full bg-[#ffdad6] px-2.5 py-1 text-xs font-semibold text-[#93000a]">
-                            {booking.statusLabel}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedBooking(booking)}
-                            className="rounded-lg p-1.5 text-[#575e70] transition-colors hover:bg-[#e7e8e9] hover:text-[#006e2f]"
-                            title="Xem chi tiết đơn"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
+            <span>Xem tất cả</span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
         </div>
 
-        {/* Right Column (4 cols on XL) */}
-        <div className="flex flex-col gap-6 xl:col-span-4">
-          {/* Today's Schedule */}
-          <section className="rounded-xl border border-[#bccbb9] bg-white p-5 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)]">
-            <div className="mb-4 flex items-center justify-between border-b border-[#bccbb9] pb-3">
-              <h3 className="font-(family-name:--font-manrope) text-base font-bold text-[#191c1d]">
-                Lịch sân hôm nay
-              </h3>
-              <button
-                type="button"
-                className="rounded-lg p-1 text-[#575e70] hover:bg-[#e7e8e9] hover:text-[#191c1d]"
-              >
-                <MoreHorizontal className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="relative ml-2 space-y-4 border-l-2 border-[#bccbb9] pl-4">
-              {TODAY_SCHEDULE.map((item) => (
-                <div key={item.id} className="relative">
-                  {/* Timeline Dot */}
-                  <div
-                    className={`absolute -left-[23px] top-1.5 h-3.5 w-3.5 rounded-full border-2 border-white ${
-                      item.isPending ? 'bg-[#6d7b6c]' : 'bg-[#006e2f]'
-                    }`}
-                  />
-
-                  {/* Card content */}
-                  <div
-                    className={`rounded-lg border p-3 transition-colors ${
-                      item.isPending
-                        ? 'border-[#bccbb9]/60 bg-[#f8f9fa] opacity-80'
-                        : 'border-[#bccbb9] bg-[#f3f4f5]'
-                    }`}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-[#bccbb9] bg-[#f3f4f5] text-xs font-semibold text-[#575e70]">
+                <th className="px-6 py-3.5">Mã đơn</th>
+                <th className="px-6 py-3.5">Khách hàng</th>
+                <th className="px-6 py-3.5">Sân</th>
+                <th className="px-6 py-3.5">Thời gian</th>
+                <th className="px-6 py-3.5">Tổng tiền</th>
+                <th className="px-6 py-3.5">Trạng thái</th>
+                <th className="px-6 py-3.5 text-center">Tác vụ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#bccbb9]/50 text-xs sm:text-sm text-[#191c1d]">
+              {isLoadingPending ? (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="py-12 text-center text-sm text-[#575e70]"
                   >
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-xs font-bold text-[#191c1d]">
-                        {item.timeSlot}
-                      </span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                          item.isPending
-                            ? 'bg-[#e1e3e4] text-[#575e70]'
-                            : 'bg-[#22c55e]/20 text-[#006e2f]'
-                        }`}
-                      >
-                        {item.courtName}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[#575e70]">
-                      {item.customerName}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Recent Activity */}
-          <section className="flex-1 rounded-xl border border-[#bccbb9] bg-white p-5 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.05)]">
-            <div className="mb-4 border-b border-[#bccbb9] pb-3">
-              <h3 className="font-(family-name:--font-manrope) text-base font-bold text-[#191c1d]">
-                Hoạt động gần đây
-              </h3>
-            </div>
-
-            <ul className="space-y-4">
-              {RECENT_ACTIVITIES.map((activity) => {
-                let iconEl = <PlusCircle className="h-4 w-4" />;
-                let badgeStyle = 'bg-[#22c55e]/20 text-[#006e2f]';
-
-                if (activity.type === 'CANCEL_BOOKING') {
-                  iconEl = <XCircle className="h-4 w-4" />;
-                  badgeStyle = 'bg-[#ffdad6] text-[#ba1a1a]';
-                } else if (activity.type === 'CONFIRM_BOOKING') {
-                  iconEl = <CheckCircle2 className="h-4 w-4" />;
-                  badgeStyle = 'bg-[#d9dff5] text-[#575e70]';
-                } else if (activity.type === 'NEW_USER') {
-                  iconEl = <UserPlus className="h-4 w-4" />;
-                  badgeStyle = 'bg-[#dce2f3] text-[#585f6c]';
-                }
-
-                return (
-                  <li key={activity.id} className="flex items-start gap-3">
-                    <div
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${badgeStyle}`}
-                    >
-                      {iconEl}
-                    </div>
-                    <div className="flex-1 text-xs">
-                      {activity.type === 'CONFIRM_BOOKING' ? (
-                        <p className="text-[#191c1d]">
-                          {activity.title}{' '}
-                          <span className="font-bold">{activity.subject}</span>
-                        </p>
-                      ) : activity.type === 'NEW_USER' ? (
-                        <p className="text-[#191c1d]">
-                          <span className="font-bold">{activity.subject}</span>{' '}
-                          {activity.title}
-                        </p>
-                      ) : (
-                        <p className="text-[#191c1d]">
-                          <span className="font-bold">{activity.subject}</span>{' '}
-                          {activity.title}
-                        </p>
+                    Đang tải danh sách đơn cần xử lý...
+                  </td>
+                </tr>
+              ) : bookings.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="py-12 text-center text-sm text-[#575e70]"
+                  >
+                    Không có đơn đặt sân nào đang chờ duyệt.
+                  </td>
+                </tr>
+              ) : (
+                bookings.map((booking) => (
+                  <tr
+                    key={booking.id}
+                    className="transition-colors hover:bg-[#f8f9fa]/80"
+                  >
+                    <td className="px-6 py-4 font-bold text-[#191c1d]">
+                      {booking.code}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-[#191c1d]">
+                      <div>{booking.customerName}</div>
+                      {booking.customerPhone && (
+                        <div className="text-xs text-[#575e70]">
+                          {booking.customerPhone}
+                        </div>
                       )}
-                      <span className="text-[11px] text-[#575e70]">
-                        {activity.timeAgo}
-                      </span>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+                    </td>
+                    <td className="px-6 py-4 text-[#575e70]">
+                      <span className="font-semibold text-[#191c1d]">
+                        {booking.fieldName}
+                      </span>{' '}
+                      <span>({booking.fieldType})</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-[#191c1d]">
+                          {booking.dateLabel}
+                        </span>
+                        <span className="text-xs text-[#575e70]">
+                          {booking.timeSlot}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 font-bold text-[#006e2f]">
+                      {formatVND(booking.finalPrice)}
+                    </td>
+                    <td className="px-6 py-4">
+                      {renderStatusBadge(booking.status)}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBooking(booking)}
+                        className="rounded-lg p-1.5 text-[#575e70] transition-colors hover:bg-[#e7e8e9] hover:text-[#006e2f]"
+                        title="Xem chi tiết đơn"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-      </div>
+      </section>
 
       {/* Quick View Modal for Pending Booking */}
       {selectedBooking && (
@@ -545,6 +458,14 @@ export default function AdminDashboardPage() {
                   </span>
                 </div>
               )}
+              {selectedBooking.customerEmail && (
+                <div className="flex justify-between">
+                  <span className="text-[#575e70]">Email:</span>
+                  <span className="font-medium text-[#191c1d]">
+                    {selectedBooking.customerEmail}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-[#575e70]">Sân bóng:</span>
                 <span className="font-semibold text-[#191c1d]">
@@ -563,11 +484,9 @@ export default function AdminDashboardPage() {
                   {formatVND(selectedBooking.finalPrice)}
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-[#575e70]">Trạng thái:</span>
-                <span className="inline-flex items-center rounded-full bg-[#ffdad6] px-2.5 py-0.5 text-xs font-semibold text-[#93000a]">
-                  {selectedBooking.statusLabel}
-                </span>
+                <span>{renderStatusBadge(selectedBooking.status)}</span>
               </div>
             </div>
 
