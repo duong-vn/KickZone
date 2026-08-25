@@ -7,6 +7,7 @@ import { Heart, MapPin, Star, Users } from 'lucide-react';
 import { Field } from '@/types/field';
 import { formatFieldTypeName } from '@/lib/utils';
 import {
+  useFavoriteStatusQuery,
   useFavoritesQuery,
   useToggleFavoriteMutation,
 } from '@/hooks/use-favorites';
@@ -64,16 +65,17 @@ export function FieldCard({
   showFavoriteButton = true,
 }: FieldCardProps) {
   const { data: favoritesData } = useFavoritesQuery();
-  const toggleFavMutation = useToggleFavoriteMutation(field?.id || '');
+  const { data: favoriteStatus } = useFavoriteStatusQuery(field.id, false);
+  const toggleFavMutation = useToggleFavoriteMutation(field.id);
 
   const isFavorited =
-    isFavorite !== undefined
-      ? isFavorite
-      : Boolean(
-          favoritesData?.data?.some(
-            (fav) => fav.field_id === field?.id || fav.field?.id === field?.id,
-          ),
-        );
+    isFavorite ??
+    favoriteStatus?.is_favorite ??
+    Boolean(
+      favoritesData?.data?.some(
+        (fav) => fav.field_id === field.id || fav.field?.id === field.id,
+      ),
+    );
 
   const [imgSrc, setImgSrc] = useState(
     field.primary_image_url || field.image || DEFAULT_FIELD_IMAGE,

@@ -35,7 +35,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import type { Review } from '@/types/review';
-import { CURRENT_USER, calculateReviewSummary } from '@/data/mock-reviews';
+import { calculateReviewSummary } from '@/data/mock-reviews';
 import {
   useFavoriteStatusQuery,
   useToggleFavoriteMutation,
@@ -47,6 +47,7 @@ import {
   DeleteReviewDialog,
 } from '@/components/reviews';
 import {
+  fetchAvailability,
   fetchFieldById,
   fetchFieldReviews,
   validateVoucherApi,
@@ -61,6 +62,13 @@ import {
 } from '@/lib/api';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 
+import {
+  businessDateKey,
+  durationMinutes as getDurationMinutes,
+  formatBusinessDate,
+  formatBusinessTime,
+  getContiguousAvailableSlots,
+} from '@/lib/booking-time';
 import { formatFieldTypeName } from '@/lib/utils';
 export { formatFieldTypeName };
 
@@ -104,75 +112,9 @@ const DEFAULT_RULES = [
   'Hủy hoặc thay đổi lịch đặt phải thực hiện trước giờ bắt đầu ít nhất 12 tiếng.',
 ];
 
-// Khung giờ 30 phút tiêu chuẩn
-const TIME_SLOTS_30MIN = [
-  '06:00',
-  '06:30',
-  '07:00',
-  '07:30',
-  '08:00',
-  '08:30',
-  '09:00',
-  '09:30',
-  '10:00',
-  '10:30',
-  '11:00',
-  '11:30',
-  '12:00',
-  '12:30',
-  '13:00',
-  '13:30',
-  '14:00',
-  '14:30',
-  '15:00',
-  '15:30',
-  '16:00',
-  '16:30',
-  '17:00',
-  '17:30',
-  '18:00',
-  '18:30',
-  '19:00',
-  '19:30',
-  '20:00',
-  '20:30',
-  '21:00',
-  '21:30',
-  '22:00',
-  '22:30',
-  '23:00',
-];
-
-const START_TIME_OPTIONS = TIME_SLOTS_30MIN.slice(0, -1); // 06:00 đến 22:30
-
-function getMinutesFromTime(time: string): number {
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
-function formatMinutesToTime(totalMinutes: number): string {
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function getTodayDateString(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
-
-function isTimePastToday(slot: string, dateStr: string): boolean {
-  const todayStr = getTodayDateString();
-  if (dateStr === todayStr) {
-    const now = new Date();
-    const [slotHour, slotMin] = slot.split(':').map(Number);
-    const currentHour = now.getHours();
-    const currentMin = now.getMinutes();
-
-    if (slotHour < currentHour) return true;
-    if (slotHour === currentHour && slotMin <= currentMin) return true;
-  }
-  return false;
+function dateKeyToLocalDate(date: string): Date {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day);
 }
 
 // Mini Calendar Component
@@ -183,9 +125,9 @@ function BookingCalendar({
   selectedDate: string;
   onSelectDate: (date: string) => void;
 }) {
-  const [currentMonth, setCurrentMonth] = useState(() => {
-    return selectedDate ? new Date(selectedDate) : new Date();
-  });
+  const [currentMonth, setCurrentMonth] = useState(() =>
+    dateKeyToLocalDate(selectedDate),
+  );
 
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -198,7 +140,7 @@ function BookingCalendar({
     setCurrentMonth(new Date(year, month + 1, 1));
   };
 
-  const todayStr = getTodayDateString();
+  const todayStr = businessDateKey(new Date());
 
   // First day of month & number of days
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -542,56 +484,61 @@ export default function FieldDetailPage({
     toggleFavoriteMutation.mutate();
   };
 
-  // 4. Booking Selection State
-  const [customSubPitchId, setCustomSubPitchId] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>(() =>
-    getTodayDateString(),
+  // 4. Booking selection uses the server's field-wide availability.
+  const [selectedDate, setSelectedDate] = useState(() =>
+    businessDateKey(new Date()),
   );
-  const [startTime, setStartTime] = useState<string>('18:00');
-  const [endTime, setEndTime] = useState<string>('19:30');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<{
     code: string;
     discount: number;
     discountType: 'PERCENT' | 'FIXED';
+    startTime: string;
+    endTime: string;
+    originalPrice: number;
   } | null>(null);
   const [isValidatingVoucher, setIsValidatingVoucher] = useState(false);
+  const availabilityQuery = useQuery({
+    queryKey: ['availability', fieldId, selectedDate],
+    queryFn: () => fetchAvailability(fieldId, selectedDate),
+    enabled: Boolean(field),
+    retry: false,
+  });
+  const availabilitySlots = useMemo(
+    () => availabilityQuery.data?.data.slots ?? [],
+    [availabilityQuery.data],
+  );
+  const startSlots = useMemo(
+    () => availabilitySlots.filter((slot) => slot.available),
+    [availabilitySlots],
+  );
+  const availabilityWindow = availabilitySlots.length
+    ? `${formatBusinessTime(availabilitySlots[0].startTime)} - ${formatBusinessTime(availabilitySlots[availabilitySlots.length - 1].endTime)}`
+    : null;
+  const selectedSlots = getContiguousAvailableSlots(
+    availabilitySlots,
+    startTime,
+    endTime || undefined,
+  );
+  const endSlots = startTime
+    ? getContiguousAvailableSlots(availabilitySlots, startTime)
+    : [];
+  const isSelectionValid = Boolean(endTime && selectedSlots.length > 0);
 
   // 5. Gallery state
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
   // 6. Review state & modals
-  const [localReviews, setLocalReviews] = useState<Review[] | null>(null);
+  const [localReviews] = useState<Review[] | null>(null);
   const [isWriteReviewOpen, setIsWriteReviewOpen] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [deletingReview, setDeletingReview] = useState<Review | null>(null);
 
-  // Field attributes & Sub-pitches
+  // Field attributes
   const fieldTypeName = formatFieldTypeName(field?.type);
-  const subPitches = useMemo(() => {
-    if (field?.subPitches && field.subPitches.length > 0) {
-      return field.subPitches;
-    }
-    const basePrice =
-      field?.base_price_per_hour || field?.basePricePerHour || 300000;
-    return [
-      {
-        id: `${fieldId}-1`,
-        name: `${fieldTypeName} - Sân A1 (Cỏ mới)`,
-        type: fieldTypeName,
-        pricePerHour: basePrice,
-      },
-      {
-        id: `${fieldId}-2`,
-        name: `${fieldTypeName} - Sân A2 (Tiêu chuẩn)`,
-        type: fieldTypeName,
-        pricePerHour: basePrice,
-      },
-    ];
-  }, [field, fieldId, fieldTypeName]);
-
-  const selectedSubPitchId = customSubPitchId ?? subPitches[0]?.id ?? '';
 
   // Reviews merged list
   const reviewsList = useMemo(() => {
@@ -648,46 +595,41 @@ export default function FieldDetailPage({
     ];
   }, [field]);
 
-  // Pricing calculations
-  const currentSubPitch = useMemo(
-    () => subPitches.find((p) => p.id === selectedSubPitchId) || subPitches[0],
-    [subPitches, selectedSubPitchId],
-  );
-
-  const pricePerHour =
-    currentSubPitch?.pricePerHour ||
-    field?.base_price_per_hour ||
-    field?.basePricePerHour ||
-    300000;
-
-  // Duration in hours
-  const startMins = getMinutesFromTime(startTime);
-  const endMins = getMinutesFromTime(endTime);
-  const durationMinutes = Math.max(0, endMins - startMins);
+  const durationMinutes = isSelectionValid
+    ? getDurationMinutes(startTime, endTime)
+    : 0;
   const durationHours = durationMinutes / 60;
-  const originalPrice = Math.round(durationHours * pricePerHour);
-
-  const discountAmount = useMemo(() => {
-    if (!appliedVoucher || originalPrice <= 0) return 0;
-    return appliedVoucher.discount;
-  }, [appliedVoucher, originalPrice]);
-
+  const originalPrice = selectedSlots.reduce((sum, slot) => sum + slot.price, 0);
+  const activeVoucher =
+    appliedVoucher?.startTime === startTime &&
+    appliedVoucher.endTime === endTime &&
+    appliedVoucher.originalPrice === originalPrice
+      ? appliedVoucher
+      : null;
+  const discountAmount = activeVoucher?.discount ?? 0;
   const finalPrice = Math.max(0, originalPrice - discountAmount);
 
-  // Auto adjust endTime if user changes startTime to something >= endTime
-  const handleStartTimeChange = (newStart: string) => {
-    setStartTime(newStart);
-    const newStartMins = getMinutesFromTime(newStart);
-    if (newStartMins >= endMins) {
-      const nextMins = Math.min(23 * 60, newStartMins + 90); // default to 90 mins
-      setEndTime(formatMinutesToTime(nextMins));
-    }
+  const handleDateChange = (date: string) => {
+    setSelectedDate(date);
+    setStartTime('');
+    setEndTime('');
+    setAppliedVoucher(null);
   };
 
-  // Quick duration selection (e.g. 60m, 90m, 120m)
+  const handleStartTimeChange = (newStart: string) => {
+    const slots = getContiguousAvailableSlots(availabilitySlots, newStart);
+    setStartTime(newStart);
+    setEndTime(slots[0]?.endTime ?? '');
+    setAppliedVoucher(null);
+  };
+
   const handleSetQuickDuration = (minutes: number) => {
-    const nextMins = Math.min(23 * 60, startMins + minutes);
-    setEndTime(formatMinutesToTime(nextMins));
+    const slot = endSlots.find(
+      (item) => getDurationMinutes(startTime, item.endTime) === minutes,
+    );
+    if (!slot) return;
+    setEndTime(slot.endTime);
+    setAppliedVoucher(null);
   };
 
   // Voucher validation against real API
@@ -711,6 +653,9 @@ export default function FieldDetailPage({
           code: result.code || code,
           discount: result.discountAmount,
           discountType: result.discountType || 'FIXED',
+          startTime,
+          endTime,
+          originalPrice,
         });
         toast.success(
           result.message ||
@@ -729,48 +674,28 @@ export default function FieldDetailPage({
     }
   };
 
-  const handleProceedToCheckout = () => {
-    if (!field) return;
-
-    if (durationMinutes <= 0) {
-      toast.error('Giờ kết thúc phải lớn hơn giờ bắt đầu.');
+  const handleProceedToCheckout = async () => {
+    if (!field || !isSelectionValid) {
+      toast.error('Vui lòng chọn khung giờ còn trống.');
       return;
     }
 
-    if (isTimePastToday(startTime, selectedDate)) {
-      toast.error(
-        'Khung giờ bạn chọn đã trôi qua trong ngày hôm nay. Vui lòng chọn giờ khác.',
-      );
+    const freshAvailability = await availabilityQuery.refetch();
+    const freshSlots = freshAvailability.data?.data.slots ?? [];
+    if (!getContiguousAvailableSlots(freshSlots, startTime, endTime).length) {
+      setStartTime('');
+      setEndTime('');
+      setAppliedVoucher(null);
+      toast.error('Khung giờ vừa không còn trống. Vui lòng chọn giờ khác.');
       return;
     }
-
-    const startISO = `${selectedDate}T${startTime}:00+07:00`;
-    const endISO = `${selectedDate}T${endTime}:00+07:00`;
-
-    const dateObj = new Date(selectedDate);
-    const dateDisplay = dateObj.toLocaleDateString('vi-VN', {
-      weekday: 'long',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
 
     const queryParams = new URLSearchParams({
       fieldId: field.id,
-      fieldName: field.name,
-      fieldAddress: field.address,
-      fieldType: formatFieldTypeName(field.type),
-      courtName: currentSubPitch?.name || 'Sân tiêu chuẩn',
-      date: selectedDate,
-      dateDisplay,
-      startTime: startISO,
-      endTime: endISO,
-      durationHours: String(durationHours),
-      pricePerHour: String(pricePerHour),
-      fieldImage: fieldImages[0] || '',
-      voucher: appliedVoucher ? appliedVoucher.code : '',
+      startTime,
+      endTime,
+      voucher: activeVoucher?.code ?? '',
     });
-
     router.push(`/checkout?${queryParams.toString()}`);
   };
 
@@ -915,15 +840,8 @@ export default function FieldDetailPage({
     );
   }
 
-  // Vietnamese date string for display
-  const displaySelectedDateVN = new Date(selectedDate).toLocaleDateString(
-    'vi-VN',
-    {
-      weekday: 'long',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    },
+  const displaySelectedDateVN = formatBusinessDate(
+    `${selectedDate}T12:00:00+07:00`,
   );
 
   return (
@@ -1384,68 +1302,35 @@ export default function FieldDetailPage({
           {/* RIGHT COLUMN: 4 COLS STICKY BOOKING WIDGET */}
           <div className="lg:col-span-4">
             <div className="sticky top-24 bg-white p-6 rounded-3xl border border-[#bccbb9]/40 shadow-xl space-y-5">
-              {/* Header Price Info */}
               <div className="flex items-baseline justify-between border-b border-[#bccbb9]/30 pb-4">
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-[#575e70] block">
-                    Giá thuê sân
+                    Đặt sân
                   </span>
-                  <div className="flex items-baseline gap-1">
-                    <span className="font-['Manrope'] text-2xl sm:text-3xl font-black text-[#006e2f]">
-                      {pricePerHour.toLocaleString('vi-VN')}đ
-                    </span>
-                    <span className="text-xs text-[#575e70]">/giờ</span>
-                  </div>
+                  <span className="font-['Manrope'] text-lg font-black text-[#006e2f]">
+                    Lịch chung của sân
+                  </span>
                 </div>
                 <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#006e2f]/10 text-[#006e2f]">
                   {fieldTypeName}
                 </span>
               </div>
 
-              {/* Step 1: Chọn sân con */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#191c1d] mb-2">
-                  1. Chọn sân thi đấu
-                </label>
-                <div className="space-y-1.5">
-                  {subPitches.map((p) => {
-                    const isSelected = selectedSubPitchId === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setCustomSubPitchId(p.id)}
-                        className={`w-full text-left p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center justify-between ${
-                          isSelected
-                            ? 'border-[#006e2f] bg-[#006e2f]/5 text-[#006e2f] ring-1 ring-[#006e2f]'
-                            : 'border-[#bccbb9]/50 hover:bg-[#f8f9fa] text-[#191c1d]'
-                        }`}
-                      >
-                        <span className="truncate pr-2">{p.name}</span>
-                        <span className="text-[11px] font-bold shrink-0">
-                          {p.pricePerHour.toLocaleString('vi-VN')}đ/h
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Step 2: Chọn ngày thi đấu bằng Calendar */}
+              {/* Step 1: Chọn ngày thi đấu bằng Calendar */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-[#191c1d] flex items-center gap-1.5">
                     <CalendarIcon className="w-3.5 h-3.5 text-[#006e2f]" />
-                    <span>2. Chọn ngày đặt sân</span>
+                    <span>1. Chọn ngày đặt sân</span>
                   </label>
                   <span className="text-[11px] font-semibold text-[#006e2f]">
-                    {selectedDate === getTodayDateString() ? 'Hôm nay' : ''}
+                    {selectedDate === businessDateKey(new Date()) ? 'Hôm nay' : ''}
                   </span>
                 </div>
 
                 <BookingCalendar
                   selectedDate={selectedDate}
-                  onSelectDate={(date) => setSelectedDate(date)}
+                  onSelectDate={handleDateChange}
                 />
 
                 <p className="text-[11px] text-[#575e70] mt-1.5 px-1 font-medium capitalize">
@@ -1453,104 +1338,126 @@ export default function FieldDetailPage({
                 </p>
               </div>
 
-              {/* Step 3: Chọn khung giờ bằng Dropdown Menu */}
+              {/* Step 2: Chọn khung giờ từ lịch thực tế */}
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-[#191c1d] flex items-center gap-1.5 mb-2">
                   <ClockIcon className="w-3.5 h-3.5 text-[#006e2f]" />
-                  <span>3. Chọn khung giờ thi đấu</span>
+                  <span>2. Chọn khung giờ thi đấu</span>
                 </label>
 
-                <div className="grid grid-cols-2 gap-2 mb-2.5">
-                  {/* Dropdown Giờ Bắt Đầu */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-[#575e70] uppercase mb-1">
-                      Giờ bắt đầu
-                    </label>
-                    <select
-                      value={startTime}
-                      onChange={(e) => handleStartTimeChange(e.target.value)}
-                      className="w-full px-2.5 py-2 text-xs font-bold border border-[#bccbb9]/60 rounded-xl bg-white text-[#191c1d] focus:outline-none focus:ring-2 focus:ring-[#006e2f]/20 cursor-pointer"
+                {availabilityQuery.isLoading || availabilityQuery.isFetching ? (
+                  <p className="rounded-xl bg-[#f8f9fa] p-3 text-xs text-[#575e70]">
+                    Đang tải lịch trống...
+                  </p>
+                ) : availabilityQuery.isError ? (
+                  <div className="rounded-xl bg-rose-50 p-3 text-xs text-rose-700">
+                    Không thể tải lịch trống.{' '}
+                    <button
+                      type="button"
+                      onClick={() => void availabilityQuery.refetch()}
+                      className="font-bold underline"
                     >
-                      {START_TIME_OPTIONS.map((slot) => {
-                        const isPast = isTimePastToday(slot, selectedDate);
+                      Thử lại
+                    </button>
+                  </div>
+                ) : !availabilitySlots.length ? (
+                  <p className="rounded-xl bg-[#f8f9fa] p-3 text-xs text-[#575e70]">
+                    Sân đóng cửa vào ngày này.
+                  </p>
+                ) : !startSlots.length ? (
+                  <p className="rounded-xl bg-[#f8f9fa] p-3 text-xs text-[#575e70]">
+                    Không còn khung giờ trống trong ngày này.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mb-2 text-[11px] text-[#575e70]">
+                      {startSlots.length} khung giờ trống · Mở cửa {availabilityWindow}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 mb-2.5">
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#575e70] uppercase mb-1">
+                          Giờ bắt đầu
+                        </label>
+                        <select
+                          value={startTime}
+                          onChange={(event) => handleStartTimeChange(event.target.value)}
+                          className="w-full px-2.5 py-2 text-xs font-bold border border-[#bccbb9]/60 rounded-xl bg-white text-[#191c1d] focus:outline-none focus:ring-2 focus:ring-[#006e2f]/20 cursor-pointer"
+                        >
+                          <option value="" disabled>
+                            Chọn giờ
+                          </option>
+                          {startSlots.map((slot) => (
+                            <option key={slot.startTime} value={slot.startTime}>
+                              {formatBusinessTime(slot.startTime)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#575e70] uppercase mb-1">
+                          Giờ kết thúc
+                        </label>
+                        <select
+                          value={endTime}
+                          onChange={(event) => {
+                            setEndTime(event.target.value);
+                            setAppliedVoucher(null);
+                          }}
+                          disabled={!endSlots.length}
+                          className="w-full px-2.5 py-2 text-xs font-bold border border-[#bccbb9]/60 rounded-xl bg-white text-[#191c1d] focus:outline-none focus:ring-2 focus:ring-[#006e2f]/20 cursor-pointer disabled:bg-[#edeeef]"
+                        >
+                          <option value="" disabled>
+                            Chọn giờ
+                          </option>
+                          {endSlots.map((slot) => (
+                            <option key={slot.endTime} value={slot.endTime}>
+                              {formatBusinessTime(slot.endTime)} ({getDurationMinutes(startTime, slot.endTime)}p)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="text-[10px] text-[#575e70] font-semibold">
+                        Nhanh:
+                      </span>
+                      {[60, 90, 120].map((minutes) => {
+                        const available = endSlots.some(
+                          (slot) =>
+                            getDurationMinutes(startTime, slot.endTime) === minutes,
+                        );
                         return (
-                          <option
-                            key={slot}
-                            value={slot}
-                            disabled={isPast}
-                            className={isPast ? 'text-gray-400' : ''}
+                          <button
+                            key={minutes}
+                            type="button"
+                            onClick={() => handleSetQuickDuration(minutes)}
+                            disabled={!available}
+                            className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all border disabled:cursor-not-allowed disabled:opacity-40 ${
+                              durationMinutes === minutes
+                                ? 'bg-[#006e2f] text-white border-[#006e2f]'
+                                : 'bg-white border-[#bccbb9]/50 text-[#575e70] hover:border-[#006e2f] hover:text-[#006e2f]'
+                            }`}
                           >
-                            {slot} {isPast ? '(Đã qua)' : ''}
-                          </option>
+                            {minutes} phút
+                          </button>
                         );
                       })}
-                    </select>
-                  </div>
+                    </div>
 
-                  {/* Dropdown Giờ Kết Thúc */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-[#575e70] uppercase mb-1">
-                      Giờ kết thúc
-                    </label>
-                    <select
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      className="w-full px-2.5 py-2 text-xs font-bold border border-[#bccbb9]/60 rounded-xl bg-white text-[#191c1d] focus:outline-none focus:ring-2 focus:ring-[#006e2f]/20 cursor-pointer"
-                    >
-                      {TIME_SLOTS_30MIN.filter(
-                        (slot) =>
-                          getMinutesFromTime(slot) >
-                          getMinutesFromTime(startTime),
-                      ).map((slot) => {
-                        const mins =
-                          getMinutesFromTime(slot) -
-                          getMinutesFromTime(startTime);
-                        return (
-                          <option key={slot} value={slot}>
-                            {slot} ({mins}p)
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Quick duration buttons */}
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span className="text-[10px] text-[#575e70] font-semibold">
-                    Nhanh:
-                  </span>
-                  {[60, 90, 120].map((mins) => {
-                    const isSelected = durationMinutes === mins;
-                    return (
-                      <button
-                        key={mins}
-                        type="button"
-                        onClick={() => handleSetQuickDuration(mins)}
-                        className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer border ${
-                          isSelected
-                            ? 'bg-[#006e2f] text-white border-[#006e2f]'
-                            : 'bg-white border-[#bccbb9]/50 text-[#575e70] hover:border-[#006e2f] hover:text-[#006e2f]'
-                        }`}
-                      >
-                        {mins} phút
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Selected time summary badge */}
-                <div className="p-2 rounded-xl bg-[#006e2f]/5 border border-[#006e2f]/20 flex items-center justify-between text-xs text-[#006e2f] font-semibold">
-                  <span>
-                    Khung giờ:{' '}
-                    <strong>
-                      {startTime} - {endTime}
-                    </strong>
-                  </span>
-                  <span className="font-bold">
-                    {durationMinutes} phút ({durationHours}h)
-                  </span>
-                </div>
+                    {isSelectionValid && (
+                      <div className="p-2 rounded-xl bg-[#006e2f]/5 border border-[#006e2f]/20 flex items-center justify-between text-xs text-[#006e2f] font-semibold">
+                        <span>
+                          Khung giờ: <strong>{formatBusinessTime(startTime)} - {formatBusinessTime(endTime)}</strong>
+                        </span>
+                        <span className="font-bold">
+                          {durationMinutes} phút ({durationHours}h)
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Step 4: Voucher Input */}
@@ -1578,9 +1485,9 @@ export default function FieldDetailPage({
                     {isValidatingVoucher ? 'Kiểm tra...' : 'Áp dụng'}
                   </Button>
                 </div>
-                {appliedVoucher && (
+                {activeVoucher && (
                   <div className="mt-1.5 text-xs text-[#006e2f] flex items-center justify-between font-semibold">
-                    <span>Mã &quot;{appliedVoucher.code}&quot; đã áp dụng</span>
+                    <span>Mã &quot;{activeVoucher.code}&quot; đã áp dụng</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -1603,13 +1510,7 @@ export default function FieldDetailPage({
                     {durationHours} giờ ({durationMinutes} phút)
                   </span>
                 </div>
-                <div className="flex justify-between text-[#575e70]">
-                  <span>Đơn giá sân:</span>
-                  <span className="font-semibold text-[#191c1d]">
-                    {pricePerHour.toLocaleString('vi-VN')}đ/h
-                  </span>
-                </div>
-                {appliedVoucher && (
+                {activeVoucher && (
                   <div className="flex justify-between text-[#006e2f] font-semibold">
                     <span>Giảm giá voucher:</span>
                     <span>-{discountAmount.toLocaleString('vi-VN')}đ</span>
@@ -1628,16 +1529,18 @@ export default function FieldDetailPage({
               {/* Submit CTA */}
               <Button
                 type="button"
-                onClick={handleProceedToCheckout}
-                disabled={durationMinutes <= 0}
+                onClick={() => void handleProceedToCheckout()}
+                disabled={!isSelectionValid || availabilityQuery.isFetching}
                 className="w-full bg-[#006e2f] hover:bg-[#004b1e] disabled:bg-[#bccbb9] text-white font-bold py-3 rounded-2xl transition-all active:scale-98 shadow-sm flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>
-                  {durationMinutes <= 0
-                    ? 'Khung giờ không hợp lệ'
-                    : 'Tiến hành đặt sân'}
+                  {availabilityQuery.isFetching
+                    ? 'Đang kiểm tra lịch...'
+                    : isSelectionValid
+                      ? 'Tiến hành đặt sân'
+                      : 'Chọn khung giờ còn trống'}
                 </span>
-                {durationMinutes > 0 && <ArrowRight className="w-4 h-4" />}
+                {isSelectionValid && !availabilityQuery.isFetching && <ArrowRight className="w-4 h-4" />}
               </Button>
             </div>
           </div>

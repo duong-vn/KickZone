@@ -7,14 +7,16 @@ import './globals.css';
 
 const inter = Inter({
   subsets: ['latin', 'vietnamese'],
-  weight: ['400', '600'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-inter',
+  display: 'swap',
 });
 
 const manrope = Manrope({
   subsets: ['latin', 'vietnamese'],
-  weight: ['600', '700', '800'],
+  weight: ['400', '500', '600', '700', '800'],
   variable: '--font-manrope',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {

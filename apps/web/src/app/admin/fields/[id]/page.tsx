@@ -3,117 +3,116 @@
 
 import React, { useState, use, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchAdminFieldById,
   updateAdminFieldStatus,
   updateAdminField,
+  deleteAdminField,
 } from '@/lib/api';
 import {
   ArrowLeft,
   Edit,
   Trash2,
-  Clock,
   MapPin,
   CheckCircle2,
   X,
-  Check,
   Calendar,
   AlertTriangle,
-  Receipt,
-  Plus,
   Ban,
+  Car,
+  Droplets,
+  Shirt,
+  Wifi,
+  Lightbulb,
+  Coffee,
+  Check,
+  Star,
+  ShieldAlert,
+  Sliders,
+  ChevronRight,
+  Info,
 } from 'lucide-react';
-
-// Types aligned with database/init.sql
-export interface PriceRuleItem {
-  id: string;
-  fieldId: string;
-  name: string;
-  daysDisplay: string;
-  daysOfWeek: number[]; // [1, 2, 3, 4, 5] (0 = Sunday, 1 = Monday...)
-  startTime: string; // '06:00'
-  endTime: string; // '17:00'
-  pricePerHour: number; // 200000
-  isActive: boolean;
-}
 
 export interface FieldDetailFullData {
   id: string;
   name: string;
+  slug?: string;
   fieldType: string; // '5-a-side' | '7-a-side' | '11-a-side'
   fieldTypeLabel: string; // 'Sân 5 người'
   dimensions: string; // '20m x 40m'
   status: 'ACTIVE' | 'INACTIVE';
   address: string;
+  district?: string;
+  city?: string;
   basePricePerHour: number;
   upcomingBookingsCount: number;
   description: string;
   imageUrl: string;
   images?: string[];
-  priceRules: PriceRuleItem[];
 }
 
-const MOCK_FIELD_DATA: FieldDetailFullData = {
+const DEFAULT_AMENITIES = [
+  {
+    icon: Car,
+    label: 'Bãi giữ xe rộng rãi',
+    desc: 'Có chỗ đỗ ô tô và xe máy an toàn',
+  },
+  {
+    icon: Droplets,
+    label: 'Nước uống phục vụ',
+    desc: 'Trà đá và nước mát giải khát',
+  },
+  {
+    icon: Shirt,
+    label: 'Phòng thay đồ & Tủ khóa',
+    desc: 'Khu vực thay đồ sạch sẽ, có tủ gửi đồ',
+  },
+  {
+    icon: Wifi,
+    label: 'Wifi miễn phí',
+    desc: 'Phủ sóng toàn bộ khuôn viên sân',
+  },
+  {
+    icon: Lightbulb,
+    label: 'Dàn đèn LED cao áp',
+    desc: 'Độ sáng đạt chuẩn thi đấu ban đêm',
+  },
+  {
+    icon: Coffee,
+    label: 'Căn tin giải khát',
+    desc: 'Phục vụ nước uống và đồ ăn nhẹ',
+  },
+];
+
+const DEFAULT_RULES = [
+  'Vui lòng sử dụng giày đế TF (đinh dăm) hoặc IC (futsal), nghiêm cấm giày đinh sắt SG.',
+  'Đến trước giờ thi đấu 10-15 phút để chuẩn bị và làm thủ tục nhận sân.',
+  'Nghiêm cấm hút thuốc, xả rác bừa bãi và mang chất dễ cháy nổ vào sân.',
+  'Hủy hoặc thay đổi lịch đặt phải thực hiện trước giờ bắt đầu ít nhất 12 tiếng.',
+];
+
+const MOCK_FIELD_FALLBACK: FieldDetailFullData = {
   id: 'f-1',
-  name: 'Sân bóng Mini Lam Sơn 1',
-  fieldType: '5-a-side',
-  fieldTypeLabel: 'Sân 5 người',
-  dimensions: '20m x 40m',
+  name: 'Sân bóng KickZone',
+  fieldType: '7-a-side',
+  fieldTypeLabel: 'Sân 7 người',
+  dimensions: '30m x 50m',
   status: 'ACTIVE',
-  address: '320/1 Trần Bình Trọng, Quận 5, TP. HCM',
-  basePricePerHour: 250000,
-  upcomingBookingsCount: 12,
+  address: 'Hồ Chí Minh',
+  basePricePerHour: 300000,
+  upcomingBookingsCount: 0,
   description:
-    'Sân cỏ nhân tạo chất lượng cao, hệ thống thoát nước chuẩn, dàn đèn LED chiếu sáng ban đêm cực sáng. Phù hợp cho các trận đấu giao hữu 5 người và rèn luyện thể thao.',
+    'Sân cỏ nhân tạo chất lượng cao đạt chuẩn thi đấu, hệ thống thoát nước hiện đại và dàn đèn LED chiếu sáng ban đêm cực sáng. Phù hợp cho các giải đấu và rèn luyện thể thao.',
   imageUrl:
-    'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=800&auto=format&fit=crop&q=80',
-  priceRules: [
-    {
-      id: 'pr-1',
-      fieldId: 'f-1',
-      name: 'Ngày thường - Ban ngày',
-      daysDisplay: 'Thứ 2 - Thứ 6',
-      daysOfWeek: [1, 2, 3, 4, 5],
-      startTime: '06:00',
-      endTime: '17:00',
-      pricePerHour: 200000,
-      isActive: true,
-    },
-    {
-      id: 'pr-2',
-      fieldId: 'f-1',
-      name: 'Ngày thường - Buổi tối',
-      daysDisplay: 'Thứ 2 - Thứ 6',
-      daysOfWeek: [1, 2, 3, 4, 5],
-      startTime: '17:00',
-      endTime: '22:00',
-      pricePerHour: 250000,
-      isActive: true,
-    },
-    {
-      id: 'pr-3',
-      fieldId: 'f-1',
-      name: 'Cuối tuần',
-      daysDisplay: 'Thứ 7 - CN',
-      daysOfWeek: [6, 0],
-      startTime: '06:00',
-      endTime: '22:00',
-      pricePerHour: 300000,
-      isActive: true,
-    },
+    'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=1200&auto=format&fit=crop&q=80',
+  images: [
+    'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=1200&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1551958219-acbc608c6377?w=800&auto=format&fit=crop&q=80',
   ],
 };
-
-const DAY_OPTIONS = [
-  { label: 'Thứ 2', value: 1 },
-  { label: 'Thứ 3', value: 2 },
-  { label: 'Thứ 4', value: 3 },
-  { label: 'Thứ 5', value: 4 },
-  { label: 'Thứ 6', value: 5 },
-  { label: 'Thứ 7', value: 6 },
-  { label: 'Chủ Nhật', value: 0 },
-];
 
 export default function AdminFieldDetailPage({
   params,
@@ -122,6 +121,7 @@ export default function AdminFieldDetailPage({
 }) {
   const resolvedParams = use(params);
   const fieldId = resolvedParams.id;
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   const { data: apiField, isLoading } = useQuery({
@@ -132,41 +132,35 @@ export default function AdminFieldDetailPage({
 
   const [localField, setLocalField] =
     useState<Partial<FieldDetailFullData> | null>(null);
+
   const field: FieldDetailFullData = useMemo(() => {
     return {
-      ...MOCK_FIELD_DATA,
+      ...MOCK_FIELD_FALLBACK,
       ...(apiField || {}),
       ...(localField || {}),
       id: fieldId,
     };
   }, [apiField, localField, fieldId]);
 
+  // Active image index for gallery
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const allImages = useMemo(() => {
+    if (field.images && field.images.length > 0) return field.images;
+    if (field.imageUrl) return [field.imageUrl];
+    return [MOCK_FIELD_FALLBACK.imageUrl];
+  }, [field]);
+
   // Modal states
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditFieldModalOpen, setIsEditFieldModalOpen] = useState(false);
-  const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
-  const [editingPriceRule, setEditingPriceRule] =
-    useState<PriceRuleItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Field Edit Form State
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
-  const [editDimensions, setEditDimensions] = useState('20m x 40m');
+  const [editDimensions, setEditDimensions] = useState('30m x 50m');
   const [editPrice, setEditPrice] = useState('300000');
   const [editDesc, setEditDesc] = useState('');
-
-  // Price Rule Form State
-  const [ruleName, setRuleName] = useState('');
-  const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]);
-  const [startTime, setStartTime] = useState('06:00');
-  const [endTime, setEndTime] = useState('17:00');
-  const [priceInput, setPriceInput] = useState('200000');
-  const [isRuleActive, setIsRuleActive] = useState(true);
-
-  const formatVND = (value: number) => {
-    return new Intl.NumberFormat('vi-VN').format(value) + 'đ/h';
-  };
 
   const formatVNDPrice = (value: number) => {
     return new Intl.NumberFormat('vi-VN').format(value) + ' đ';
@@ -175,6 +169,16 @@ export default function AdminFieldDetailPage({
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  // Open Edit Modal with current values
+  const handleOpenEditModal = () => {
+    setEditName(field.name);
+    setEditAddress(field.address);
+    setEditDimensions(field.dimensions || '30m x 50m');
+    setEditPrice(String(field.basePricePerHour));
+    setEditDesc(field.description || '');
+    setIsEditFieldModalOpen(true);
   };
 
   // Toggle field status (Active / Disabled)
@@ -199,182 +203,51 @@ export default function AdminFieldDetailPage({
   // Save Field Info
   const handleSaveFieldInfo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!field) return;
-    const priceNum = parseInt(editPrice, 10) || field.basePricePerHour;
-    const updatedData = {
+    if (!editName.trim()) {
+      showToast('Vui lòng nhập tên sân');
+      return;
+    }
+
+    const priceNum = Number(editPrice) || 300000;
+    const updatedPayload = {
       name: editName,
       address: editAddress,
       basePricePerHour: priceNum,
       description: editDesc,
     };
+
     setLocalField((prev) => ({
       ...(prev || {}),
-      ...updatedData,
+      name: editName,
+      address: editAddress,
       dimensions: editDimensions,
+      basePricePerHour: priceNum,
+      description: editDesc,
     }));
+
     try {
-      await updateAdminField(fieldId, updatedData);
+      await updateAdminField(fieldId, updatedPayload);
       queryClient.invalidateQueries({ queryKey: ['admin-field', fieldId] });
       queryClient.invalidateQueries({ queryKey: ['admin-fields'] });
-      setIsEditFieldModalOpen(false);
       showToast('Cập nhật thông tin sân bóng thành công!');
+      setIsEditFieldModalOpen(false);
     } catch (err) {
       showToast(`Lỗi cập nhật: ${(err as Error).message}`);
     }
   };
 
-  // Price Rule Actions
-  const handleOpenCreatePriceModal = () => {
-    setEditingPriceRule(null);
-    setRuleName('');
-    setSelectedDays([1, 2, 3, 4, 5]);
-    setStartTime('06:00');
-    setEndTime('17:00');
-    setPriceInput('200000');
-    setIsRuleActive(true);
-    setIsPriceModalOpen(true);
-  };
-
-  const handleOpenEditPriceModal = (rule: PriceRuleItem) => {
-    setEditingPriceRule(rule);
-    setRuleName(rule.name);
-    setSelectedDays(rule.daysOfWeek);
-    setStartTime(rule.startTime);
-    setEndTime(rule.endTime);
-    setPriceInput(rule.pricePerHour.toString());
-    setIsRuleActive(rule.isActive);
-    setIsPriceModalOpen(true);
-  };
-
-  const handleDeletePriceRule = (ruleId: string) => {
-    if (confirm('Bạn có chắc chắn muốn xóa mức giá này?')) {
-      setLocalField((prev) => ({
-        ...(prev || {}),
-        priceRules: (prev?.priceRules || field.priceRules).filter(
-          (r) => r.id !== ruleId,
-        ),
-      }));
-      showToast('Đã xóa mức giá.');
+  // Delete Field
+  const handleConfirmDelete = async () => {
+    try {
+      await deleteAdminField(fieldId);
+      queryClient.invalidateQueries({ queryKey: ['admin-fields'] });
+      showToast('Đã xóa sân bóng thành công.');
+      setIsDeleteModalOpen(false);
+      router.push('/admin/fields');
+    } catch (err) {
+      showToast(`Không thể xóa sân: ${(err as Error).message}`);
     }
   };
-
-  const toggleDay = (dayVal: number) => {
-    setSelectedDays((prev) =>
-      prev.includes(dayVal)
-        ? prev.filter((d) => d !== dayVal)
-        : [...prev, dayVal],
-    );
-  };
-
-  const handleSavePriceRule = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!ruleName.trim()) {
-      alert('Vui lòng nhập tên mức giá.');
-      return;
-    }
-    if (selectedDays.length === 0) {
-      alert('Vui lòng chọn ít nhất một ngày áp dụng.');
-      return;
-    }
-
-    const priceNumber = parseInt(priceInput, 10) || 0;
-
-    let daysLabel = 'Tùy chỉnh';
-    if (
-      selectedDays.length === 5 &&
-      [1, 2, 3, 4, 5].every((d) => selectedDays.includes(d))
-    ) {
-      daysLabel = 'Thứ 2 - Thứ 6';
-    } else if (
-      selectedDays.length === 2 &&
-      [6, 0].every((d) => selectedDays.includes(d))
-    ) {
-      daysLabel = 'Thứ 7 - CN';
-    } else if (selectedDays.length === 7) {
-      daysLabel = 'Cả tuần';
-    }
-
-    if (editingPriceRule) {
-      setLocalField((prev) => ({
-        ...(prev || {}),
-        priceRules: (prev?.priceRules || field.priceRules).map((r) =>
-          r.id === editingPriceRule.id
-            ? {
-                ...r,
-                name: ruleName,
-                daysDisplay: daysLabel,
-                daysOfWeek: selectedDays,
-                startTime,
-                endTime,
-                pricePerHour: priceNumber,
-                isActive: isRuleActive,
-              }
-            : r,
-        ),
-      }));
-      showToast(`Đã cập nhật mức giá "${ruleName}"!`);
-    } else {
-      const newRule: PriceRuleItem = {
-        id: `pr-${Date.now()}`,
-        fieldId: field.id,
-        name: ruleName,
-        daysDisplay: daysLabel,
-        daysOfWeek: selectedDays,
-        startTime,
-        endTime,
-        pricePerHour: priceNumber,
-        isActive: isRuleActive,
-      };
-      setLocalField((prev) => ({
-        ...(prev || {}),
-        priceRules: [...(prev?.priceRules || field.priceRules), newRule],
-      }));
-      showToast(`Đã thêm mức giá "${ruleName}"!`);
-    }
-
-    setIsPriceModalOpen(false);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="mx-auto w-full max-w-7xl space-y-6">
-        <div className="h-6 w-32 bg-slate-200 animate-pulse rounded" />
-        <div className="flex justify-between items-center">
-          <div className="space-y-2">
-            <div className="h-8 w-64 bg-slate-200 animate-pulse rounded" />
-            <div className="h-4 w-48 bg-slate-200 animate-pulse rounded" />
-          </div>
-          <div className="h-10 w-32 bg-slate-200 animate-pulse rounded-xl" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 h-96 bg-slate-200 animate-pulse rounded-2xl" />
-          <div className="h-96 bg-slate-200 animate-pulse rounded-2xl" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!apiField && fieldId !== 'f-1') {
-    return (
-      <div className="mx-auto w-full max-w-7xl py-16 flex flex-col items-center justify-center text-center">
-        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4 text-slate-400">
-          <Ban className="w-8 h-8" />
-        </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-2">
-          Không tìm thấy sân bóng
-        </h2>
-        <p className="text-slate-500 text-sm max-w-md mb-6">
-          Sân bóng không tồn tại hoặc đã bị xóa khỏi hệ thống.
-        </p>
-        <Link
-          href="/admin/fields"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
-        </Link>
-      </div>
-    );
-  }
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -395,533 +268,375 @@ export default function AdminFieldDetailPage({
         </div>
       )}
 
-      {/* Back Link */}
-      <div>
-        <Link
-          href="/admin/fields"
-          className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-[#575e70] transition-colors hover:text-[#006e2f]"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Quay lại danh sách</span>
-        </Link>
-      </div>
-
-      {/* Field Summary Card */}
-      <div className="overflow-hidden rounded-2xl border border-[#bccbb9] bg-white shadow-sm flex flex-col md:flex-row">
-        {/* Pitch Image with Status Badge */}
-        <div className="relative h-64 md:h-auto md:w-1/3 shrink-0">
-          <img
-            src={field.imageUrl}
-            alt={field.name}
-            className="h-full w-full object-cover"
-          />
-          <div className="absolute left-4 top-4 flex items-center gap-1.5 rounded-full border border-[#c8e6c9] bg-[#e8f5e9] px-3 py-1 text-xs font-bold text-[#2e7d32] shadow-sm">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            <span>
-              {field.status === 'ACTIVE' ? 'Đang hoạt động' : 'Vô hiệu hóa'}
-            </span>
-          </div>
-        </div>
-
-        {/* Info & Metrics Grid */}
-        <div className="flex flex-1 flex-col justify-between p-6 md:w-2/3">
+      {/* Top Header & Breadcrumb Navigation */}
+      <div className="flex flex-col items-start justify-between gap-4 border-b border-[#bccbb9]/50 pb-4 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/fields"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#bccbb9] bg-white text-[#575e70] transition-colors hover:bg-[#e7e8e9] hover:text-[#191c1d]"
+            title="Quay lại danh sách"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
           <div>
-            <div className="mb-2 flex items-start justify-between">
-              <h3 className="font-(family-name:--font-manrope) text-xl sm:text-2xl font-bold text-[#191c1d]">
+            <div className="flex items-center gap-2">
+              <h2 className="font-(family-name:--font-manrope) text-2xl font-bold tracking-tight text-[#191c1d]">
                 {field.name}
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditName(field.name);
-                  setEditAddress(field.address);
-                  setEditDimensions(field.dimensions);
-                  setEditPrice(field.basePricePerHour.toString());
-                  setEditDesc(field.description);
-                  setIsEditFieldModalOpen(true);
-                }}
-                className="flex items-center gap-1.5 rounded-lg border border-transparent p-2 text-xs sm:text-sm font-semibold text-[#006e2f] transition-colors hover:border-[#bccbb9] hover:bg-[#f3f4f5]"
-              >
-                <Edit className="h-4 w-4" />
-                <span>Chỉnh sửa</span>
-              </button>
+              </h2>
+              <span className="rounded-md bg-[#22c55e]/20 px-2.5 py-0.5 text-xs font-bold text-[#006e2f]">
+                {field.fieldTypeLabel}
+              </span>
+              {field.status === 'ACTIVE' ? (
+                <span className="rounded-full bg-[#22c55e] px-2.5 py-0.5 text-xs font-bold text-white">
+                  Hoạt động
+                </span>
+              ) : (
+                <span className="rounded-full border border-[#bccbb9] bg-[#e1e3e4] px-2.5 py-0.5 text-xs font-bold text-[#575e70]">
+                  Vô hiệu hóa
+                </span>
+              )}
             </div>
-
-            <div className="mb-4 flex items-center gap-1.5 text-xs sm:text-sm text-[#575e70]">
-              <MapPin className="h-4 w-4 text-[#575e70]" />
-              <span>{field.address}</span>
-            </div>
-
-            {/* 4 Metric Boxes */}
-            <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-              <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-3.5">
-                <p className="mb-1 text-xs font-semibold text-[#575e70]">
-                  Loại sân
-                </p>
-                <p className="flex items-center gap-1.5 font-bold text-[#191c1d] text-sm">
-                  <span className="h-2 w-2 rounded-full bg-[#006e2f]" />
-                  <span>{field.fieldTypeLabel}</span>
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-3.5">
-                <p className="mb-1 text-xs font-semibold text-[#575e70]">
-                  Kích thước
-                </p>
-                <p className="font-bold text-[#191c1d] text-sm">
-                  {field.dimensions}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-3.5">
-                <p className="mb-1 text-xs font-semibold text-[#575e70]">
-                  Giá cơ bản
-                </p>
-                <p className="font-bold text-[#191c1d] text-sm">
-                  {formatVND(field.basePricePerHour)}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-[#bccbb9]/60 bg-[#f8f9fa] p-3.5">
-                <p className="mb-1 text-xs font-semibold text-[#575e70]">
-                  Đơn sắp tới
-                </p>
-                <p className="font-bold text-[#006e2f] text-sm">
-                  {field.upcomingBookingsCount} đơn
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-wrap gap-3 border-t border-[#bccbb9]/60 pt-4">
-            <Link
-              href={`/admin/schedule?fieldId=${field.id}`}
-              className="flex items-center gap-2 rounded-xl bg-[#e7e8e9] px-4 py-2 text-xs sm:text-sm font-semibold text-[#191c1d] transition-colors hover:bg-[#d9dadb]"
-            >
-              <Calendar className="h-4 w-4 text-[#006e2f]" />
-              <span>Xem lịch trống</span>
-            </Link>
-
-            <Link
-              href={`/admin/bookings?fieldId=${field.id}`}
-              className="flex items-center gap-2 rounded-xl bg-[#e7e8e9] px-4 py-2 text-xs sm:text-sm font-semibold text-[#191c1d] transition-colors hover:bg-[#d9dadb]"
-            >
-              <Receipt className="h-4 w-4 text-[#006e2f]" />
-              <span>Danh sách đơn</span>
-            </Link>
+            <p className="mt-0.5 text-xs text-[#575e70]">
+              Quản trị chi tiết thông tin sân bóng, tiện ích và cài đặt hoạt động
+            </p>
           </div>
         </div>
-      </div>
 
-      {/* Embedded Section: Quản lý giá — [Tên sân] */}
-      <div className="space-y-4 pt-2">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <h3 className="font-(family-name:--font-manrope) text-xl font-extrabold tracking-tight text-[#191c1d]">
-            Quản lý giá — {field.name}
-          </h3>
+        {/* Action buttons */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={handleOpenCreatePriceModal}
-            className="flex items-center gap-2 rounded-xl bg-[#006e2f] px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm transition-all hover:bg-[#004b1e] active:scale-95"
+            onClick={handleOpenEditModal}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#bccbb9] bg-white px-3.5 py-2 text-xs font-bold text-[#191c1d] transition-colors hover:bg-[#f8f9fa]"
           >
-            <Plus className="h-4 w-4" />
-            <span>Thêm mức giá mới</span>
+            <Edit className="h-4 w-4 text-[#006e2f]" />
+            <span>Sửa thông tin</span>
           </button>
-        </div>
-
-        {/* Price Rules Table */}
-        <div className="overflow-hidden rounded-2xl border border-[#bccbb9] bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-xs sm:text-sm">
-              <thead>
-                <tr className="border-b border-[#bccbb9] bg-[#f8f9fa] text-xs font-semibold text-[#575e70]">
-                  <th className="px-6 py-4 whitespace-nowrap">Tên mức giá</th>
-                  <th className="px-6 py-4 whitespace-nowrap">Ngày áp dụng</th>
-                  <th className="px-6 py-4 whitespace-nowrap">Khung giờ</th>
-                  <th className="px-6 py-4 whitespace-nowrap text-right">
-                    Giá/giờ
-                  </th>
-                  <th className="px-6 py-4 whitespace-nowrap text-center">
-                    Trạng thái
-                  </th>
-                  <th className="px-6 py-4 whitespace-nowrap text-right">
-                    Hành động
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#bccbb9]/40 text-[#191c1d]">
-                {field.priceRules.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-[#575e70]">
-                      Chưa có mức giá nào được thiết lập.
-                    </td>
-                  </tr>
-                ) : (
-                  field.priceRules.map((rule) => (
-                    <tr
-                      key={rule.id}
-                      className="group transition-colors hover:bg-[#f8f9fa]"
-                    >
-                      <td className="px-6 py-4 font-bold text-[#191c1d] whitespace-nowrap">
-                        {rule.name}
-                      </td>
-                      <td className="px-6 py-4 text-[#575e70] whitespace-nowrap">
-                        {rule.daysDisplay}
-                      </td>
-                      <td className="px-6 py-4 text-[#575e70] whitespace-nowrap">
-                        <span className="flex items-center gap-1.5">
-                          <Clock className="h-4 w-4 text-[#575e70]" />
-                          <span>
-                            {rule.startTime} - {rule.endTime}
-                          </span>
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right font-bold text-[#006e2f] whitespace-nowrap">
-                        {formatVNDPrice(rule.pricePerHour)}
-                      </td>
-                      <td className="px-6 py-4 text-center whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            rule.isActive
-                              ? 'bg-[#dcfce7] text-[#166534]'
-                              : 'bg-[#f3f4f5] text-[#575e70]'
-                          }`}
-                        >
-                          {rule.isActive ? 'Hoạt động' : 'Tạm tắt'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5 opacity-90 transition-opacity group-hover:opacity-100">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditPriceModal(rule)}
-                            className="rounded-lg p-1.5 text-[#575e70] transition-colors hover:bg-[#e7e8e9] hover:text-[#006e2f]"
-                            title="Chỉnh sửa"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeletePriceRule(rule.id)}
-                            className="rounded-lg p-1.5 text-[#575e70] transition-colors hover:bg-[#ffdad6] hover:text-[#ba1a1a]"
-                            title="Xóa"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <Link
+            href={`/admin/schedule?fieldId=${field.id}`}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#006e2f] px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#004b1e]"
+          >
+            <Calendar className="h-4 w-4" />
+            <span>Xem lịch đặt sân</span>
+          </Link>
         </div>
       </div>
 
-      {/* Danger Zone (Vùng nguy hiểm) */}
-      <div className="overflow-hidden rounded-2xl border border-[#ffdad6] bg-[#fff5f5]">
-        {/* Header */}
-        <div className="border-b border-[#ffdad6] bg-[#ffdad6] px-6 py-4 text-[#93000a]">
-          <h4 className="flex items-center gap-2 font-(family-name:--font-manrope) text-base sm:text-lg font-bold">
-            <AlertTriangle className="h-5 w-5 text-[#ba1a1a]" />
-            <span>Vùng nguy hiểm</span>
-          </h4>
-          <p className="mt-1 text-xs sm:text-sm text-[#93000a]">
-            Các thao tác dưới đây có thể ảnh hưởng nghiêm trọng đến dữ liệu hệ
-            thống.
-          </p>
-        </div>
-
-        {/* Content Actions */}
-        <div className="p-6 space-y-6">
-          {/* Row 1: Vô hiệu hóa sân */}
-          <div className="flex flex-col justify-between gap-4 border-b border-[#ffdad6] pb-6 md:flex-row md:items-center">
-            <div>
-              <h5 className="font-bold text-[#191c1d] text-xs sm:text-sm mb-1">
-                {field.status === 'ACTIVE'
-                  ? 'Vô hiệu hóa sân'
-                  : 'Kích hoạt lại sân'}
-              </h5>
-              <p className="text-xs sm:text-sm text-[#575e70]">
-                Tạm dừng hoạt động đặt sân mới. Các đơn đã đặt vẫn được giữ
-                nguyên.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleToggleStatus}
-              className="whitespace-nowrap rounded-xl border border-[#ba1a1a] bg-white px-4 py-2 text-xs sm:text-sm font-bold text-[#ba1a1a] transition-colors hover:bg-[#ba1a1a] hover:text-white"
-            >
-              {field.status === 'ACTIVE'
-                ? 'Vô hiệu hóa sân'
-                : 'Kích hoạt lại sân'}
-            </button>
+      {/* Image Gallery Section (Matching User Page style) */}
+      <section className="overflow-hidden rounded-2xl border border-[#bccbb9] bg-white p-3 shadow-sm">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+          {/* Main Hero Image */}
+          <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-[#f3f4f5] md:col-span-8 lg:col-span-9">
+            <img
+              src={allImages[activeImageIndex] || field.imageUrl}
+              alt={field.name}
+              className="h-full w-full object-cover transition-all duration-300"
+            />
           </div>
 
-          {/* Row 2: Xóa sân vĩnh viễn */}
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-            <div>
-              <h5 className="font-bold text-[#191c1d] text-xs sm:text-sm mb-1">
-                Xóa sân vĩnh viễn
-              </h5>
-              <p className="text-xs sm:text-sm text-[#575e70]">
-                Xóa hoàn toàn sân này khỏi hệ thống. Không thể hoàn tác hành
-                động này.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsDeleteModalOpen(true)}
-              className="whitespace-nowrap rounded-xl bg-[#ba1a1a] px-5 py-2 text-xs sm:text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
-            >
-              Xóa sân
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Delete Restriction Modal (Không thể xóa sân này) */}
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#191c1d]/40 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl border border-[#bccbb9] bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150 text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#ffdad6] text-[#ba1a1a]">
-              <Ban className="h-7 w-7" />
-            </div>
-
-            <h3 className="font-(family-name:--font-manrope) text-lg sm:text-xl font-bold text-[#191c1d] mb-2">
-              Không thể xóa sân này
-            </h3>
-
-            <p className="text-xs sm:text-sm text-[#575e70] mb-6 leading-relaxed">
-              Sân bóng <strong>&ldquo;{field.name}&rdquo;</strong> hiện đang có{' '}
-              <strong className="text-[#ba1a1a]">
-                {field.upcomingBookingsCount} đơn đặt sân
-              </strong>{' '}
-              đang chờ xử lý hoặc sắp diễn ra. Vui lòng hoàn tất hoặc hủy các
-              đơn này trước khi thực hiện xóa.
-            </p>
-
-            <div className="flex flex-col gap-3">
-              <Link
-                href={`/admin/bookings?fieldId=${field.id}`}
-                className="w-full rounded-xl bg-[#006e2f] py-3 text-xs sm:text-sm font-bold text-white shadow-sm hover:bg-[#004b1e] transition-colors"
-              >
-                Xem các đơn liên quan
-              </Link>
+          {/* Side Thumbnails */}
+          <div className="flex flex-row gap-3 overflow-x-auto md:flex-col md:overflow-visible md:col-span-4 lg:col-span-3">
+            {allImages.slice(0, 3).map((img, idx) => (
               <button
+                key={idx}
                 type="button"
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="w-full rounded-xl border border-[#bccbb9] bg-white py-2.5 text-xs sm:text-sm font-semibold text-[#191c1d] hover:bg-[#f3f4f5] transition-colors"
+                onClick={() => setActiveImageIndex(idx)}
+                className={`relative aspect-video w-full flex-1 overflow-hidden rounded-xl border-2 transition-all ${
+                  activeImageIndex === idx
+                    ? 'border-[#006e2f] shadow-md ring-2 ring-[#006e2f]/20'
+                    : 'border-transparent opacity-70 hover:opacity-100'
+                }`}
               >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Thêm / Sửa mức giá */}
-      {isPriceModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#191c1d]/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl rounded-2xl border border-[#bccbb9] bg-white shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-[#bccbb9]/60 px-6 py-4">
-              <h3 className="font-(family-name:--font-manrope) text-lg sm:text-xl font-bold text-[#191c1d]">
-                {editingPriceRule ? 'Chỉnh sửa mức giá' : 'Thêm mức giá mới'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsPriceModalOpen(false)}
-                className="rounded-full p-1.5 text-[#575e70] hover:bg-[#e7e8e9]"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form
-              onSubmit={handleSavePriceRule}
-              className="p-6 space-y-5 text-xs sm:text-sm"
-            >
-              <div>
-                <label className="mb-1.5 block font-semibold text-[#191c1d]">
-                  Tên mức giá <span className="text-[#ba1a1a]">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={ruleName}
-                  onChange={(e) => setRuleName(e.target.value)}
-                  placeholder="VD: Lễ Tết, Giờ vàng..."
-                  className="w-full rounded-xl border border-[#bccbb9] bg-white px-4 py-2.5 text-xs sm:text-sm text-[#191c1d] shadow-sm transition-all focus:border-[#006e2f] focus:outline-none"
+                <img
+                  src={img}
+                  alt={`Ảnh ${idx + 1}`}
+                  className="h-full w-full object-cover"
                 />
-              </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
+      {/* Main Grid: 8 Cols Left (Details) & 4 Cols Right (Info & Danger Zone) */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* Left Column (8 cols): Giới thiệu, Tiện ích, Quy định */}
+        <div className="space-y-6 lg:col-span-8">
+          {/* 1. Header Info Card */}
+          <div className="rounded-xl border border-[#bccbb9] bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <label className="mb-2 block font-semibold text-[#191c1d]">
-                  Ngày áp dụng <span className="text-[#ba1a1a]">*</span>
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {DAY_OPTIONS.map((day) => {
-                    const isSelected = selectedDays.includes(day.value);
-                    return (
-                      <button
-                        key={day.value}
-                        type="button"
-                        onClick={() => toggleDay(day.value)}
-                        className={`rounded-lg border px-4 py-2 text-xs sm:text-sm font-semibold transition-colors ${
-                          isSelected
-                            ? 'border-[#006e2f] bg-[#22c55e]/20 text-[#004b1e]'
-                            : 'border-[#bccbb9] bg-white text-[#575e70] hover:bg-[#f8f9fa]'
-                        }`}
-                      >
-                        {day.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block font-semibold text-[#191c1d]">
-                    Giờ bắt đầu
-                  </label>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
-                    <input
-                      type="time"
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      className="w-full rounded-xl border border-[#bccbb9] bg-white py-2.5 pl-9 pr-4 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none"
-                    />
+                <h1 className="font-(family-name:--font-manrope) text-2xl font-extrabold text-[#191c1d]">
+                  {field.name}
+                </h1>
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[#575e70]">
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-4 w-4 text-[#006e2f]" />
+                    <span>{field.address}</span>
                   </div>
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block font-semibold text-[#191c1d]">
-                    Giờ kết thúc
-                  </label>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#575e70]" />
-                    <input
-                      type="time"
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      className="w-full rounded-xl border border-[#bccbb9] bg-white py-2.5 pl-9 pr-4 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none"
-                    />
+                  <span>•</span>
+                  <div className="flex items-center gap-1 font-bold text-amber-500">
+                    <Star className="h-4 w-4 fill-current" />
+                    <span>4.9 (48 đánh giá)</span>
                   </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block font-semibold text-[#191c1d]">
-                  Giá theo giờ (VND) <span className="text-[#ba1a1a]">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="10000"
-                    min="0"
-                    required
-                    value={priceInput}
-                    onChange={(e) => setPriceInput(e.target.value)}
-                    placeholder="0"
-                    className="w-full rounded-xl border border-[#bccbb9] bg-white py-2.5 pl-4 pr-12 text-xs sm:text-sm font-bold text-[#006e2f] focus:border-[#006e2f] focus:outline-none"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#575e70]">
-                    VNĐ
+                  <span>•</span>
+                  <span className="font-semibold text-[#191c1d]">
+                    Kích thước: {field.dimensions || '30m x 50m'}
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-[#bccbb9] bg-[#f8f9fa] p-4">
-                <div>
-                  <p className="font-bold text-[#191c1d]">Trạng thái áp dụng</p>
-                  <p className="text-[11px] text-[#575e70] mt-0.5">
-                    Kích hoạt mức giá này ngay sau khi lưu
-                  </p>
+              <div className="rounded-xl border border-[#006e2f]/30 bg-[#22c55e]/10 p-3 text-right">
+                <span className="text-xs font-semibold text-[#575e70]">
+                  Giá thuê cơ bản
+                </span>
+                <div className="font-(family-name:--font-manrope) text-xl font-extrabold text-[#006e2f]">
+                  {formatVNDPrice(field.basePricePerHour)}
+                  <span className="text-xs font-normal text-[#575e70]">/giờ</span>
                 </div>
-
-                <label className="relative inline-flex cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    checked={isRuleActive}
-                    onChange={(e) => setIsRuleActive(e.target.checked)}
-                    className="peer sr-only"
-                  />
-                  <div className="h-6 w-11 rounded-full bg-[#d9dadb] transition-all peer peer-checked:bg-[#006e2f] peer-checked:after:translate-x-full peer-checked:after:border-white after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all" />
-                </label>
               </div>
+            </div>
+          </div>
 
-              <div className="flex items-center justify-end gap-3 border-t border-[#bccbb9]/60 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsPriceModalOpen(false)}
-                  className="rounded-xl border border-[#bccbb9] bg-white px-5 py-2.5 text-xs sm:text-sm font-semibold text-[#575e70] hover:bg-[#e7e8e9]"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-[#006e2f] px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm hover:bg-[#004b1e]"
-                >
-                  Lưu mức giá
-                </button>
-              </div>
-            </form>
+          {/* 2. Giới thiệu sân bóng */}
+          <div className="rounded-xl border border-[#bccbb9] bg-white p-6 shadow-sm">
+            <h3 className="mb-3 font-(family-name:--font-manrope) text-lg font-bold text-[#191c1d]">
+              Giới thiệu sân bóng
+            </h3>
+            <p className="whitespace-pre-line text-sm leading-relaxed text-[#575e70]">
+              {field.description ||
+                'Sân bóng cỏ nhân tạo tiêu chuẩn thi đấu, mặt sân bằng phẳng được bảo dưỡng định kỳ hàng tuần. Không gian thoáng đãng, hệ thống chiếu sáng LED hiện đại đảm bảo tầm nhìn tốt nhất cho các trận cầu kịch tính.'}
+            </p>
+          </div>
+
+          {/* 3. Tiện ích & Dịch vụ đi kèm */}
+          <div className="rounded-xl border border-[#bccbb9] bg-white p-6 shadow-sm">
+            <h3 className="mb-4 font-(family-name:--font-manrope) text-lg font-bold text-[#191c1d]">
+              Tiện ích & Dịch vụ đi kèm
+            </h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {DEFAULT_AMENITIES.map((amenity, idx) => {
+                const IconComponent = amenity.icon;
+                return (
+                  <div
+                    key={idx}
+                    className="flex items-start gap-3 rounded-lg border border-[#bccbb9]/40 bg-[#f8f9fa] p-3.5 transition-colors hover:border-[#006e2f]/40 hover:bg-white"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#22c55e]/15 text-[#006e2f]">
+                      <IconComponent className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-[#191c1d]">
+                        {amenity.label}
+                      </h4>
+                      <p className="mt-0.5 text-[11px] text-[#575e70]">
+                        {amenity.desc}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 4. Quy định & Lưu ý */}
+          <div className="rounded-xl border border-[#bccbb9] bg-white p-6 shadow-sm">
+            <h3 className="mb-3 font-(family-name:--font-manrope) text-lg font-bold text-[#191c1d]">
+              Quy định & Lưu ý khi sử dụng sân
+            </h3>
+            <ul className="space-y-2.5">
+              {DEFAULT_RULES.map((rule, idx) => (
+                <li key={idx} className="flex items-start gap-2.5 text-xs text-[#575e70]">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#006e2f]" />
+                  <span>{rule}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
-      )}
 
-      {/* Modal: Chỉnh sửa thông tin sân bóng */}
+        {/* Right Column (4 cols): Thông tin quản trị & VÙNG NGUY HIỂM */}
+        <div className="space-y-6 lg:col-span-4">
+          {/* Card 1: Thông tin quản lý nhanh */}
+          <div className="rounded-xl border border-[#bccbb9] bg-white p-5 shadow-sm">
+            <h3 className="mb-4 font-(family-name:--font-manrope) text-base font-bold text-[#191c1d]">
+              Thông tin quản trị
+            </h3>
+
+            <div className="space-y-3.5 text-xs">
+              <div className="flex items-center justify-between border-b border-[#bccbb9]/40 pb-2.5">
+                <span className="text-[#575e70]">Mã sân (ID):</span>
+                <span className="font-mono font-bold text-[#191c1d]">
+                  {field.id.substring(0, 8)}...
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-b border-[#bccbb9]/40 pb-2.5">
+                <span className="text-[#575e70]">Loại sân:</span>
+                <span className="font-bold text-[#006e2f]">
+                  {field.fieldTypeLabel}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-b border-[#bccbb9]/40 pb-2.5">
+                <span className="text-[#575e70]">Kích thước:</span>
+                <span className="font-semibold text-[#191c1d]">
+                  {field.dimensions || '30m x 50m'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-b border-[#bccbb9]/40 pb-2.5">
+                <span className="text-[#575e70]">Giá thuê tiêu chuẩn:</span>
+                <span className="font-bold text-[#006e2f]">
+                  {formatVNDPrice(field.basePricePerHour)}/giờ
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[#575e70]">Trạng thái nhận đơn:</span>
+                {field.status === 'ACTIVE' ? (
+                  <span className="rounded-full bg-[#22c55e] px-2 py-0.5 text-[11px] font-bold text-white">
+                    Đang hoạt động
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-[#ba1a1a] px-2 py-0.5 text-[11px] font-bold text-white">
+                    Vô hiệu hóa
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-2">
+              <button
+                type="button"
+                onClick={handleOpenEditModal}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#bccbb9] bg-white py-2.5 text-xs font-bold text-[#191c1d] transition-colors hover:bg-[#f8f9fa]"
+              >
+                <Edit className="h-4 w-4 text-[#006e2f]" />
+                <span>Chỉnh sửa thông tin sân</span>
+              </button>
+              <Link
+                href={`/admin/schedule?fieldId=${field.id}`}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#006e2f] py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-[#004b1e]"
+              >
+                <Calendar className="h-4 w-4" />
+                <span>Xem lịch sân hôm nay</span>
+              </Link>
+            </div>
+          </div>
+
+          {/* Card 2: VÙNG NGUY HIỂM (Danger Zone - Giữ nguyên theo yêu cầu) */}
+          <div className="rounded-xl border border-[#ba1a1a]/30 bg-[#ffdad6]/15 p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-[#ba1a1a]" />
+              <h3 className="font-(family-name:--font-manrope) text-base font-bold text-[#ba1a1a]">
+                Vùng nguy hiểm
+              </h3>
+            </div>
+
+            <div className="space-y-4">
+              {/* Vô hiệu hóa sân */}
+              <div className="rounded-lg border border-[#ba1a1a]/20 bg-white p-3.5 shadow-xs">
+                <div className="mb-2">
+                  <h4 className="text-xs font-bold text-[#191c1d]">
+                    {field.status === 'ACTIVE'
+                      ? 'Tạm ngưng hoạt động sân'
+                      : 'Kích hoạt lại sân'}
+                  </h4>
+                  <p className="mt-0.5 text-[11px] text-[#575e70]">
+                    {field.status === 'ACTIVE'
+                      ? 'Khi vô hiệu hóa, khách hàng sẽ không thể tìm thấy hoặc đặt sân này.'
+                      : 'Kích hoạt lại để cho phép khách hàng đặt sân bình thường.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleStatus}
+                  className={`flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-colors ${
+                    field.status === 'ACTIVE'
+                      ? 'border border-[#ba1a1a]/30 bg-[#ffdad6]/40 text-[#ba1a1a] hover:bg-[#ffdad6]'
+                      : 'bg-[#006e2f] text-white hover:bg-[#004b1e]'
+                  }`}
+                >
+                  {field.status === 'ACTIVE' ? (
+                    <>
+                      <Ban className="h-4 w-4" />
+                      <span>Vô hiệu hóa sân bóng</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Kích hoạt lại sân</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Xóa sân vĩnh viễn */}
+              <div className="rounded-lg border border-[#ba1a1a]/20 bg-white p-3.5 shadow-xs">
+                <div className="mb-2">
+                  <h4 className="text-xs font-bold text-[#ba1a1a]">
+                    Xóa sân bóng
+                  </h4>
+                  <p className="mt-0.5 text-[11px] text-[#575e70]">
+                    Xóa mềm sân bóng này khỏi hệ thống. Thao tác này không thể hoàn tác nếu không có quyền can thiệp cơ sở dữ liệu.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteModalOpen(true)}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#ba1a1a] py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-[#93000a]"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Xóa sân bóng này</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal Chỉnh sửa thông tin sân */}
       {isEditFieldModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#191c1d]/50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-2xl border border-[#bccbb9] bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="flex items-start justify-between border-b border-[#bccbb9]/60 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-lg rounded-2xl border border-[#bccbb9] bg-white p-6 shadow-xl animate-in zoom-in-95">
+            <div className="mb-4 flex items-center justify-between border-b border-[#bccbb9]/60 pb-3">
               <h3 className="font-(family-name:--font-manrope) text-lg font-bold text-[#191c1d]">
-                Chỉnh sửa thông tin sân bóng
+                Chỉnh sửa thông tin sân
               </h3>
               <button
                 type="button"
                 onClick={() => setIsEditFieldModalOpen(false)}
-                className="rounded-full p-1.5 text-[#575e70] hover:bg-[#e7e8e9]"
+                className="rounded-lg p-1 text-[#575e70] hover:bg-[#e7e8e9]"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form
-              onSubmit={handleSaveFieldInfo}
-              className="my-4 space-y-3.5 text-xs sm:text-sm"
-            >
+            <form onSubmit={handleSaveFieldInfo} className="space-y-4 text-xs">
               <div>
                 <label className="mb-1 block font-semibold text-[#191c1d]">
-                  Tên sân bóng
+                  Tên sân bóng *
                 </label>
                 <input
                   type="text"
-                  required
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full rounded-xl border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block font-semibold text-[#191c1d]">
-                  Địa chỉ
-                </label>
-                <input
-                  type="text"
+                  className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-sm focus:border-[#006e2f] focus:outline-none"
                   required
-                  value={editAddress}
-                  onChange={(e) => setEditAddress(e.target.value)}
-                  className="w-full rounded-xl border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block font-semibold text-[#191c1d]">
+                    Giá cơ bản (VNĐ/giờ) *
+                  </label>
+                  <input
+                    type="number"
+                    step="10000"
+                    value={editPrice}
+                    onChange={(e) => setEditPrice(e.target.value)}
+                    className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-sm focus:border-[#006e2f] focus:outline-none"
+                    required
+                  />
+                </div>
                 <div>
                   <label className="mb-1 block font-semibold text-[#191c1d]">
                     Kích thước
@@ -930,54 +645,96 @@ export default function AdminFieldDetailPage({
                     type="text"
                     value={editDimensions}
                     onChange={(e) => setEditDimensions(e.target.value)}
-                    placeholder="VD: 20m x 40m"
-                    className="w-full rounded-xl border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block font-semibold text-[#191c1d]">
-                    Giá cơ bản / giờ
-                  </label>
-                  <input
-                    type="number"
-                    step="10000"
-                    required
-                    value={editPrice}
-                    onChange={(e) => setEditPrice(e.target.value)}
-                    className="w-full rounded-xl border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none font-bold text-[#006e2f]"
+                    placeholder="VD: 30m x 50m"
+                    className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-sm focus:border-[#006e2f] focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
                 <label className="mb-1 block font-semibold text-[#191c1d]">
-                  Mô tả chi tiết
+                  Địa chỉ sân *
                 </label>
-                <textarea
-                  rows={3}
-                  value={editDesc}
-                  onChange={(e) => setEditDesc(e.target.value)}
-                  className="w-full rounded-xl border border-[#bccbb9] p-2.5 text-xs sm:text-sm text-[#191c1d] focus:border-[#006e2f] focus:outline-none"
+                <input
+                  type="text"
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-sm focus:border-[#006e2f] focus:outline-none"
+                  required
                 />
               </div>
 
-              <div className="mt-6 flex justify-end gap-3 pt-2">
+              <div>
+                <label className="mb-1 block font-semibold text-[#191c1d]">
+                  Mô tả giới thiệu
+                </label>
+                <textarea
+                  rows={4}
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  className="w-full rounded-lg border border-[#bccbb9] p-2.5 text-sm focus:border-[#006e2f] focus:outline-none"
+                  placeholder="Mô tả chất lượng mặt cỏ, dàn đèn, tiện ích..."
+                />
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2 border-t border-[#bccbb9]/40 pt-4">
                 <button
                   type="button"
                   onClick={() => setIsEditFieldModalOpen(false)}
-                  className="rounded-xl border border-[#bccbb9] px-4 py-2 text-xs font-semibold text-[#575e70] hover:bg-[#e7e8e9]"
+                  className="rounded-lg border border-[#bccbb9] px-4 py-2 text-xs font-bold text-[#575e70] hover:bg-[#f8f9fa]"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="flex items-center gap-1.5 rounded-xl bg-[#006e2f] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#004b1e]"
+                  className="rounded-lg bg-[#006e2f] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#004b1e]"
                 >
-                  <Check className="h-4 w-4" />
-                  <span>Lưu thông tin</span>
+                  Lưu thay đổi
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Xác nhận Xóa sân */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-[#ba1a1a]/30 bg-white p-6 shadow-xl animate-in zoom-in-95">
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#ffdad6] text-[#ba1a1a]">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-(family-name:--font-manrope) text-base font-bold text-[#191c1d]">
+                  Xác nhận xóa sân bóng
+                </h3>
+                <p className="text-xs text-[#575e70]">
+                  Hành động này sẽ vô hiệu hóa sân bóng vĩnh viễn
+                </p>
+              </div>
+            </div>
+
+            <p className="my-4 rounded-lg bg-[#ffdad6]/30 p-3 text-xs text-[#93000a]">
+              Bạn có chắc chắn muốn xóa sân <strong>&quot;{field.name}&quot;</strong>? Sân này sẽ không còn hiển thị cho người dùng đặt lịch.
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="rounded-lg border border-[#bccbb9] px-4 py-2 text-xs font-bold text-[#575e70] hover:bg-[#f8f9fa]"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="rounded-lg bg-[#ba1a1a] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#93000a]"
+              >
+                Xác nhận xóa
+              </button>
+            </div>
           </div>
         </div>
       )}

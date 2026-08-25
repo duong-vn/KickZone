@@ -308,15 +308,15 @@ export default function AdminBookingDetailPage({
         <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4 text-slate-400">
           <Ban className="w-8 h-8" />
         </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-2">
+        <h2 className="font-(family-name:--font-manrope) text-xl font-bold text-[#191c1d] mb-2">
           Không tìm thấy đơn đặt sân
         </h2>
-        <p className="text-slate-500 text-sm max-w-md mb-6">
+        <p className="text-[#575e70] text-sm max-w-md mb-6">
           Đơn đặt sân không tồn tại hoặc đã bị xóa khỏi hệ thống.
         </p>
         <Link
           href="/admin/bookings"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#006e2f] text-white font-bold hover:bg-[#004b1e] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
         </Link>
