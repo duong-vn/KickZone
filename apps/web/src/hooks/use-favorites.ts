@@ -44,27 +44,61 @@ export function useToggleFavoriteMutation(fieldId: string) {
   return useMutation({
     mutationFn: () => toggleFavoriteField(fieldId),
     onMutate: async () => {
-      // 1. Cancel ongoing queries to avoid overwriting optimistic update
-      await queryClient.cancelQueries({
-        queryKey: FAVORITE_STATUS_QUERY_KEY(fieldId),
-      });
+      await Promise.all([
+        queryClient.cancelQueries({
+          queryKey: FAVORITE_STATUS_QUERY_KEY(fieldId),
+        }),
+        queryClient.cancelQueries({ queryKey: FAVORITES_QUERY_KEY }),
+      ]);
 
-      // 2. Snapshot previous value
       const previousStatus = queryClient.getQueryData<{
         is_favorite: boolean;
       }>(FAVORITE_STATUS_QUERY_KEY(fieldId));
+      const previousFavorites = queryClient.getQueriesData<FavoritesResponse>({
+        queryKey: FAVORITES_QUERY_KEY,
+      });
+      const wasFavorite =
+        previousStatus?.is_favorite ??
+        previousFavorites.some(([, favorites]) =>
+          favorites?.data.some((favorite) => favorite.field_id === fieldId),
+        );
+      const newStatus = !wasFavorite;
 
-      const newStatus = !previousStatus?.is_favorite;
-
-      // 3. Optimistically update status
       queryClient.setQueryData<{ is_favorite: boolean }>(
         FAVORITE_STATUS_QUERY_KEY(fieldId),
         { is_favorite: newStatus },
       );
 
-      return { previousStatus, newStatus };
+      if (!newStatus) {
+        queryClient.setQueriesData<FavoritesResponse>(
+          { queryKey: FAVORITES_QUERY_KEY },
+          (favorites) => {
+            if (!favorites) return favorites;
+
+            const data = favorites.data.filter(
+              (favorite) => favorite.field_id !== fieldId,
+            );
+            return {
+              ...favorites,
+              data,
+              meta: favorites.meta
+                ? {
+                    ...favorites.meta,
+                    total: Math.max(0, favorites.meta.total - (favorites.data.length - data.length)),
+                  }
+                : undefined,
+            };
+          },
+        );
+      }
+
+      return { previousStatus, previousFavorites };
     },
     onSuccess: (data) => {
+      queryClient.setQueryData(FAVORITE_STATUS_QUERY_KEY(fieldId), {
+        is_favorite: data.is_favorite,
+      });
+
       if (data.is_favorite) {
         toast.success(data.message || 'Đã thêm sân vào danh sách yêu thích!');
       } else {
@@ -72,13 +106,20 @@ export function useToggleFavoriteMutation(fieldId: string) {
       }
     },
     onError: (err, _variables, context) => {
-      // Rollback optimistic update
-      if (context?.previousStatus !== undefined) {
+      if (context?.previousStatus === undefined) {
+        queryClient.removeQueries({
+          queryKey: FAVORITE_STATUS_QUERY_KEY(fieldId),
+          exact: true,
+        });
+      } else {
         queryClient.setQueryData(
           FAVORITE_STATUS_QUERY_KEY(fieldId),
           context.previousStatus,
         );
       }
+      context?.previousFavorites.forEach(([queryKey, favorites]) => {
+        queryClient.setQueryData(queryKey, favorites);
+      });
 
       if ((err as Error).message === 'UNAUTHORIZED') {
         toast.error('Vui lòng đăng nhập để lưu sân yêu thích!', {

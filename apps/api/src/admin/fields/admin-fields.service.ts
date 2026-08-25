@@ -67,7 +67,9 @@ export class AdminFieldsService {
         where,
         include: {
           field_types: true,
-          field_images: true,
+          field_images: {
+            orderBy: [{ is_primary: 'desc' }, { sort_order: 'asc' }],
+          },
           price_rules: true,
         },
         orderBy: { created_at: 'desc' },
@@ -77,40 +79,34 @@ export class AdminFieldsService {
       this.prisma.fields.count({ where }),
     ]);
 
-    const data = await Promise.all(
-      items.map(async (f) => {
-        const firstImg = await this.prisma.field_images.findFirst({
-          where: { field_id: f.id },
-          orderBy: [{ is_primary: 'desc' }, { sort_order: 'asc' }],
-        });
-        return {
-          id: f.id,
-          name: f.name,
-          slug: f.slug,
-          fieldTypeId: f.field_type_id,
-          fieldType: f.field_types?.name,
-          fieldTypeLabel:
-            f.field_types?.name === '5-a-side'
-              ? 'Sân 5 người'
-              : f.field_types?.name === '7-a-side'
-                ? 'Sân 7 người'
-                : 'Sân 11 người',
-          address: f.address,
-          district: f.district,
-          city: f.city,
-          basePricePerHour: f.base_price_per_hour,
-          rating: 4.8,
-          reviewCount: 0,
-          status: f.status,
-          imageUrl:
-            firstImg?.storage_path ||
-            f.field_images?.[0]?.storage_path ||
-            'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=500&auto=format&fit=crop&q=60',
-          description: f.description || '',
-          createdAt: f.created_at.toISOString().split('T')[0],
-        };
-      }),
-    );
+    const data = items.map((f) => {
+      const firstImg = f.field_images?.[0];
+      return {
+        id: f.id,
+        name: f.name,
+        slug: f.slug,
+        fieldTypeId: f.field_type_id,
+        fieldType: f.field_types?.name,
+        fieldTypeLabel:
+          f.field_types?.name === '5-a-side'
+            ? 'Sân 5 người'
+            : f.field_types?.name === '7-a-side'
+              ? 'Sân 7 người'
+              : 'Sân 11 người',
+        address: f.address,
+        district: f.district,
+        city: f.city,
+        basePricePerHour: f.base_price_per_hour,
+        rating: 4.8,
+        reviewCount: 0,
+        status: f.status,
+        imageUrl:
+          firstImg?.storage_path ||
+          'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=500&auto=format&fit=crop&q=60',
+        description: f.description || '',
+        createdAt: f.created_at.toISOString().split('T')[0],
+      };
+    });
 
     return {
       data,
@@ -137,7 +133,9 @@ export class AdminFieldsService {
       where,
       include: {
         field_types: true,
-        field_images: true,
+        field_images: {
+          orderBy: [{ is_primary: 'desc' }, { sort_order: 'asc' }],
+        },
         field_operating_hours: {
           orderBy: { day_of_week: 'asc' },
         },
@@ -151,16 +149,12 @@ export class AdminFieldsService {
       throw new NotFoundException('Sân bóng không tồn tại');
     }
 
-    const fieldImages = await this.prisma.field_images.findMany({
-      where: { field_id: field.id },
-      orderBy: [{ is_primary: 'desc' }, { sort_order: 'asc' }],
-    });
+    const fieldImages = field.field_images || [];
 
     const imageUrl =
       fieldImages.length > 0
         ? fieldImages[0].storage_path
-        : field.field_images?.[0]?.storage_path ||
-          'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=800&auto=format&fit=crop&q=80';
+        : 'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=800&auto=format&fit=crop&q=80';
 
     const images =
       fieldImages.length > 0
