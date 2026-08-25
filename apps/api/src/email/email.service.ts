@@ -84,6 +84,51 @@ export class EmailService {
     });
   }
 
+  async sendPasswordResetEmail(
+    recipient: string,
+    resetUrl: string,
+  ): Promise<void> {
+    const subject = 'Khôi phục mật khẩu tài khoản KickZone';
+    const text = [
+      'Chào bạn,',
+      '',
+      'KickZone nhận được yêu cầu khôi phục mật khẩu cho tài khoản của bạn.',
+      'Vui lòng truy cập liên kết sau để thiết lập mật khẩu mới (liên kết có hiệu lực trong vòng 15 phút):',
+      resetUrl,
+      '',
+      'Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email hoặc liên hệ với chúng tôi để được hỗ trợ.',
+      '',
+      'Trân trọng,',
+      'Đội ngũ KickZone',
+    ].join('\n');
+
+    const html = this.renderPasswordResetHtml(subject, resetUrl);
+    const from = process.env.EMAIL_AUTH_USER;
+
+    try {
+      const transporter = this.getTransporter('password-reset');
+      if (!transporter || !from) return;
+      await transporter.sendMail({
+        from: `"KickZone" <${from}>`,
+        to: recipient,
+        subject,
+        text,
+        html,
+      });
+    } catch {
+      this.logger.error(`Password reset email failed for ${recipient}`);
+      return;
+    }
+
+    if (this.shouldPreview()) {
+      try {
+        await this.openPreview(html, 'password-reset');
+      } catch {
+        this.logger.warn(`Email preview failed for password reset`);
+      }
+    }
+  }
+
   private async sendBookingEmail(
     recipient: string,
     booking: BookingResponse,
@@ -147,6 +192,50 @@ export class EmailService {
       process.env.NODE_ENV !== 'production' &&
       process.env.NODE_ENV !== 'test'
     );
+  }
+
+  private renderPasswordResetHtml(subject: string, resetUrl: string): string {
+    return `<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${this.escapeHtml(subject)}</title>
+  </head>
+  <body style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;background-color:#f8fafc;margin:0;padding:24px;line-height:1.6">
+    <main style="max-width:540px;margin:0 auto;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05)">
+      <div style="background-color:#16a34a;padding:28px 24px;text-align:center">
+        <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:700;letter-spacing:-0.5px">KickZone</h1>
+        <p style="color:#dcfce7;margin:6px 0 0 0;font-size:14px">Hệ thống đặt sân bóng đá trực tuyến</p>
+      </div>
+      <div style="padding:32px 28px">
+        <h2 style="color:#0f172a;font-size:18px;font-weight:600;margin:0 0 16px 0">Yêu cầu khôi phục mật khẩu</h2>
+        <p style="margin:0 0 16px 0;font-size:15px;color:#334155">Xin chào,</p>
+        <p style="margin:0 0 24px 0;font-size:15px;color:#334155;line-height:1.6">
+          Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản KickZone của bạn. Vui lòng bấm vào nút bên dưới để tạo mật khẩu mới. Liên kết này sẽ hết hạn sau <strong>15 phút</strong>.
+        </p>
+        <div style="text-align:center;margin:32px 0">
+          <a href="${this.escapeHtml(resetUrl)}" style="display:inline-block;background-color:#16a34a;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 28px;border-radius:8px;box-shadow:0 2px 4px rgba(22,163,74,0.3)">
+            Đặt lại mật khẩu
+          </a>
+        </div>
+        <p style="margin:24px 0 8px 0;font-size:13px;color:#64748b;line-height:1.5">
+          Nếu nút bấm trên không hoạt động, bạn có thể sao chép và dán liên kết sau vào trình duyệt:
+        </p>
+        <p style="margin:0 0 24px 0;font-size:12px;color:#0284c7;word-break:break-all">
+          <a href="${this.escapeHtml(resetUrl)}" style="color:#0284c7">${this.escapeHtml(resetUrl)}</a>
+        </p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0" />
+        <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5">
+          Nếu bạn không thực hiện yêu cầu này, hãy yên tâm bỏ qua email. Mật khẩu của bạn vẫn được giữ an toàn.
+        </p>
+      </div>
+      <div style="background-color:#f1f5f9;padding:16px 24px;text-align:center;border-top:1px solid #e2e8f0">
+        <p style="margin:0;font-size:12px;color:#64748b">&copy; KickZone - Nền tảng kết nối đam mê bóng đá</p>
+      </div>
+    </main>
+  </body>
+</html>`;
   }
 
   private renderHtml(subject: string, text: string): string {

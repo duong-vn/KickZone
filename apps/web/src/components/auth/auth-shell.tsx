@@ -73,7 +73,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
         )}
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-primary lg:hidden" />
-        <div key={pathname} className="auth-form-enter w-full">
+        <div key={pathname} className="auth-form-enter flex w-full justify-center">
           {children}
         </div>
       </section>

@@ -764,3 +764,47 @@ export async function fetchAdminDashboardStats() {
   });
   return res.data;
 }
+
+// ---------------- Auth APIs (Forgot & Reset Password) ----------------
+
+export async function requestForgotPassword(
+  email: string,
+): Promise<{ message: string }> {
+  return request<{ message: string }>('post', '/auth/forgot-password', {
+    email,
+  });
+}
+
+export async function resetPassword(payload: {
+  token: string;
+  password: string;
+}): Promise<{ message: string }> {
+  return request<{ message: string }>('post', '/auth/reset-password', payload);
+}
+
+// ---------------- Social OAuth APIs (Google & Facebook) ----------------
+
+export async function loginWithGoogle(payload: {
+  idToken?: string;
+  accessToken?: string;
+  code?: string;
+}): Promise<{ user: unknown; message: string }> {
+  return request<{ user: unknown; message: string }>(
+    'post',
+    '/auth/google',
+    payload,
+  );
+}
+
+export async function loginWithFacebook(payload: {
+  accessToken?: string;
+  code?: string;
+}): Promise<{ user: unknown; message: string }> {
+  return request<{ user: unknown; message: string }>(
+    'post',
+    '/auth/facebook',
+    payload,
+  );
+}
+
+
