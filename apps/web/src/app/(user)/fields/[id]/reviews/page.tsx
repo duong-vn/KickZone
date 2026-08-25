@@ -3,7 +3,7 @@
 import { useState, useMemo, use, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   ChevronLeft,
@@ -17,13 +17,11 @@ import {
 import { toast } from 'sonner';
 import type {
   Review,
-  ReviewComment,
   ReviewFilterState,
   ReviewStarFilter,
   ReviewSortOption,
 } from '@/types/review';
 import {
-  CURRENT_USER,
   calculateReviewSummary,
   filterAndSortReviews,
 } from '@/data/mock-reviews';
@@ -35,9 +33,19 @@ import {
   DeleteReviewDialog,
 } from '@/components/reviews';
 import { Button } from '@/components/ui/button';
-import { fetchFieldById, fetchFieldReviews } from '@/lib/api';
+import {
+  fetchFieldById,
+  fetchFieldReviews,
+  createReview,
+  updateReview,
+  deleteReview,
+  checkReviewEligibility,
+  createReviewComment,
+  updateReviewComment,
+  deleteReviewComment,
+  fetchCurrentUserProfile,
+} from '@/lib/api';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
-import { formatFieldTypeName } from '../page';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -47,6 +55,7 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const fieldId = resolvedParams.id;
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   // Fetch field info
   const {
@@ -73,16 +82,13 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
     enabled: !!field,
   });
 
-  // Auth & eligibility check
+  // Auth state
   const [currentUser, setCurrentUser] = useState<{
     id: string;
     email?: string;
+    avatarUrl?: string | null;
+    fullName?: string;
   } | null>(null);
-  const [hasCompletedBooking] = useState(false);
-  const [showEligibilityDialog, setShowEligibilityDialog] = useState(false);
-  const [eligibilityReason, setEligibilityReason] = useState<
-    'not_logged_in' | 'no_completed_booking'
-  >('not_logged_in');
 
   useEffect(() => {
     let isMounted = true;
@@ -92,9 +98,16 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
         const { data } = await supabase.auth.getUser();
         if (!isMounted) return;
         if (data.user) {
+          const userMeta = data.user.user_metadata || {};
           setCurrentUser({
             id: data.user.id,
             email: data.user.email,
+            avatarUrl: userMeta.avatar_url || userMeta.picture || null,
+            fullName:
+              userMeta.full_name ||
+              userMeta.name ||
+              data.user.email?.split('@')[0] ||
+              'Người dùng',
           });
         } else {
           setCurrentUser(null);
@@ -111,11 +124,154 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
     };
   }, [fieldId]);
 
-  // Local state for reviews store to allow client interactions
-  const [localReviews, setLocalReviews] = useState<Review[] | null>(null);
+  // Check eligibility for reviews
+  const { data: eligibilityData } = useQuery({
+    queryKey: ['review-eligibility', fieldId],
+    queryFn: () => checkReviewEligibility(fieldId),
+    enabled: !!currentUser && !!field,
+    retry: false,
+  });
+
+  // Fetch current user profile
+  const { data: userProfileData } = useQuery({
+    queryKey: ['currentUserProfile', currentUser?.id],
+    queryFn: () => fetchCurrentUserProfile(),
+    enabled: !!currentUser,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const profileFromApi = userProfileData?.data ?? userProfileData;
+  const currentProfile = profileFromApi?.id
+    ? {
+        id: profileFromApi.id,
+        authUserId: profileFromApi.authUserId || currentUser?.id,
+        fullName:
+          profileFromApi.fullName || currentUser?.fullName || 'Người dùng',
+        avatarUrl: profileFromApi.avatarUrl || currentUser?.avatarUrl || null,
+        role: profileFromApi.role || 'USER',
+      }
+    : currentUser
+      ? {
+          id: currentUser.id,
+          authUserId: currentUser.id,
+          fullName: currentUser.fullName || 'Người dùng',
+          avatarUrl: currentUser.avatarUrl || null,
+          role: 'USER',
+        }
+      : null;
+
+  const effectiveCurrentUserId = currentUser
+    ? currentProfile?.id || eligibilityData?.currentProfileId || currentUser.id
+    : null;
+
+  const [showEligibilityDialog, setShowEligibilityDialog] = useState(false);
+  const [eligibilityReason, setEligibilityReason] = useState<
+    'not_logged_in' | 'no_completed_booking' | 'already_reviewed'
+  >('not_logged_in');
+
+  // Comment Mutations
+  const createCommentMutation = useMutation({
+    mutationFn: ({
+      reviewId,
+      content,
+      parentId,
+    }: {
+      reviewId: string;
+      content: string;
+      parentId?: string;
+    }) => createReviewComment(reviewId, { content, parentId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã gửi bình luận thành công!');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể gửi bình luận.';
+      toast.error(message);
+    },
+  });
+
+  const updateCommentMutation = useMutation({
+    mutationFn: ({
+      commentId,
+      content,
+    }: {
+      commentId: string;
+      content: string;
+    }) => updateReviewComment(commentId, { content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã cập nhật bình luận.');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể cập nhật bình luận.';
+      toast.error(message);
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: (commentId: string) => deleteReviewComment(commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã xóa bình luận.');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể xóa bình luận.';
+      toast.error(message);
+    },
+  });
+
+  // Review Mutations
+  const createReviewMutation = useMutation({
+    mutationFn: (data: {
+      rating: number;
+      content: string;
+      bookingId?: string;
+    }) => createReview(fieldId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      queryClient.invalidateQueries({ queryKey: ['field', fieldId] });
+      queryClient.invalidateQueries({
+        queryKey: ['review-eligibility', fieldId],
+      });
+    },
+  });
+
+  const updateReviewMutation = useMutation({
+    mutationFn: ({
+      reviewId,
+      data,
+    }: {
+      reviewId: string;
+      data: { rating?: number; content?: string };
+    }) => updateReview(reviewId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      queryClient.invalidateQueries({ queryKey: ['field', fieldId] });
+    },
+  });
+
+  const deleteReviewMutation = useMutation({
+    mutationFn: (reviewId: string) => deleteReview(reviewId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      queryClient.invalidateQueries({ queryKey: ['field', fieldId] });
+      queryClient.invalidateQueries({
+        queryKey: ['review-eligibility', fieldId],
+      });
+      toast.success('Đã xóa bài đánh giá thành công.');
+      setDeletingReview(null);
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể xóa bài đánh giá.';
+      toast.error(message);
+    },
+  });
 
   const reviewsList = useMemo(() => {
-    if (localReviews !== null) return localReviews;
     if (reviewsResponse?.data && reviewsResponse.data.length > 0) {
       return reviewsResponse.data;
     }
@@ -123,7 +279,7 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
       return field.reviews;
     }
     return [];
-  }, [localReviews, reviewsResponse, field]);
+  }, [reviewsResponse, field]);
 
   // Filter and Sort state
   const [starFilter, setStarFilter] = useState<ReviewStarFilter>('all');
@@ -138,11 +294,11 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
 
   // Summary calculation
   const summary = useMemo(() => {
-    if (reviewsResponse?.summary && localReviews === null) {
+    if (reviewsResponse?.summary) {
       return reviewsResponse.summary;
     }
     return calculateReviewSummary(reviewsList);
-  }, [reviewsResponse, localReviews, reviewsList]);
+  }, [reviewsResponse, reviewsList]);
 
   // Star counts mapping for filter pills
   const starCounts = useMemo(() => {
@@ -183,8 +339,12 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
       return;
     }
 
-    if (!hasCompletedBooking) {
-      setEligibilityReason('no_completed_booking');
+    if (eligibilityData && !eligibilityData.canReview) {
+      setEligibilityReason(
+        eligibilityData.reason === 'already_reviewed'
+          ? 'already_reviewed'
+          : 'no_completed_booking',
+      );
       setShowEligibilityDialog(true);
       return;
     }
@@ -193,108 +353,51 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
     setIsWriteModalOpen(true);
   };
 
-  const handleCreateOrUpdateReview = (data: {
+  const handleCreateOrUpdateReview = async (data: {
     rating: number;
     content: string;
     reviewId?: string;
   }) => {
     if (!field) return;
     if (data.reviewId) {
-      setLocalReviews((prev) => {
-        const base = prev ?? reviewsList;
-        return base.map((r: Review) =>
-          r.id === data.reviewId
-            ? {
-                ...r,
-                rating: data.rating,
-                content: data.content,
-                updatedAt: new Date().toISOString(),
-              }
-            : r,
-        );
+      await updateReviewMutation.mutateAsync({
+        reviewId: data.reviewId,
+        data: { rating: data.rating, content: data.content },
       });
+      setIsWriteModalOpen(false);
       setEditingReview(null);
-      toast.success('Đã cập nhật bài đánh giá.');
     } else {
-      const newReview: Review = {
-        id: `rev-${Date.now()}`,
-        userId: currentUser?.id || CURRENT_USER.id,
-        fieldId: field.id,
-        bookingId: `bk-${Date.now()}`,
+      await createReviewMutation.mutateAsync({
         rating: data.rating,
         content: data.content,
-        createdAt: new Date().toISOString(),
-        verifiedBooking: true,
-        isOwner: true,
-        user: {
-          id: currentUser?.id || CURRENT_USER.id,
-          fullName: currentUser?.email?.split('@')[0] || 'Tôi',
-          avatarUrl:
-            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-          role: 'USER',
-        },
-        booking: {
-          id: `bk-${Date.now()}`,
-          code: `KZ-BK-${Math.floor(100 + Math.random() * 900)}`,
-          fieldName: field.name,
-          matchDate: 'Hôm nay',
-          timeSlot: '18:00 - 19:30',
-          fieldTypeName: formatFieldTypeName(field.type),
-        },
-        comments: [],
-      };
-      setLocalReviews((prev) => [newReview, ...(prev ?? reviewsList)]);
-      toast.success('Đã gửi đánh giá thành công!');
+        bookingId: eligibilityData?.eligibleBookingId,
+      });
     }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingReview) return;
-    setLocalReviews((prev) => {
-      const base = prev ?? reviewsList;
-      return base.filter((r: Review) => r.id !== deletingReview.id);
-    });
-    toast.success('Đã xóa bài đánh giá thành công.');
-    setDeletingReview(null);
+    await deleteReviewMutation.mutateAsync(deletingReview.id);
   };
 
   const handleAddComment = (
     reviewId: string,
     content: string,
     parentId?: string,
-    replyToUserName?: string,
   ) => {
-    const newComment = {
-      id: `comm-${Date.now()}`,
-      reviewId,
-      userId: currentUser?.id || CURRENT_USER.id,
-      parentId: parentId || null,
-      replyToUserName: replyToUserName || null,
-      content,
-      createdAt: new Date().toISOString(),
-      user: CURRENT_USER,
-    };
+    if (!currentUser) {
+      toast.error('Vui lòng đăng nhập để bình luận.');
+      return;
+    }
+    createCommentMutation.mutate({ reviewId, content, parentId });
+  };
 
-    setLocalReviews((prev) => {
-      const base = prev ?? reviewsList;
-      return base.map((rev: Review) => {
-        if (rev.id !== reviewId) return rev;
+  const handleEditComment = (commentId: string, content: string) => {
+    updateCommentMutation.mutate({ commentId, content });
+  };
 
-        if (parentId) {
-          const updatedComments = rev.comments.map((c: ReviewComment) => {
-            if (c.id === parentId) {
-              return { ...c, replies: [...(c.replies || []), newComment] };
-            }
-            return c;
-          });
-          return { ...rev, comments: updatedComments };
-        }
-
-        return { ...rev, comments: [...rev.comments, newComment] };
-      });
-    });
-
-    toast.success('Đã gửi bình luận thành công!');
+  const handleDeleteComment = (commentId: string) => {
+    deleteCommentMutation.mutate(commentId);
   };
 
   if (isFieldLoading || isReviewsLoading) {
@@ -438,12 +541,16 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
                     key={rev.id}
                     review={rev}
                     fieldId={fieldId}
+                    currentUserId={effectiveCurrentUserId}
+                    currentUser={currentProfile}
                     onEdit={(r) => {
                       setEditingReview(r);
                       setIsWriteModalOpen(true);
                     }}
                     onDelete={(r) => setDeletingReview(r)}
                     onAddComment={handleAddComment}
+                    onEditComment={handleEditComment}
+                    onDeleteComment={handleDeleteComment}
                   />
                 ))}
               </div>
@@ -546,7 +653,11 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2.5">
                     <Button
-                      onClick={() => router.push('/login')}
+                      onClick={() =>
+                        router.push(
+                          `/login?redirect=/fields/${field.id}/reviews`,
+                        )
+                      }
                       className="flex-1 bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-bold rounded-xl py-2.5 cursor-pointer"
                     >
                       Đăng nhập ngay
@@ -557,6 +668,53 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
                       className="flex-1 border-[#bccbb9]/60 text-xs font-semibold rounded-xl py-2.5 cursor-pointer"
                     >
                       Đóng
+                    </Button>
+                  </div>
+                </>
+              ) : eligibilityReason === 'already_reviewed' ? (
+                <>
+                  <h3 className="font-['Manrope'] text-lg font-extrabold text-[#191c1d] mb-2">
+                    Đã hoàn thành đánh giá
+                  </h3>
+                  <p className="text-xs text-[#575e70] leading-relaxed mb-6">
+                    Bạn đã đánh giá các lượt đặt sân đã hoàn thành của mình tại{' '}
+                    <strong>{field.name}</strong>. Bạn có thể chỉnh sửa lại bài
+                    đánh giá của mình bất cứ lúc nào!
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2.5">
+                    {reviewsList.find(
+                      (r) =>
+                        r.id === eligibilityData?.existingReviewId ||
+                        (effectiveCurrentUserId &&
+                          (r.userId === effectiveCurrentUserId ||
+                            r.user?.id === effectiveCurrentUserId)),
+                    ) && (
+                      <Button
+                        onClick={() => {
+                          const target = reviewsList.find(
+                            (r) =>
+                              r.id === eligibilityData?.existingReviewId ||
+                              (effectiveCurrentUserId &&
+                                (r.userId === effectiveCurrentUserId ||
+                                  r.user?.id === effectiveCurrentUserId)),
+                          );
+                          setShowEligibilityDialog(false);
+                          if (target) {
+                            setEditingReview(target);
+                            setIsWriteModalOpen(true);
+                          }
+                        }}
+                        className="flex-1 bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-bold rounded-xl py-2.5 cursor-pointer"
+                      >
+                        Chỉnh sửa đánh giá
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowEligibilityDialog(false)}
+                      className="flex-1 border-[#bccbb9]/60 text-xs font-semibold rounded-xl py-2.5 cursor-pointer"
+                    >
+                      Đã hiểu
                     </Button>
                   </div>
                 </>
@@ -601,12 +759,14 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
           }}
           onSubmit={handleCreateOrUpdateReview}
           initialReview={editingReview}
+          bookingProof={eligibilityData?.bookingProof}
         />
 
         <DeleteReviewDialog
           isOpen={Boolean(deletingReview)}
           onClose={() => setDeletingReview(null)}
           onConfirm={handleConfirmDelete}
+          isLoading={deleteReviewMutation.isPending}
         />
       </div>
     </div>

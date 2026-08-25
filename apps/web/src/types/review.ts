@@ -93,3 +93,13 @@ export interface CreateCommentInput {
   parentId?: string | null;
   replyToUserName?: string | null;
 }
+
+export interface ReviewEligibilityResponse {
+  canReview: boolean;
+  eligibleBookingId?: string;
+  currentProfileId?: string;
+  existingReviewId?: string;
+  reason?: string;
+  message?: string;
+  bookingProof?: ReviewBookingProof;
+}

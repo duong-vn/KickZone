@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import type { Review, ReviewBookingProof } from '@/types/review';
 import { StarRating } from './star-rating';
 import { Button } from '@/components/ui/button';
-import { MOCK_BOOKING_PROOF } from '@/data/mock-reviews';
+import { formatFieldTypeName } from '@/lib/utils';
 
 export interface WriteReviewModalProps {
   isOpen: boolean;
@@ -23,7 +23,7 @@ export interface WriteReviewModalProps {
     rating: number;
     content: string;
     reviewId?: string;
-  }) => void;
+  }) => Promise<void> | void;
   bookingProof?: ReviewBookingProof;
   initialReview?: Review | null; // For editing
 }
@@ -31,7 +31,7 @@ export interface WriteReviewModalProps {
 function WriteReviewModalContent({
   onClose,
   onSubmit,
-  bookingProof = MOCK_BOOKING_PROOF,
+  bookingProof,
   initialReview,
 }: Omit<WriteReviewModalProps, 'isOpen'>) {
   const [rating, setRating] = useState<number>(
@@ -47,34 +47,44 @@ function WriteReviewModalContent({
   const isEditing = Boolean(initialReview);
   const maxLength = 500;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const effectiveBookingProof =
+    bookingProof || initialReview?.booking || undefined;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) {
       setError('Vui lòng chọn số sao đánh giá chất lượng sân.');
       return;
     }
-    if (content.trim().length < 10) {
-      setError('Vui lòng nhập nội dung đánh giá tối thiểu 10 ký tự.');
+    if (content.trim().length < 5) {
+      setError('Vui lòng nhập nội dung đánh giá tối thiểu 5 ký tự.');
       return;
     }
 
     setIsSubmitting(true);
     setError(null);
 
-    setTimeout(() => {
-      onSubmit({
+    try {
+      await onSubmit({
         rating,
         content: content.trim(),
         reviewId: initialReview?.id,
       });
+      if (isEditing) {
+        toast.success('Đã cập nhật bài đánh giá thành công!');
+        onClose();
+      } else {
+        setIsSuccess(true);
+        toast.success('Cảm ơn bạn! Đánh giá đã được đăng thành công.');
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Có lỗi xảy ra khi gửi đánh giá.';
+      setError(message);
+      toast.error(message);
+    } finally {
       setIsSubmitting(false);
-      setIsSuccess(true);
-      toast.success(
-        isEditing
-          ? 'Đã cập nhật bài đánh giá thành công!'
-          : 'Cảm ơn bạn! Đánh giá đã được đăng thành công.',
-      );
-    }, 400);
+    }
   };
 
   const handleCloseModal = () => {
@@ -97,7 +107,7 @@ function WriteReviewModalContent({
 
         {isSuccess ? (
           /* ==========================================
-             SUCCESS STATE SCREEN (Screen 3 Success View)
+             SUCCESS STATE SCREEN
           ========================================== */
           <div className="p-8 sm:p-12 flex flex-col items-center justify-center text-center animate-in fade-in-0 zoom-in-95">
             <div className="w-16 h-16 rounded-full bg-[#22c55e]/15 text-[#006e2f] flex items-center justify-center mb-5">
@@ -117,14 +127,14 @@ function WriteReviewModalContent({
             <Button
               type="button"
               onClick={handleCloseModal}
-              className="bg-[#006e2f] hover:bg-[#004b1e] text-white font-semibold rounded-xl px-8 py-2.5 shadow-sm"
+              className="bg-[#006e2f] hover:bg-[#004b1e] text-white font-semibold rounded-xl px-8 py-2.5 shadow-sm cursor-pointer"
             >
               Hoàn tất & Quay lại
             </Button>
           </div>
         ) : (
           /* ==========================================
-             REVIEW FORM SCREEN (Screen 3 Form View)
+             REVIEW FORM SCREEN
           ========================================== */
           <div className="p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
             {/* Header */}
@@ -138,36 +148,39 @@ function WriteReviewModalContent({
               </p>
             </div>
 
-            {/* Booking Summary Card */}
-            <div className="flex items-center gap-4 p-3.5 bg-[#f8f9fa] rounded-xl border border-[#bccbb9]/40 mb-6">
-              {bookingProof.fieldImage ? (
-                <img
-                  src={bookingProof.fieldImage}
-                  alt={bookingProof.fieldName}
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover shrink-0 border border-[#bccbb9]/30"
-                />
-              ) : (
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-[#006e2f]/10 flex items-center justify-center text-[#006e2f] shrink-0">
-                  <Sparkles className="w-6 h-6" />
-                </div>
-              )}
-              <div className="min-w-0">
-                <h3 className="font-['Manrope'] font-bold text-sm sm:text-base text-[#191c1d] truncate mb-1">
-                  {bookingProof.fieldName}
-                </h3>
-                <div className="flex items-center gap-1.5 text-xs text-[#575e70] mb-0.5">
-                  <Calendar className="w-3.5 h-3.5 text-[#006e2f]" />
-                  <span>Ngày đá: {bookingProof.matchDate}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-[#575e70]">
-                  <Clock className="w-3.5 h-3.5 text-[#006e2f]" />
-                  <span>
-                    Khung giờ: {bookingProof.timeSlot} (
-                    {bookingProof.fieldTypeName || 'Sân tiêu chuẩn'})
-                  </span>
+            {/* Booking Summary Card if available */}
+            {effectiveBookingProof && (
+              <div className="flex items-center gap-4 p-3.5 bg-[#f8f9fa] rounded-xl border border-[#bccbb9]/40 mb-6">
+                {effectiveBookingProof.fieldImage ? (
+                  <img
+                    src={effectiveBookingProof.fieldImage}
+                    alt={effectiveBookingProof.fieldName}
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover shrink-0 border border-[#bccbb9]/30"
+                  />
+                ) : (
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-[#006e2f]/10 flex items-center justify-center text-[#006e2f] shrink-0">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <h3 className="font-['Manrope'] font-bold text-sm sm:text-base text-[#191c1d] truncate mb-1">
+                    {effectiveBookingProof.fieldName}
+                  </h3>
+                  <div className="flex items-center gap-1.5 text-xs text-[#575e70] mb-0.5">
+                    <Calendar className="w-3.5 h-3.5 text-[#006e2f]" />
+                    <span>Ngày đá: {effectiveBookingProof.matchDate}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-[#575e70]">
+                    <Clock className="w-3.5 h-3.5 text-[#006e2f]" />
+                    <span>
+                      Khung giờ: {effectiveBookingProof.timeSlot} (
+                      {formatFieldTypeName(effectiveBookingProof.fieldTypeName)}
+                      )
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Error Message */}
             {error && (
@@ -232,14 +245,15 @@ function WriteReviewModalContent({
                   type="button"
                   variant="outline"
                   onClick={handleCloseModal}
-                  className="rounded-xl px-5 text-xs font-semibold text-[#575e70]"
+                  disabled={isSubmitting}
+                  className="rounded-xl px-5 text-xs font-semibold text-[#575e70] cursor-pointer"
                 >
                   Hủy
                 </Button>
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="bg-[#006e2f] hover:bg-[#004b1e] text-white font-semibold rounded-xl px-6 text-xs shadow-sm"
+                  className="bg-[#006e2f] hover:bg-[#004b1e] text-white font-semibold rounded-xl px-6 text-xs shadow-sm cursor-pointer"
                 >
                   {isSubmitting
                     ? 'Đang gửi...'

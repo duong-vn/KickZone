@@ -15,6 +15,7 @@ import {
 } from '../bookings/booking-rules';
 import { GetFieldReviewsQueryDto } from './dto/get-field-reviews-query.dto';
 import { GetFieldsQueryDto } from './dto/get-fields-query.dto';
+import { buildCommentsTree } from '../reviews/reviews.service';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 9;
@@ -27,6 +28,21 @@ const PUBLIC_FIELD_WHERE = {
   status: field_status.ACTIVE,
   deleted_at: null,
 } satisfies Prisma.fieldsWhereInput;
+
+function formatFieldTypeName(name?: string | null): string {
+  if (!name) return 'Sân 7 người';
+  const clean = name.toLowerCase().trim();
+  if (clean === '5-a-side' || clean === '5' || clean.includes('5')) {
+    return 'Sân 5 người';
+  }
+  if (clean === '7-a-side' || clean === '7' || clean.includes('7')) {
+    return 'Sân 7 người';
+  }
+  if (clean === '11-a-side' || clean === '11' || clean.includes('11')) {
+    return 'Sân 11 người';
+  }
+  return name;
+}
 
 @Injectable()
 export class FieldsService {
@@ -204,18 +220,6 @@ export class FieldsService {
       this.prisma.fields.count({ where }),
     ]);
 
-    const formatFieldTypeName = (name?: string | null): string => {
-      if (!name) return 'Sân 7 người';
-      const clean = name.toLowerCase().trim();
-      if (clean === '5-a-side' || clean === '5' || clean.includes('5'))
-        return 'Sân 5 người';
-      if (clean === '7-a-side' || clean === '7' || clean.includes('7'))
-        return 'Sân 7 người';
-      if (clean === '11-a-side' || clean === '11' || clean.includes('11'))
-        return 'Sân 11 người';
-      return name;
-    };
-
     const transformedData = fields.map((field) => {
       const reviews = field.reviews ?? [];
       const reviewsCount = reviews.length;
@@ -337,6 +341,8 @@ export class FieldsService {
             select: {
               id: true,
               user_id: true,
+              field_id: true,
+              booking_id: true,
               rating: true,
               content: true,
               created_at: true,
@@ -394,18 +400,6 @@ export class FieldsService {
             ).toFixed(1),
           )
         : 5.0;
-
-    const formatFieldTypeName = (name?: string | null): string => {
-      if (!name) return 'Sân 7 người';
-      const clean = name.toLowerCase().trim();
-      if (clean === '5-a-side' || clean === '5' || clean.includes('5'))
-        return 'Sân 5 người';
-      if (clean === '7-a-side' || clean === '7' || clean.includes('7'))
-        return 'Sân 7 người';
-      if (clean === '11-a-side' || clean === '11' || clean.includes('11'))
-        return 'Sân 11 người';
-      return name;
-    };
 
     const rawTypeName = field.field_types?.name ?? '7-a-side';
     const fieldTypeName = formatFieldTypeName(rawTypeName);
@@ -496,6 +490,9 @@ export class FieldsService {
 
     const mappedReviews = reviews.map((r) => ({
       id: r.id,
+      userId: r.user_id,
+      fieldId: r.field_id || field.id,
+      bookingId: r.booking_id,
       author: r.profiles?.full_name || 'Khách hàng',
       avatar:
         r.profiles?.avatar_path ||
@@ -503,9 +500,17 @@ export class FieldsService {
       date: r.created_at
         ? new Date(r.created_at).toISOString()
         : new Date().toISOString(),
+      createdAt: r.created_at
+        ? new Date(r.created_at).toISOString()
+        : new Date().toISOString(),
+      updatedAt: r.updated_at
+        ? new Date(r.updated_at).toISOString()
+        : undefined,
       rating: r.rating,
       content: r.content,
       verified: true,
+      verifiedBooking: true,
+      comments: [],
       user: {
         id: r.profiles?.id || r.user_id,
         fullName: r.profiles?.full_name || 'Khách hàng',
@@ -698,6 +703,19 @@ export class FieldsService {
               end_time: true,
             },
           },
+          review_comments: {
+            orderBy: { created_at: 'asc' },
+            include: {
+              profiles: {
+                select: {
+                  id: true,
+                  full_name: true,
+                  avatar_path: true,
+                  role: true,
+                },
+              },
+            },
+          },
         },
       }),
       this.prisma.reviews.count({ where }),
@@ -756,10 +774,10 @@ export class FieldsService {
               r.bookings.start_time && r.bookings.end_time
                 ? `${new Date(r.bookings.start_time).toISOString().substring(11, 16)} - ${new Date(r.bookings.end_time).toISOString().substring(11, 16)}`
                 : '',
-            fieldTypeName: field.field_types?.name || 'Sân bóng đá',
+            fieldTypeName: formatFieldTypeName(field.field_types?.name),
           }
         : undefined,
-      comments: [],
+      comments: buildCommentsTree(r.review_comments || []),
       verifiedBooking: true,
     }));
 

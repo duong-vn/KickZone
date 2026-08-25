@@ -4,7 +4,7 @@
 import { useMemo, use, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   MapPin,
   Star,
@@ -35,11 +35,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import type { Review } from '@/types/review';
-import {
-  CURRENT_USER,
-  INITIAL_MOCK_REVIEWS,
-  calculateReviewSummary,
-} from '@/data/mock-reviews';
+import { CURRENT_USER, calculateReviewSummary } from '@/data/mock-reviews';
 import {
   useFavoriteStatusQuery,
   useToggleFavoriteMutation,
@@ -54,24 +50,19 @@ import {
   fetchFieldById,
   fetchFieldReviews,
   validateVoucherApi,
+  createReview,
+  updateReview,
+  deleteReview,
+  checkReviewEligibility,
+  createReviewComment,
+  updateReviewComment,
+  deleteReviewComment,
+  fetchCurrentUserProfile,
 } from '@/lib/api';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 
-// Helper to format field type to clean Vietnamese
-export function formatFieldTypeName(
-  name?: string | { name?: string } | null,
-): string {
-  if (!name) return 'Sân 7 người';
-  if (typeof name === 'object') return name.name || 'Sân 7 người';
-  const clean = name.toLowerCase().trim();
-  if (clean === '5-a-side' || clean === '5' || clean.includes('5'))
-    return 'Sân 5 người';
-  if (clean === '7-a-side' || clean === '7' || clean.includes('7'))
-    return 'Sân 7 người';
-  if (clean === '11-a-side' || clean === '11' || clean.includes('11'))
-    return 'Sân 11 người';
-  return name;
-}
+import { formatFieldTypeName } from '@/lib/utils';
+export { formatFieldTypeName };
 
 const DEFAULT_AMENITIES = [
   {
@@ -354,11 +345,15 @@ export default function FieldDetailPage({
   const [currentUser, setCurrentUser] = useState<{
     id: string;
     email?: string;
+    avatarUrl?: string | null;
+    fullName?: string;
   } | null>(null);
-  const [hasCompletedBooking] = useState(false);
   const [showEligibilityDialog, setShowEligibilityDialog] = useState(false);
   const [eligibilityReason, setEligibilityReason] = useState<
-    'not_logged_in_booking' | 'not_logged_in_review' | 'no_completed_booking'
+    | 'not_logged_in_booking'
+    | 'not_logged_in_review'
+    | 'no_completed_booking'
+    | 'already_reviewed'
   >('not_logged_in_booking');
 
   useEffect(() => {
@@ -368,9 +363,16 @@ export default function FieldDetailPage({
         const supabase = getSupabaseBrowserClient();
         const { data } = await supabase.auth.getSession();
         if (isMounted && data.session?.user) {
+          const userMeta = data.session.user.user_metadata || {};
           setCurrentUser({
             id: data.session.user.id,
             email: data.session.user.email,
+            avatarUrl: userMeta.avatar_url || userMeta.picture || null,
+            fullName:
+              userMeta.full_name ||
+              userMeta.name ||
+              data.session.user.email?.split('@')[0] ||
+              'Người dùng',
           });
         }
       } catch {
@@ -382,6 +384,150 @@ export default function FieldDetailPage({
       isMounted = false;
     };
   }, []);
+
+  const queryClient = useQueryClient();
+
+  // Check eligibility for reviews
+  const { data: eligibilityData } = useQuery({
+    queryKey: ['review-eligibility', fieldId],
+    queryFn: () => checkReviewEligibility(fieldId),
+    enabled: !!currentUser && !!field,
+    retry: false,
+  });
+
+  // Fetch current user profile
+  const { data: userProfileData } = useQuery({
+    queryKey: ['currentUserProfile', currentUser?.id],
+    queryFn: () => fetchCurrentUserProfile(),
+    enabled: !!currentUser,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const profileFromApi = userProfileData?.data ?? userProfileData;
+  const currentProfile = profileFromApi?.id
+    ? {
+        id: profileFromApi.id,
+        authUserId: profileFromApi.authUserId || currentUser?.id,
+        fullName:
+          profileFromApi.fullName || currentUser?.fullName || 'Người dùng',
+        avatarUrl: profileFromApi.avatarUrl || currentUser?.avatarUrl || null,
+        role: profileFromApi.role || 'USER',
+      }
+    : currentUser
+      ? {
+          id: currentUser.id,
+          authUserId: currentUser.id,
+          fullName: currentUser.fullName || 'Người dùng',
+          avatarUrl: currentUser.avatarUrl || null,
+          role: 'USER',
+        }
+      : null;
+
+  const effectiveCurrentUserId = currentUser
+    ? currentProfile?.id || eligibilityData?.currentProfileId || currentUser.id
+    : null;
+
+  // Comment Mutations
+  const createCommentMutation = useMutation({
+    mutationFn: ({
+      reviewId,
+      content,
+      parentId,
+    }: {
+      reviewId: string;
+      content: string;
+      parentId?: string;
+    }) => createReviewComment(reviewId, { content, parentId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã gửi bình luận thành công!');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể gửi bình luận.';
+      toast.error(message);
+    },
+  });
+
+  const updateCommentMutation = useMutation({
+    mutationFn: ({
+      commentId,
+      content,
+    }: {
+      commentId: string;
+      content: string;
+    }) => updateReviewComment(commentId, { content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã cập nhật bình luận.');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể cập nhật bình luận.';
+      toast.error(message);
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: (commentId: string) => deleteReviewComment(commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      toast.success('Đã xóa bình luận.');
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể xóa bình luận.';
+      toast.error(message);
+    },
+  });
+
+  // Review Mutations
+  const createReviewMutation = useMutation({
+    mutationFn: (data: {
+      rating: number;
+      content: string;
+      bookingId?: string;
+    }) => createReview(fieldId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      queryClient.invalidateQueries({ queryKey: ['field', fieldId] });
+      queryClient.invalidateQueries({
+        queryKey: ['review-eligibility', fieldId],
+      });
+    },
+  });
+
+  const updateReviewMutation = useMutation({
+    mutationFn: ({
+      reviewId,
+      data,
+    }: {
+      reviewId: string;
+      data: { rating?: number; content?: string };
+    }) => updateReview(reviewId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      queryClient.invalidateQueries({ queryKey: ['field', fieldId] });
+    },
+  });
+
+  const deleteReviewMutation = useMutation({
+    mutationFn: (reviewId: string) => deleteReview(reviewId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['field-reviews', fieldId] });
+      queryClient.invalidateQueries({ queryKey: ['field', fieldId] });
+      queryClient.invalidateQueries({
+        queryKey: ['review-eligibility', fieldId],
+      });
+      toast.success('Đã xóa bài đánh giá thành công.');
+      setDeletingReview(null);
+    },
+    onError: (err: unknown) => {
+      const message =
+        err instanceof Error ? err.message : 'Không thể xóa bài đánh giá.';
+      toast.error(message);
+    },
+  });
 
   // 3. Favorites state
   const { data: favData } = useFavoriteStatusQuery(fieldId);
@@ -450,18 +596,31 @@ export default function FieldDetailPage({
   // Reviews merged list
   const reviewsList = useMemo(() => {
     if (localReviews !== null) return localReviews;
-    if (reviewsResponse?.data && reviewsResponse.data.length > 0) {
+    if (reviewsResponse?.data) {
       return reviewsResponse.data;
     }
-    if (field?.reviews && field.reviews.length > 0) {
+    if (field?.reviews) {
       return field.reviews;
     }
-    return INITIAL_MOCK_REVIEWS;
+    return [];
   }, [localReviews, reviewsResponse, field]);
 
   const reviewSummary = useMemo(() => {
     if (localReviews === null && reviewsResponse?.summary) {
       return reviewsResponse.summary;
+    }
+    if (reviewsList.length === 0) {
+      return {
+        averageRating: 0,
+        totalReviews: 0,
+        breakdown: [
+          { star: 5, count: 0, percentage: 0 },
+          { star: 4, count: 0, percentage: 0 },
+          { star: 3, count: 0, percentage: 0 },
+          { star: 2, count: 0, percentage: 0 },
+          { star: 1, count: 0, percentage: 0 },
+        ],
+      };
     }
     return calculateReviewSummary(reviewsList);
   }, [reviewsResponse, localReviews, reviewsList]);
@@ -623,8 +782,12 @@ export default function FieldDetailPage({
       return;
     }
 
-    if (!hasCompletedBooking) {
-      setEligibilityReason('no_completed_booking');
+    if (eligibilityData && !eligibilityData.canReview) {
+      setEligibilityReason(
+        eligibilityData.reason === 'already_reviewed'
+          ? 'already_reviewed'
+          : 'no_completed_booking',
+      );
       setShowEligibilityDialog(true);
       return;
     }
@@ -634,7 +797,7 @@ export default function FieldDetailPage({
   };
 
   // Review actions
-  const handleCreateOrUpdateReview = (data: {
+  const handleCreateOrUpdateReview = async (data: {
     rating: number;
     content: string;
     reviewId?: string;
@@ -642,102 +805,44 @@ export default function FieldDetailPage({
     if (!field) return;
 
     if (data.reviewId) {
-      setLocalReviews((prev) => {
-        const base = prev ?? reviewsList;
-        return base.map((r) =>
-          r.id === data.reviewId
-            ? {
-                ...r,
-                rating: data.rating,
-                content: data.content,
-                updatedAt: new Date().toISOString(),
-              }
-            : r,
-        );
+      await updateReviewMutation.mutateAsync({
+        reviewId: data.reviewId,
+        data: { rating: data.rating, content: data.content },
       });
+      setIsWriteReviewOpen(false);
       setEditingReview(null);
-      toast.success('Đã cập nhật bài đánh giá.');
     } else {
-      const newReview: Review = {
-        id: `rev-${Date.now()}`,
-        userId: currentUser?.id || CURRENT_USER.id,
-        fieldId: field.id,
-        bookingId: `bk-${Date.now()}`,
+      await createReviewMutation.mutateAsync({
         rating: data.rating,
         content: data.content,
-        createdAt: new Date().toISOString(),
-        verifiedBooking: true,
-        isOwner: true,
-        user: {
-          id: currentUser?.id || CURRENT_USER.id,
-          fullName: currentUser?.email?.split('@')[0] || 'Tôi',
-          avatarUrl:
-            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-          role: 'USER',
-        },
-        booking: {
-          id: `bk-${Date.now()}`,
-          code: `KZ-BK-${Math.floor(100 + Math.random() * 900)}`,
-          fieldName: field?.name ?? 'Sân bóng',
-          matchDate: 'Hôm nay',
-          timeSlot: `${startTime} - ${endTime}`,
-          fieldTypeName: formatFieldTypeName(field.type),
-        },
-        comments: [],
-      };
-
-      setLocalReviews((prev) => [newReview, ...(prev ?? reviewsList)]);
-      toast.success('Đã gửi đánh giá thành công!');
+        bookingId: eligibilityData?.eligibleBookingId,
+      });
     }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingReview) return;
-    setLocalReviews((prev) => {
-      const base = prev ?? reviewsList;
-      return base.filter((r) => r.id !== deletingReview.id);
-    });
-    toast.success('Đã xóa bài đánh giá thành công.');
-    setDeletingReview(null);
+    await deleteReviewMutation.mutateAsync(deletingReview.id);
   };
 
   const handleAddComment = (
     reviewId: string,
     content: string,
     parentId?: string,
-    replyToUserName?: string,
   ) => {
-    const newComment = {
-      id: `comm-${Date.now()}`,
-      reviewId,
-      userId: currentUser?.id || CURRENT_USER.id,
-      parentId: parentId || null,
-      replyToUserName: replyToUserName || null,
-      content,
-      createdAt: new Date().toISOString(),
-      user: CURRENT_USER,
-    };
+    if (!currentUser) {
+      toast.error('Vui lòng đăng nhập để gửi bình luận.');
+      return;
+    }
+    createCommentMutation.mutate({ reviewId, content, parentId });
+  };
 
-    setLocalReviews((prev) => {
-      const base = prev ?? reviewsList;
-      return base.map((rev) => {
-        if (rev.id !== reviewId) return rev;
+  const handleEditComment = (commentId: string, content: string) => {
+    updateCommentMutation.mutate({ commentId, content });
+  };
 
-        if (parentId) {
-          const updatedComments = rev.comments.map((c) => {
-            if (c.id === parentId) {
-              return { ...c, replies: [...(c.replies || []), newComment] };
-            }
-            return c;
-          });
-          return { ...rev, comments: updatedComments };
-        }
-
-        return { ...rev, comments: [...rev.comments, newComment] };
-      });
-    });
-
-    toast.success('Đã gửi phản hồi thành công!');
+  const handleDeleteComment = (commentId: string) => {
+    deleteCommentMutation.mutate(commentId);
   };
 
   if (isLoading) {
@@ -899,20 +1004,30 @@ export default function FieldDetailPage({
                 </span>
                 <div className="flex items-center gap-1 text-xs font-bold text-amber-600">
                   <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                  <span>
-                    {(
-                      field.rating_avg ||
-                      field.rating ||
-                      reviewSummary.averageRating
-                    ).toFixed(1)}
-                  </span>
-                  <span className="text-[#575e70] font-normal">
-                    (
-                    {field.reviews_count ||
-                      field.reviewCount ||
-                      reviewSummary.totalReviews}{' '}
-                    đánh giá)
-                  </span>
+                  {(field.reviews_count ||
+                    field.reviewCount ||
+                    reviewSummary.totalReviews) > 0 ? (
+                    <>
+                      <span>
+                        {(
+                          field.rating_avg ||
+                          field.rating ||
+                          reviewSummary.averageRating
+                        ).toFixed(1)}
+                      </span>
+                      <span className="text-[#575e70] font-normal">
+                        (
+                        {field.reviews_count ||
+                          field.reviewCount ||
+                          reviewSummary.totalReviews}{' '}
+                        đánh giá)
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[#575e70] font-normal">
+                      Chưa có đánh giá
+                    </span>
+                  )}
                 </div>
               </div>
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-[#191c1d] font-['Manrope'] tracking-tight">
@@ -1167,18 +1282,31 @@ export default function FieldDetailPage({
               {/* Review Summary Breakdown */}
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-6 rounded-2xl bg-[#f8f9fa] border border-[#bccbb9]/30 items-center">
                 <div className="md:col-span-4 text-center md:text-left space-y-1">
-                  <div className="text-4xl sm:text-5xl font-black text-[#191c1d] font-['Manrope']">
-                    {reviewSummary.averageRating.toFixed(1)}
-                  </div>
-                  <div className="flex justify-center md:justify-start">
-                    <StarRating
-                      rating={Math.round(reviewSummary.averageRating)}
-                      size="md"
-                    />
-                  </div>
-                  <p className="text-xs text-[#575e70]">
-                    Dựa trên {reviewSummary.totalReviews} lượt đánh giá
-                  </p>
+                  {reviewSummary.totalReviews > 0 ? (
+                    <>
+                      <div className="text-4xl sm:text-5xl font-black text-[#191c1d] font-['Manrope']">
+                        {reviewSummary.averageRating.toFixed(1)}
+                      </div>
+                      <div className="flex justify-center md:justify-start">
+                        <StarRating
+                          rating={Math.round(reviewSummary.averageRating)}
+                          size="md"
+                        />
+                      </div>
+                      <p className="text-xs text-[#575e70]">
+                        Dựa trên {reviewSummary.totalReviews} lượt đánh giá
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-xl sm:text-2xl font-bold text-[#191c1d] font-['Manrope'] mb-1">
+                        Chưa có đánh giá
+                      </div>
+                      <p className="text-xs text-[#575e70]">
+                        Sân này chưa có lượt đánh giá nào từ người chơi
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 <div className="md:col-span-8 space-y-1.5">
@@ -1213,12 +1341,16 @@ export default function FieldDetailPage({
                       key={rev.id}
                       review={rev}
                       fieldId={fieldId}
+                      currentUserId={effectiveCurrentUserId}
+                      currentUser={currentProfile}
                       onEdit={(r) => {
                         setEditingReview(r);
                         setIsWriteReviewOpen(true);
                       }}
                       onDelete={(r) => setDeletingReview(r)}
                       onAddComment={handleAddComment}
+                      onEditComment={handleEditComment}
+                      onDeleteComment={handleDeleteComment}
                     />
                   ))}
                 </div>
@@ -1652,6 +1784,53 @@ export default function FieldDetailPage({
                   </Button>
                 </div>
               </>
+            ) : eligibilityReason === 'already_reviewed' ? (
+              <>
+                <h3 className="font-['Manrope'] text-lg font-extrabold text-[#191c1d] mb-2">
+                  Đã hoàn thành đánh giá
+                </h3>
+                <p className="text-xs text-[#575e70] leading-relaxed mb-6">
+                  Bạn đã đánh giá các lượt đặt sân đã hoàn thành của mình tại{' '}
+                  <strong>{field.name}</strong>. Bạn có thể chỉnh sửa lại bài
+                  đánh giá của mình bất cứ lúc nào!
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  {reviewsList.find(
+                    (r) =>
+                      r.id === eligibilityData?.existingReviewId ||
+                      (effectiveCurrentUserId &&
+                        (r.userId === effectiveCurrentUserId ||
+                          r.user?.id === effectiveCurrentUserId)),
+                  ) && (
+                    <Button
+                      onClick={() => {
+                        const target = reviewsList.find(
+                          (r) =>
+                            r.id === eligibilityData?.existingReviewId ||
+                            (effectiveCurrentUserId &&
+                              (r.userId === effectiveCurrentUserId ||
+                                r.user?.id === effectiveCurrentUserId)),
+                        );
+                        setShowEligibilityDialog(false);
+                        if (target) {
+                          setEditingReview(target);
+                          setIsWriteReviewOpen(true);
+                        }
+                      }}
+                      className="flex-1 bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-bold rounded-xl py-2.5 cursor-pointer"
+                    >
+                      Chỉnh sửa đánh giá
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowEligibilityDialog(false)}
+                    className="flex-1 border-[#bccbb9]/60 text-xs font-semibold rounded-xl py-2.5 cursor-pointer"
+                  >
+                    Đã hiểu
+                  </Button>
+                </div>
+              </>
             ) : (
               <>
                 <h3 className="font-['Manrope'] text-lg font-extrabold text-[#191c1d] mb-2">
@@ -1696,6 +1875,7 @@ export default function FieldDetailPage({
         }}
         onSubmit={handleCreateOrUpdateReview}
         initialReview={editingReview}
+        bookingProof={eligibilityData?.bookingProof}
       />
 
       {/* Delete Review Confirmation Dialog */}
@@ -1703,6 +1883,7 @@ export default function FieldDetailPage({
         isOpen={Boolean(deletingReview)}
         onClose={() => setDeletingReview(null)}
         onConfirm={handleConfirmDelete}
+        isLoading={deleteReviewMutation.isPending}
       />
     </div>
   );

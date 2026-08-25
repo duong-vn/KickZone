@@ -9,6 +9,7 @@ import { BookingsController } from './bookings/bookings.controller';
 import { BookingsService } from './bookings/bookings.service';
 import { EmailService } from './email/email.service';
 import { FavoritesModule } from './favorites/favorites.module';
+import { ReviewsModule } from './reviews/reviews.module';
 import { FieldsController } from './fields/fields.controller';
 import { FieldsService } from './fields/fields.service';
 import { VouchersController } from './vouchers/vouchers.controller';
@@ -22,6 +23,7 @@ import { AdminModule } from './admin/admin.module';
     ScheduleModule.forRoot(),
     AuthModule,
     FavoritesModule,
+    ReviewsModule,
     StorageModule,
     AdminModule,
   ],

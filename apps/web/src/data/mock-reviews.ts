@@ -242,7 +242,7 @@ export const INITIAL_MOCK_REVIEWS: Review[] = [
       'Dịch vụ rất chu đáo, sân mới thay cỏ nên chạy rất bám giày, không bị trơn trượt. Sẽ đặt định kỳ hàng tuần cho anh em công ty.',
     createdAt: '2026-08-23T20:00:00.000Z',
     verifiedBooking: true,
-    isOwner: true,
+    isOwner: false,
     user: CURRENT_USER,
     booking: {
       id: 'bk-05',

@@ -14,14 +14,20 @@ import {
   Send,
 } from 'lucide-react';
 import type { Review } from '@/types/review';
-import { CURRENT_USER } from '@/data/mock-reviews';
 import { StarRating } from './star-rating';
 import { ReviewCommentItem } from './review-comment-item';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { cn, formatFieldTypeName } from '@/lib/utils';
 
 export interface ReviewCardProps {
   review: Review;
+  currentUserId?: string | null;
+  currentUser?: {
+    id: string;
+    fullName?: string;
+    avatarUrl?: string | null;
+    role?: string;
+  } | null;
   onEdit?: (review: Review) => void;
   onDelete?: (review: Review) => void;
   onAddComment?: (
@@ -30,6 +36,8 @@ export interface ReviewCardProps {
     parentId?: string,
     replyToUserName?: string,
   ) => void;
+  onEditComment?: (commentId: string, content: string) => void;
+  onDeleteComment?: (commentId: string) => void;
   fieldId?: string;
   defaultExpandedComments?: boolean;
   className?: string;
@@ -37,9 +45,13 @@ export interface ReviewCardProps {
 
 export function ReviewCard({
   review,
+  currentUserId,
+  currentUser,
   onEdit,
   onDelete,
   onAddComment,
+  onEditComment,
+  onDeleteComment,
   fieldId,
   defaultExpandedComments = false,
   className,
@@ -50,21 +62,40 @@ export function ReviewCard({
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [commentText, setCommentText] = useState('');
 
-  const isOwner = review.isOwner || review.userId === CURRENT_USER.id;
+  const hasLoggedInUser = Boolean(currentUserId || currentUser?.id);
+  const isOwner = Boolean(
+    hasLoggedInUser &&
+    ((currentUserId &&
+      (review.userId === currentUserId ||
+        review.user?.id === currentUserId ||
+        (review as { profiles?: { id?: string } }).profiles?.id ===
+          currentUserId)) ||
+      (currentUser?.id &&
+        (review.userId === currentUser.id ||
+          review.user?.id === currentUser.id ||
+          (review as { authUserId?: string }).authUserId === currentUser.id ||
+          (currentUser as { authUserId?: string }).authUserId ===
+            review.userId ||
+          (currentUser as { authUserId?: string }).authUserId ===
+            review.user?.id))),
+  );
 
   // Flatten comments count including nested replies
-  const totalCommentsCount = review.comments.reduce(
+  const commentsList = review.comments || [];
+  const totalCommentsCount = commentsList.reduce(
     (acc, c) => acc + 1 + (c.replies?.length || 0),
     0,
   );
 
-  const formattedDate = review.createdAt.includes('T')
-    ? new Date(review.createdAt).toLocaleDateString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      })
-    : review.createdAt;
+  const rawDate = review.createdAt || (review as { date?: string }).date || '';
+  const formattedDate =
+    typeof rawDate === 'string' && rawDate.includes('T')
+      ? new Date(rawDate).toLocaleDateString('vi-VN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        })
+      : rawDate || 'Gần đây';
 
   const handleSendComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +117,10 @@ export function ReviewCard({
   };
 
   const currentFieldId = fieldId || review.fieldId || '1';
+  const userAvatar = currentUser?.avatarUrl;
+  const userInitials = (currentUser?.fullName || 'Bạn')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div
@@ -129,7 +164,7 @@ export function ReviewCard({
             <div className="text-[11px] text-[#575e70] mt-0.5">
               {formattedDate}
               {review.booking?.fieldTypeName &&
-                ` • ${review.booking.fieldTypeName}`}
+                ` • ${formatFieldTypeName(review.booking.fieldTypeName)}`}
             </div>
           </div>
         </div>
@@ -224,15 +259,15 @@ export function ReviewCard({
           onSubmit={handleSendComment}
           className="mt-3.5 flex items-start gap-2.5 p-3 bg-[#f8f9fa] rounded-xl border border-[#bccbb9]/40 animate-in fade-in-0 duration-200"
         >
-          {CURRENT_USER.avatarUrl ? (
+          {userAvatar ? (
             <img
-              src={CURRENT_USER.avatarUrl}
-              alt={CURRENT_USER.fullName}
+              src={userAvatar}
+              alt={currentUser?.fullName || 'Avatar'}
               className="w-8 h-8 rounded-full object-cover shrink-0 border border-[#bccbb9]/40"
             />
           ) : (
             <div className="w-8 h-8 rounded-full bg-[#006e2f] text-white text-xs font-bold flex items-center justify-center shrink-0">
-              {CURRENT_USER.fullName.slice(0, 2).toUpperCase()}
+              {userInitials}
             </div>
           )}
 
@@ -270,13 +305,17 @@ export function ReviewCard({
       )}
 
       {/* 5. Expanded Comments Thread (Screen 1 & 4) */}
-      {isCommentsExpanded && review.comments.length > 0 && (
+      {isCommentsExpanded && commentsList.length > 0 && (
         <div className="mt-4 pt-3.5 border-t border-[#bccbb9]/20 space-y-3.5">
-          {review.comments.map((comm) => (
+          {commentsList.map((comm) => (
             <ReviewCommentItem
               key={comm.id}
               comment={comm}
               onAddReply={handleAddNestedReply}
+              onEditComment={onEditComment}
+              onDeleteComment={onDeleteComment}
+              currentUserId={currentUserId}
+              currentUser={currentUser}
             />
           ))}
         </div>

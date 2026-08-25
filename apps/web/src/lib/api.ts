@@ -18,6 +18,7 @@ import type {
   FieldReviewsResponse,
   Paginated,
 } from '@/types/field';
+import type { Review, ReviewComment, ReviewBookingProof } from '@/types/review';
 
 export interface ApiErrorShape {
   status: number;
@@ -56,7 +57,7 @@ export async function getAuthToken(): Promise<string | null> {
 }
 
 async function request<T>(
-  method: 'get' | 'post' | 'patch',
+  method: 'get' | 'post' | 'patch' | 'delete',
   url: string,
   data?: unknown,
   params?: Record<string, string | number | boolean | undefined | null>,
@@ -307,6 +308,105 @@ export const validateVoucherApi = async (
     };
   }
 };
+
+export interface ReviewEligibilityResponse {
+  canReview: boolean;
+  eligibleBookingId?: string;
+  currentProfileId?: string;
+  existingReviewId?: string;
+  reason?: string;
+  message?: string;
+  bookingProof?: ReviewBookingProof;
+}
+
+export function createReview(
+  fieldId: string,
+  input: { rating: number; content: string; bookingId?: string },
+) {
+  return request<{ data: Review; message: string }>(
+    'post',
+    `/fields/${fieldId}/reviews`,
+    input,
+    undefined,
+    true,
+  );
+}
+
+export function updateReview(
+  reviewId: string,
+  input: { rating?: number; content?: string },
+) {
+  return request<{ data: Review; message: string }>(
+    'patch',
+    `/reviews/${reviewId}`,
+    input,
+    undefined,
+    true,
+  );
+}
+
+export function deleteReview(reviewId: string) {
+  return request<{ success: boolean; message: string; id: string }>(
+    'delete',
+    `/reviews/${reviewId}`,
+    undefined,
+    undefined,
+    true,
+  );
+}
+
+export function checkReviewEligibility(fieldId: string) {
+  return request<ReviewEligibilityResponse>(
+    'get',
+    `/fields/${fieldId}/reviews/eligibility`,
+    undefined,
+    undefined,
+    true,
+  );
+}
+
+export function fetchReviewComments(reviewId: string) {
+  return request<{ data: ReviewComment[] }>(
+    'get',
+    `/reviews/${reviewId}/comments`,
+  );
+}
+
+export function createReviewComment(
+  reviewId: string,
+  input: { content: string; parentId?: string },
+) {
+  return request<{ data: ReviewComment; message: string }>(
+    'post',
+    `/reviews/${reviewId}/comments`,
+    input,
+    undefined,
+    true,
+  );
+}
+
+export function updateReviewComment(
+  commentId: string,
+  input: { content: string },
+) {
+  return request<{ data: ReviewComment; message: string }>(
+    'patch',
+    `/reviews/comments/${commentId}`,
+    input,
+    undefined,
+    true,
+  );
+}
+
+export function deleteReviewComment(commentId: string) {
+  return request<{ success: boolean; message: string; id: string }>(
+    'delete',
+    `/reviews/comments/${commentId}`,
+    undefined,
+    undefined,
+    true,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Admin APIs
