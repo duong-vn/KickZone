@@ -11,6 +11,7 @@ import {
   CalendarCheck,
   LogOut,
   Loader2,
+  TicketPercent,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
@@ -40,6 +41,11 @@ const ADMIN_NAV_ITEMS = [
     label: 'Lịch sân',
     href: '/admin/schedule',
     icon: CalendarCheck,
+  },
+  {
+    label: 'Voucher',
+    href: '/admin/vouchers',
+    icon: TicketPercent,
   },
 ];
 

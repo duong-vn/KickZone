@@ -8,6 +8,8 @@ import { AdminFieldsController } from './fields/admin-fields.controller';
 import { AdminFieldsService } from './fields/admin-fields.service';
 import { AdminUsersController } from './users/admin-users.controller';
 import { AdminUsersService } from './users/admin-users.service';
+import { AdminVouchersController } from './vouchers/admin-vouchers.controller';
+import { AdminVouchersService } from './vouchers/admin-vouchers.service';
 
 @Module({
   imports: [
@@ -16,8 +18,17 @@ import { AdminUsersService } from './users/admin-users.service';
     AdminBookingsModule,
     AdminDashboardModule,
   ],
-  controllers: [AdminFieldsController, AdminUsersController],
-  providers: [AdminFieldsService, AdminUsersService, PrismaService],
+  controllers: [
+    AdminFieldsController,
+    AdminUsersController,
+    AdminVouchersController,
+  ],
+  providers: [
+    AdminFieldsService,
+    AdminUsersService,
+    AdminVouchersService,
+    PrismaService,
+  ],
   exports: [AdminFieldsService, AdminUsersService],
 })
 export class AdminModule {}

@@ -703,3 +703,71 @@ export async function fetchAdminDashboardStats() {
   });
   return res.data;
 }
+
+// ---------------- Admin Vouchers APIs ----------------
+
+export type AdminVoucherPayload = {
+  code: string;
+  discountType: 'PERCENT' | 'FIXED';
+  value: number;
+  maxDiscount?: number | null;
+  minOrderValue?: number | null;
+  startAt?: string | null;
+  endAt?: string | null;
+  usageLimit?: number | null;
+  perUserLimit?: number | null;
+  isActive?: boolean;
+};
+
+export async function fetchAdminVouchers(params?: {
+  search?: string;
+  status?: string;
+  type?: string;
+  page?: number;
+  limit?: number;
+}) {
+  return request<{
+    data: Array<{
+      id: string;
+      code: string;
+      discountType: 'PERCENT' | 'FIXED';
+      value: number;
+      maxDiscount: number | null;
+      minOrderValue: number | null;
+      startAt: string | null;
+      endAt: string | null;
+      usageLimit: number | null;
+      perUserLimit: number | null;
+      usageCount: number;
+      isActive: boolean;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }>('get', '/admin/vouchers', undefined, params, true);
+}
+
+export function createAdminVoucher(data: AdminVoucherPayload) {
+  return request('post', '/admin/vouchers', data, undefined, true);
+}
+
+export function updateAdminVoucher(
+  id: string,
+  data: Partial<AdminVoucherPayload>,
+) {
+  return request('patch', `/admin/vouchers/${id}`, data, undefined, true);
+}
+
+export function updateAdminVoucherStatus(id: string, isActive: boolean) {
+  return request(
+    'patch',
+    `/admin/vouchers/${id}/status`,
+    { isActive },
+    undefined,
+    true,
+  );
+}
+
+export function deactivateAdminVoucher(id: string) {
+  return request('delete', `/admin/vouchers/${id}`, undefined, undefined, true);
+}

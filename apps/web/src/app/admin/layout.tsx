@@ -170,6 +170,8 @@ export default function AdminLayout({
     currentTitle = 'Chi tiết người dùng';
   } else if (pathname.startsWith('/admin/schedule')) {
     currentTitle = 'Lịch sân';
+  } else if (pathname.startsWith('/admin/vouchers')) {
+    currentTitle = 'Quản lý voucher';
   } else if (pathname === '/admin') {
     currentTitle = 'Tổng quan';
   }
