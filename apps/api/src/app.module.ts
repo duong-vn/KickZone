@@ -12,6 +12,7 @@ import { FavoritesModule } from './favorites/favorites.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { FieldsController } from './fields/fields.controller';
 import { FieldsService } from './fields/fields.service';
+import { FieldTypesController } from './fields/field-types.controller';
 import { VouchersController } from './vouchers/vouchers.controller';
 import { VouchersService } from './vouchers/vouchers.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -31,6 +32,7 @@ import { AdminModule } from './admin/admin.module';
   controllers: [
     AppController,
     FieldsController,
+    FieldTypesController,
     BookingsController,
     VouchersController,
   ],

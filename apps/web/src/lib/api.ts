@@ -192,16 +192,39 @@ export function cancelBooking(id: string, input: CancelBookingRequest) {
   );
 }
 
-export const fetchFieldTypes = async () => {
-  const res = await fetch(`${API_BASE_URL}/field-types`, {
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    throw new ApiError({ status: res.status, message: 'Lỗi tải loại sân' });
+export const fetchFieldTypes = async (): Promise<
+  Array<{ id: string; name: string; description?: string | null }>
+> => {
+  const res = await api.get<{
+    data: Array<{ id: string; name: string; description?: string | null }>;
+  }>('/field-types');
+  const responseData = res.data;
+  if (Array.isArray(responseData)) return responseData;
+  if (
+    responseData &&
+    Array.isArray(
+      (
+        responseData as {
+          data?: Array<{
+            id: string;
+            name: string;
+            description?: string | null;
+          }>;
+        }
+      ).data,
+    )
+  ) {
+    return (
+      responseData as {
+        data: Array<{
+          id: string;
+          name: string;
+          description?: string | null;
+        }>;
+      }
+    ).data;
   }
-
-  return res.json();
+  return [];
 };
 
 export async function toggleFavoriteField(
