@@ -71,6 +71,48 @@ export interface BookingDetailData {
   cancellationReason?: string;
 }
 
+function UserAvatar({
+  avatarUrl,
+  name,
+  size = 'md',
+}: {
+  avatarUrl?: string;
+  name: string;
+  size?: 'sm' | 'md' | 'lg';
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  const sizeClasses = {
+    sm: 'h-8 w-8 text-xs',
+    md: 'h-10 w-10 text-xs',
+    lg: 'h-16 w-16 text-xl',
+  }[size];
+
+  const getInitials = (str: string) => {
+    const trimmed = (str || 'K').trim();
+    return trimmed.charAt(0).toUpperCase();
+  };
+
+  if (avatarUrl && !hasError) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        className={`${sizeClasses} shrink-0 rounded-full border border-[#bccbb9] object-cover`}
+        onError={() => setHasError(true)}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`flex ${sizeClasses} shrink-0 items-center justify-center rounded-full bg-[#dce2f3] font-bold text-[#151c27] border border-[#bccbb9]/40`}
+    >
+      {getInitials(name)}
+    </div>
+  );
+}
+
 export default function AdminBookingDetailPage({
   params,
 }: {
@@ -322,17 +364,11 @@ export default function AdminBookingDetailPage({
             </h3>
 
             <div className="flex items-center gap-4 rounded-xl bg-[#f8f9fa] p-4 border border-[#bccbb9]/40">
-              {booking.user.avatarUrl ? (
-                <img
-                  src={booking.user.avatarUrl}
-                  alt={booking.user.fullName}
-                  className="h-16 w-16 shrink-0 rounded-full border border-[#bccbb9] object-cover"
-                />
-              ) : (
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#dce2f3] text-xl font-bold text-[#151c27]">
-                  {booking.user.fullName.charAt(0)}
-                </div>
-              )}
+              <UserAvatar
+                avatarUrl={booking.user.avatarUrl}
+                name={booking.user.fullName}
+                size="lg"
+              />
               <div className="flex-1 space-y-1">
                 <p className="font-(family-name:--font-manrope) text-base sm:text-lg font-bold text-[#191c1d]">
                   {booking.user.fullName}

@@ -12,6 +12,10 @@ import {
   getSqlTimeMinutes,
   makeLocalDateTime,
   parseAvailabilityDate,
+  cleanRuleName,
+  parseRuleDays,
+  encodeRuleNameAndDayOfWeek,
+  formatDaysDisplay,
 } from '../../bookings/booking-rules';
 
 export function slugify(text: string): string {
@@ -76,6 +80,9 @@ export class AdminFieldsService {
             orderBy: [{ is_primary: 'desc' }, { sort_order: 'asc' }],
           },
           price_rules: true,
+          reviews: {
+            select: { rating: true },
+          },
         },
         orderBy: { created_at: 'desc' },
         skip,
@@ -86,6 +93,17 @@ export class AdminFieldsService {
 
     const data = items.map((f) => {
       const firstImg = f.field_images?.[0];
+      const reviews = f.reviews ?? [];
+      const reviewCount = reviews.length;
+      const rating =
+        reviewCount > 0
+          ? Number(
+              (
+                reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+              ).toFixed(1),
+            )
+          : 0;
+
       return {
         id: f.id,
         name: f.name,
@@ -102,8 +120,8 @@ export class AdminFieldsService {
         district: f.district,
         city: f.city,
         basePricePerHour: f.base_price_per_hour,
-        rating: 4.8,
-        reviewCount: 0,
+        rating,
+        reviewCount,
         status: f.status,
         imageUrl:
           firstImg?.storage_path ||
@@ -147,6 +165,9 @@ export class AdminFieldsService {
         price_rules: {
           orderBy: { priority: 'desc' },
         },
+        reviews: {
+          select: { rating: true },
+        },
       },
     });
 
@@ -155,6 +176,16 @@ export class AdminFieldsService {
     }
 
     const fieldImages = field.field_images || [];
+    const reviews = field.reviews ?? [];
+    const reviewCount = reviews.length;
+    const rating =
+      reviewCount > 0
+        ? Number(
+            (
+              reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+            ).toFixed(1),
+          )
+        : 0;
 
     const imageUrl =
       fieldImages.length > 0
@@ -184,6 +215,8 @@ export class AdminFieldsService {
       district: field.district,
       city: field.city,
       basePricePerHour: field.base_price_per_hour,
+      rating,
+      reviewCount,
       upcomingBookingsCount: 0,
       description: field.description || '',
       imageUrl,
@@ -194,23 +227,22 @@ export class AdminFieldsService {
         isPrimary: image.is_primary,
         sortOrder: image.sort_order,
       })),
-      priceRules: field.price_rules.map((pr) => ({
-        id: pr.id,
-        fieldId: pr.field_id,
-        name: pr.name,
-        daysDisplay:
-          pr.day_of_week !== null && pr.day_of_week !== undefined
-            ? `Thứ ${pr.day_of_week + 1}`
-            : 'Cả tuần',
-        daysOfWeek:
-          pr.day_of_week !== null && pr.day_of_week !== undefined
-            ? [pr.day_of_week]
-            : [1, 2, 3, 4, 5, 6, 0],
-        startTime: pr.start_time.toISOString().substring(11, 16),
-        endTime: pr.end_time.toISOString().substring(11, 16),
-        pricePerHour: pr.price_per_hour,
-        isActive: pr.is_active,
-      })),
+      priceRules: field.price_rules.map((pr) => {
+        const cleanName = cleanRuleName(pr.name);
+        const days = parseRuleDays(pr);
+        const daysOfWeek = days || [1, 2, 3, 4, 5, 6, 0];
+        return {
+          id: pr.id,
+          fieldId: pr.field_id,
+          name: cleanName,
+          daysDisplay: formatDaysDisplay(days),
+          daysOfWeek,
+          startTime: pr.start_time.toISOString().substring(11, 16),
+          endTime: pr.end_time.toISOString().substring(11, 16),
+          pricePerHour: pr.price_per_hour,
+          isActive: pr.is_active,
+        };
+      }),
     };
   }
 
@@ -679,31 +711,30 @@ export class AdminFieldsService {
       orderBy: [{ priority: 'desc' }, { created_at: 'desc' }],
     });
 
-    return rules.map((r) => ({
-      id: r.id,
-      fieldId: r.field_id,
-      name: r.name,
-      dayOfWeek: r.day_of_week,
-      daysDisplay:
-        r.day_of_week !== null && r.day_of_week !== undefined
-          ? `Thứ ${r.day_of_week === 0 ? 'CN' : r.day_of_week + 1}`
-          : 'Tất cả các ngày',
-      daysOfWeek:
-        r.day_of_week !== null && r.day_of_week !== undefined
-          ? [r.day_of_week]
-          : [1, 2, 3, 4, 5, 6, 0],
-      startTime: r.start_time.toISOString().substring(11, 16),
-      endTime: r.end_time.toISOString().substring(11, 16),
-      pricePerHour: r.price_per_hour,
-      effectiveFrom: r.effective_from
-        ? r.effective_from.toISOString().split('T')[0]
-        : null,
-      effectiveTo: r.effective_to
-        ? r.effective_to.toISOString().split('T')[0]
-        : null,
-      priority: r.priority,
-      isActive: r.is_active,
-    }));
+    return rules.map((r) => {
+      const cleanName = cleanRuleName(r.name);
+      const days = parseRuleDays(r);
+      const daysOfWeek = days || [1, 2, 3, 4, 5, 6, 0];
+      return {
+        id: r.id,
+        fieldId: r.field_id,
+        name: cleanName,
+        dayOfWeek: r.day_of_week,
+        daysDisplay: formatDaysDisplay(days),
+        daysOfWeek,
+        startTime: r.start_time.toISOString().substring(11, 16),
+        endTime: r.end_time.toISOString().substring(11, 16),
+        pricePerHour: r.price_per_hour,
+        effectiveFrom: r.effective_from
+          ? r.effective_from.toISOString().split('T')[0]
+          : null,
+        effectiveTo: r.effective_to
+          ? r.effective_to.toISOString().split('T')[0]
+          : null,
+        priority: r.priority,
+        isActive: r.is_active,
+      };
+    });
   }
 
   async createPriceRule(
@@ -731,16 +762,17 @@ export class AdminFieldsService {
       throw new BadRequestException('Giờ bắt đầu phải nhỏ hơn giờ kết thúc');
     }
 
+    const encoded = encodeRuleNameAndDayOfWeek(
+      data.name,
+      data.daysOfWeek,
+      data.dayOfWeek,
+    );
+
     return this.prisma.price_rules.create({
       data: {
         field_id: fieldId,
-        name: data.name,
-        day_of_week:
-          data.dayOfWeek !== undefined
-            ? data.dayOfWeek
-            : data.daysOfWeek && data.daysOfWeek.length === 1
-              ? data.daysOfWeek[0]
-              : null,
+        name: encoded.name,
+        day_of_week: encoded.day_of_week,
         start_time: parseTimeToDate(data.startTime),
         end_time: parseTimeToDate(data.endTime),
         price_per_hour: data.pricePerHour,
@@ -783,11 +815,33 @@ export class AdminFieldsService {
       );
     }
 
+    const nameToEncode =
+      data.name !== undefined ? data.name : cleanRuleName(existing.name);
+    const hasDaysUpdate =
+      data.daysOfWeek !== undefined || data.dayOfWeek !== undefined;
+    const existingDays = parseRuleDays(existing);
+
+    const encoded = hasDaysUpdate
+      ? encodeRuleNameAndDayOfWeek(
+          nameToEncode,
+          data.daysOfWeek,
+          data.dayOfWeek,
+        )
+      : data.name !== undefined
+        ? encodeRuleNameAndDayOfWeek(
+            nameToEncode,
+            existingDays || undefined,
+            existing.day_of_week ?? undefined,
+          )
+        : null;
+
     return this.prisma.price_rules.update({
       where: { id: ruleId },
       data: {
-        ...(data.name && { name: data.name }),
-        ...(data.dayOfWeek !== undefined && { day_of_week: data.dayOfWeek }),
+        ...(encoded && {
+          name: encoded.name,
+          day_of_week: encoded.day_of_week,
+        }),
         ...(data.startTime && { start_time: parseTimeToDate(data.startTime) }),
         ...(data.endTime && { end_time: parseTimeToDate(data.endTime) }),
         ...(data.pricePerHour !== undefined && {

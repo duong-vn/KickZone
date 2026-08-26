@@ -19,6 +19,7 @@ export interface TimeWindow {
 }
 
 export interface PriceRuleInput {
+  name?: string;
   day_of_week: number | null;
   start_time: Date;
   end_time: Date;
@@ -29,6 +30,86 @@ export interface PriceRuleInput {
   created_at: Date;
   id: string;
   is_active: boolean;
+}
+
+export function cleanRuleName(name: string): string {
+  return name.replace(/\s*\[days:[0-6,]+\]\s*/g, '').trim();
+}
+
+export function parseRuleDays(rule: {
+  name?: string;
+  day_of_week?: number | null;
+}): number[] | null {
+  if (rule.name) {
+    const match = rule.name.match(/\[days:([0-6,]+)\]/);
+    if (match) {
+      const parsed = match[1]
+        .split(',')
+        .map(Number)
+        .filter((n) => !isNaN(n) && n >= 0 && n <= 6);
+      if (parsed.length > 0) return parsed;
+    }
+  }
+  if (rule.day_of_week !== null && rule.day_of_week !== undefined) {
+    return [rule.day_of_week];
+  }
+  return null;
+}
+
+export function encodeRuleNameAndDayOfWeek(
+  name: string,
+  daysOfWeek?: number[],
+  dayOfWeek?: number,
+): { name: string; day_of_week: number | null } {
+  const clean = cleanRuleName(name);
+  if (daysOfWeek && Array.isArray(daysOfWeek)) {
+    const uniqueDays = Array.from(new Set(daysOfWeek)).filter(
+      (n) => !isNaN(n) && n >= 0 && n <= 6,
+    );
+    if (uniqueDays.length === 0 || uniqueDays.length === 7) {
+      return { name: clean, day_of_week: null };
+    }
+    if (uniqueDays.length === 1) {
+      return { name: clean, day_of_week: uniqueDays[0] };
+    }
+    const sortedDays = uniqueDays.sort((a, b) => a - b);
+    return {
+      name: `${clean} [days:${sortedDays.join(',')}]`,
+      day_of_week: null,
+    };
+  }
+  if (dayOfWeek !== undefined && dayOfWeek !== null) {
+    return { name: clean, day_of_week: dayOfWeek };
+  }
+  return { name: clean, day_of_week: null };
+}
+
+export function formatDaysDisplay(days: number[] | null): string {
+  if (!days || days.length === 0 || days.length === 7) {
+    return 'Cả tuần';
+  }
+  if (days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d))) {
+    return 'Thứ 2 - Thứ 6';
+  }
+  if (days.length === 2 && [6, 0].every((d) => days.includes(d))) {
+    return 'Thứ 7 - CN';
+  }
+  if (days.length === 1) {
+    return days[0] === 0 ? 'Chủ Nhật' : `Thứ ${days[0] + 1}`;
+  }
+  const dayNames: Record<number, string> = {
+    1: 'Thứ 2',
+    2: 'Thứ 3',
+    3: 'Thứ 4',
+    4: 'Thứ 5',
+    5: 'Thứ 6',
+    6: 'Thứ 7',
+    0: 'CN',
+  };
+  const sorted = [...days].sort(
+    (a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b),
+  );
+  return sorted.map((d) => dayNames[d] ?? `Thứ ${d + 1}`).join(', ');
 }
 
 export interface PriceSegment {
@@ -234,9 +315,13 @@ export function getSegments(
         const effectiveTo = rule.effective_to
           ? formatUtcDate(rule.effective_to)
           : null;
+        const ruleDays = parseRuleDays(rule);
+        const isDayMatching =
+          ruleDays === null ? true : ruleDays.includes(parts.weekday);
+
         return (
           rule.is_active &&
-          (rule.day_of_week === null || rule.day_of_week === parts.weekday) &&
+          isDayMatching &&
           (!effectiveFrom || parts.date >= effectiveFrom) &&
           (!effectiveTo || parts.date <= effectiveTo) &&
           parts.hour * 60 + parts.minute >= ruleStart &&

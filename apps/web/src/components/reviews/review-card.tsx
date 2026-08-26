@@ -3,6 +3,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
+import { toast } from 'sonner';
 import {
   ChevronDown,
   ChevronUp,
@@ -93,6 +95,33 @@ export function ReviewCard({
           year: 'numeric',
         })
       : rawDate || 'Gần đây';
+
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleReplyClick = () => {
+    if (!hasLoggedInUser) {
+      const currentPath =
+        typeof window !== 'undefined'
+          ? pathname || window.location.pathname
+          : '';
+      toast.info('Vui lòng đăng nhập để gửi bình luận.', {
+        action: {
+          label: 'Đăng nhập',
+          onClick: () => {
+            router.push(
+              currentPath
+                ? `/login?redirect=${encodeURIComponent(currentPath)}`
+                : '/login',
+            );
+          },
+        },
+      });
+      return;
+    }
+    setShowReplyBox((prev) => !prev);
+    setIsCommentsExpanded(true);
+  };
 
   const handleSendComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -229,10 +258,7 @@ export function ReviewCard({
 
           <button
             type="button"
-            onClick={() => {
-              setShowReplyBox(!showReplyBox);
-              setIsCommentsExpanded(true);
-            }}
+            onClick={handleReplyClick}
             className="inline-flex items-center gap-1 text-xs font-semibold text-[#575e70] hover:text-[#006e2f] transition-colors cursor-pointer ml-1"
           >
             <Reply className="w-3.5 h-3.5" />
@@ -251,7 +277,7 @@ export function ReviewCard({
       </div>
 
       {/* 4. Inline Reply Input Form */}
-      {showReplyBox && (
+      {showReplyBox && hasLoggedInUser && (
         <form
           onSubmit={handleSendComment}
           className="mt-3.5 flex items-start gap-2.5 p-3 bg-[#f8f9fa] rounded-xl border border-[#bccbb9]/40 animate-in fade-in-0 duration-200"

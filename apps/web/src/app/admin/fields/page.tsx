@@ -131,9 +131,13 @@ export default function AdminFieldsPage() {
   const fieldSummary = useMemo(() => {
     const active = fields.filter((item) => item.status === 'ACTIVE').length;
     const inactive = fields.filter((item) => item.status === 'INACTIVE').length;
-    const averageRating = fields.length
+    const ratedFields = fields.filter(
+      (item) => (item.reviewCount && item.reviewCount > 0) || item.rating > 0,
+    );
+    const averageRating = ratedFields.length
       ? (
-          fields.reduce((sum, item) => sum + item.rating, 0) / fields.length
+          ratedFields.reduce((sum, item) => sum + item.rating, 0) /
+          ratedFields.length
         ).toFixed(1)
       : '0.0';
     return { active, inactive, averageRating };
@@ -562,16 +566,29 @@ export default function AdminFieldsPage() {
 
                     {/* Đánh giá */}
                     <td className="p-4">
-                      <div
-                        className={`flex items-center gap-1 font-bold ${
-                          field.status === 'ACTIVE'
-                            ? 'text-[#006e2f]'
-                            : 'text-[#575e70]'
-                        }`}
-                      >
-                        <Star className="h-4 w-4 fill-current text-amber-500" />
-                        <span>{field.rating}</span>
-                      </div>
+                      {field.rating > 0 ||
+                      (field.reviewCount && field.reviewCount > 0) ? (
+                        <div
+                          className={`flex items-center gap-1 font-bold ${
+                            field.status === 'ACTIVE'
+                              ? 'text-[#006e2f]'
+                              : 'text-[#575e70]'
+                          }`}
+                        >
+                          <Star className="h-4 w-4 fill-current text-amber-500" />
+                          <span>{field.rating.toFixed(1)}</span>
+                          {field.reviewCount ? (
+                            <span className="text-[11px] font-normal text-[#575e70]">
+                              ({field.reviewCount})
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-xs text-[#575e70]">
+                          <Star className="h-3.5 w-3.5 text-[#bccbb9]" />
+                          <span>Chưa có</span>
+                        </div>
+                      )}
                     </td>
 
                     {/* Trạng thái */}

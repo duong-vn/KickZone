@@ -12,6 +12,7 @@ import {
   CheckCircle,
   Edit3,
   Trash2,
+  LogIn,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -477,52 +478,77 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
             </span>
           </div>
 
-          {/* Add New Comment Box */}
-          <form
-            onSubmit={handleAddTopComment}
-            className="flex items-start gap-3 mb-8"
-          >
-            {userAvatar ? (
-              <img
-                src={userAvatar}
-                alt={currentProfile?.fullName || 'Avatar'}
-                className="w-10 h-10 rounded-full object-cover shrink-0 border border-[#bccbb9]/40"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-[#006e2f] text-white text-xs font-bold flex items-center justify-center shrink-0">
-                {userInitials}
-              </div>
-            )}
+          {/* Add New Comment Box (Logged in) or CTA Banner (Guest) */}
+          {currentUser ? (
+            <form
+              onSubmit={handleAddTopComment}
+              className="flex items-start gap-3 mb-8"
+            >
+              {userAvatar ? (
+                <img
+                  src={userAvatar}
+                  alt={currentProfile?.fullName || 'Avatar'}
+                  className="w-10 h-10 rounded-full object-cover shrink-0 border border-[#bccbb9]/40"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-[#006e2f] text-white text-xs font-bold flex items-center justify-center shrink-0">
+                  {userInitials}
+                </div>
+              )}
 
-            <div className="flex-1 flex flex-col gap-2.5">
-              <textarea
-                rows={3}
-                value={newCommentText}
-                onChange={(e) => setNewCommentText(e.target.value)}
-                placeholder={
-                  currentUser
-                    ? 'Viết bình luận hoặc câu hỏi của bạn về bài đánh giá này...'
-                    : 'Đăng nhập để tham gia bình luận...'
-                }
-                disabled={!currentUser}
-                className="w-full bg-[#f8f9fa] border border-[#bccbb9]/60 rounded-xl p-3.5 text-xs sm:text-sm text-[#191c1d] placeholder:text-[#575e70]/60 focus:outline-none focus:bg-white focus:border-[#006e2f] focus:ring-2 focus:ring-[#006e2f]/20 transition-all resize-none disabled:opacity-60"
-              />
-              <div className="flex justify-end">
-                <Button
-                  type="submit"
-                  disabled={
-                    !currentUser ||
-                    createCommentMutation.isPending ||
-                    !newCommentText.trim()
-                  }
-                  className="bg-[#006e2f] hover:bg-[#004b1e] text-white font-semibold rounded-xl px-5 text-xs shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+              <div className="flex-1 flex flex-col gap-2.5">
+                <textarea
+                  rows={3}
+                  value={newCommentText}
+                  onChange={(e) => setNewCommentText(e.target.value)}
+                  placeholder="Viết bình luận hoặc câu hỏi của bạn về bài đánh giá này..."
+                  className="w-full bg-[#f8f9fa] border border-[#bccbb9]/60 rounded-xl p-3.5 text-xs sm:text-sm text-[#191c1d] placeholder:text-[#575e70]/60 focus:outline-none focus:bg-white focus:border-[#006e2f] focus:ring-2 focus:ring-[#006e2f]/20 transition-all resize-none"
+                />
+                <div className="flex justify-end">
+                  <Button
+                    type="submit"
+                    disabled={
+                      createCommentMutation.isPending || !newCommentText.trim()
+                    }
+                    className="bg-[#006e2f] hover:bg-[#004b1e] text-white font-semibold rounded-xl px-5 text-xs shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Gửi bình luận</span>
+                  </Button>
+                </div>
+              </div>
+            </form>
+          ) : (
+            <div className="mb-8 p-4 sm:p-5 rounded-2xl bg-[#f0fdf4] border border-[#006e2f]/20 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left shadow-xs">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-[#006e2f]/10 text-[#006e2f] flex items-center justify-center shrink-0 border border-[#006e2f]/20">
+                  <LogIn className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-[#191c1d]">
+                    Tham gia thảo luận về bài đánh giá này
+                  </p>
+                  <p className="text-xs text-[#575e70] mt-0.5">
+                    Đăng nhập để đặt câu hỏi hoặc trao đổi thêm cùng mọi người.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Link
+                  href={`/login?redirect=${encodeURIComponent(`/fields/${fieldId}/reviews/${reviewId}`)}`}
+                  className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-[#006e2f] hover:bg-[#004b1e] rounded-xl transition-all shadow-sm active:scale-95"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Gửi bình luận</span>
-                </Button>
+                  Đăng nhập
+                </Link>
+                <Link
+                  href={`/register?redirect=${encodeURIComponent(`/fields/${fieldId}/reviews/${reviewId}`)}`}
+                  className="inline-flex items-center justify-center px-4 py-2 text-xs font-semibold text-[#006e2f] bg-white border border-[#006e2f]/30 hover:bg-[#006e2f]/5 rounded-xl transition-all active:scale-95"
+                >
+                  Đăng ký
+                </Link>
               </div>
             </div>
-          </form>
+          )}
 
           {/* Nested Comments Thread */}
           {commentsList.length > 0 ? (
