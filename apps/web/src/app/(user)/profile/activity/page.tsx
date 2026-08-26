@@ -177,7 +177,7 @@ export default function MyActivityPage() {
       const { data: authData, error: authError } =
         await supabase.auth.getUser();
       if (authError || !authData.user) {
-        router.replace('/login?redirect=/profile/activity');
+        router.replace('/login?next=/profile/activity');
         return;
       }
 

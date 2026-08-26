@@ -71,38 +71,6 @@ export interface BookingDetailData {
   cancellationReason?: string;
 }
 
-const MOCK_BOOKING: BookingDetailData = {
-  id: 'bk-9270',
-  code: '#BK-9270',
-  createdAt: '14:30 - 24/10/2023',
-  status: 'PENDING',
-  user: {
-    id: 'u-1',
-    fullName: 'Nguyễn Văn A',
-    email: 'nguyen.vana@email.com',
-    phone: '0901 234 567',
-    avatarUrl:
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-  },
-  field: {
-    id: 'f-1',
-    name: 'Sân Chảo Lửa - Sân 5',
-    fieldType: 'Sân 5 người',
-    address: '30 Phan Thúc Duyện, Tân Bình, TP.HCM',
-    imageUrl:
-      'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&auto=format&fit=crop&q=80',
-  },
-  bookingDate: '26/10/2023',
-  startTime: '18:00',
-  endTime: '19:30',
-  durationMinutes: 90,
-  originalPrice: 450000,
-  voucherCode: 'KICK10',
-  discountAmount: 45000,
-  otherDiscount: 0,
-  finalPrice: 405000,
-};
-
 export default function AdminBookingDetailPage({
   params,
 }: {
@@ -170,15 +138,8 @@ export default function AdminBookingDetailPage({
         cancellationReason: apiBooking.cancellationReason,
       };
     }
-    if (!isLoading && bookingId === 'bk-9270') {
-      return {
-        ...MOCK_BOOKING,
-        status: localStatus || MOCK_BOOKING.status,
-        rejectionReason: localRejectionReason || undefined,
-      };
-    }
     return null;
-  }, [apiBooking, bookingId, isLoading, localStatus, localRejectionReason]);
+  }, [apiBooking, localStatus, localRejectionReason]);
 
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);

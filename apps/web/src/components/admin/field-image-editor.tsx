@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { ChangeEvent, KeyboardEvent, useRef, useState } from 'react';
+import { ChangeEvent, useRef, useState } from 'react';
 import { ImagePlus, Loader2, Plus, Star, Trash2 } from 'lucide-react';
 
 export type FieldEditorImage = {
@@ -41,16 +41,6 @@ export function FieldImageEditor({
     const files = Array.from(event.target.files ?? []);
     if (files.length > 0) void onFilesSelected(files);
     event.target.value = '';
-  };
-
-  const selectWithKeyboard = (
-    event: KeyboardEvent<HTMLDivElement>,
-    imageId: string,
-  ) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      setSelectedImageId(imageId);
-    }
   };
 
   return (
@@ -127,21 +117,23 @@ export function FieldImageEditor({
           {thumbnailImages.map((image, index) => (
             <div
               key={image.id}
-              role="button"
-              tabIndex={0}
-              aria-label={`Xem ảnh sân ${index + 1}`}
-              onClick={() => setSelectedImageId(image.id)}
-              onKeyDown={(event) => selectWithKeyboard(event, image.id)}
-              className={`group relative aspect-[16/10] shrink-0 cursor-pointer overflow-hidden rounded-xl border bg-[#edeeef] outline-none transition hover:border-[#006e2f] focus-visible:ring-2 focus-visible:ring-[#006e2f] ${
+              className={`group relative aspect-[16/10] shrink-0 overflow-hidden rounded-xl border bg-[#edeeef] ${
                 image.isPrimary ? 'border-[#006e2f]' : 'border-[#bccbb9]'
               }`}
             >
-              <img
-                src={image.url}
-                alt={`Ảnh sân ${index + 2}`}
-                className="h-full w-full object-cover"
-              />
-              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-[#191c1d]/55 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+              <button
+                type="button"
+                aria-label={`Xem ảnh sân ${index + 1}`}
+                onClick={() => setSelectedImageId(image.id)}
+                className="h-full w-full p-0 border-0 bg-transparent text-left cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#006e2f]"
+              >
+                <img
+                  src={image.url}
+                  alt={`Ảnh sân ${index + 2}`}
+                  className="h-full w-full object-cover"
+                />
+              </button>
+              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-[#191c1d]/55 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none">
                 {!image.isPrimary && onSetPrimary && (
                   <button
                     type="button"
@@ -150,7 +142,7 @@ export function FieldImageEditor({
                       event.stopPropagation();
                       void onSetPrimary(image);
                     }}
-                    className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-2 text-xs font-bold text-[#006e2f] shadow-sm hover:bg-[#f3f4f5] disabled:opacity-50"
+                    className="pointer-events-auto inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-2 text-xs font-bold text-[#006e2f] shadow-sm hover:bg-[#f3f4f5] disabled:opacity-50"
                   >
                     <Star className="h-3.5 w-3.5" />
                     Ảnh bìa
@@ -164,7 +156,7 @@ export function FieldImageEditor({
                       event.stopPropagation();
                       void onRemove(image);
                     }}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#ba1a1a] text-white shadow-sm hover:bg-[#93000a] disabled:opacity-50"
+                    className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#ba1a1a] text-white shadow-sm hover:bg-[#93000a] disabled:opacity-50"
                     title="Xóa ảnh"
                   >
                     <Trash2 className="h-4 w-4" />

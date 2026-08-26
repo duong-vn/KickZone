@@ -16,6 +16,8 @@ import {
   Eye,
   Ban,
   CheckCircle2,
+  AlertCircle,
+  RotateCcw,
   Check,
   X,
   ChevronDown,
@@ -23,6 +25,7 @@ import {
   ChevronRight,
   ShieldCheck,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 // Types aligned with database/init.sql
 export type UserRole = 'USER' | 'ADMIN' | 'MANAGER';
@@ -96,10 +99,12 @@ export default function AdminUsersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [roleFilter, setRoleFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const {
     data: apiResponse,
     isLoading,
+    isError,
     refetch,
   } = useQuery({
     queryKey: [
@@ -108,6 +113,7 @@ export default function AdminUsersPage() {
       statusFilter,
       roleFilter,
       currentPage,
+      pageSize,
     ],
     queryFn: () =>
       fetchAdminUsers({
@@ -125,11 +131,13 @@ export default function AdminUsersPage() {
               : 'ADMIN'
             : undefined,
         page: currentPage,
+        limit: pageSize,
       }),
     retry: false,
   });
 
   const [localUsers, setLocalUsers] = useState<AdminUserItem[] | null>(null);
+
   const users: AdminUserItem[] = useMemo(
     () => localUsers || apiResponse?.data || [],
     [localUsers, apiResponse?.data],
@@ -153,47 +161,8 @@ export default function AdminUsersPage() {
     return dateStr;
   };
 
-  // Filtered users list
-  const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      // Search
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesName = user.fullName.toLowerCase().includes(q);
-        const matchesEmail = user.email.toLowerCase().includes(q);
-        const matchesPhone = user.phone.includes(q);
-        if (!matchesName && !matchesEmail && !matchesPhone) return false;
-      }
-
-      // Status
-      if (statusFilter !== 'all') {
-        if (statusFilter === 'active' && user.status !== 'ACTIVE') return false;
-        if (statusFilter === 'disabled' && user.status !== 'INACTIVE')
-          return false;
-        if (statusFilter === 'pending' && user.status !== 'PENDING')
-          return false;
-      }
-
-      // Role
-      if (roleFilter !== 'all') {
-        if (roleFilter === 'customer' && user.role !== 'USER') return false;
-        if (
-          roleFilter === 'manager' &&
-          user.role !== 'MANAGER' &&
-          user.role !== 'ADMIN'
-        )
-          return false;
-      }
-
-      return true;
-    });
-  }, [users, searchQuery, statusFilter, roleFilter]);
-
-  const [pageSize, setPageSize] = useState(10);
-  const totalRecords = apiResponse?.meta?.total ?? filteredUsers.length ?? 0;
-  const totalPages =
-    apiResponse?.meta?.totalPages ??
-    Math.max(1, Math.ceil(totalRecords / pageSize));
+  const totalRecords = apiResponse?.meta?.total ?? 0;
+  const totalPages = apiResponse?.meta?.totalPages ?? 0;
   const startRecord = totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRecord = Math.min(currentPage * pageSize, totalRecords);
   const userSummary = useMemo(
@@ -235,21 +204,13 @@ export default function AdminUsersPage() {
     ];
   };
 
-  // Filtered and paginated users
-  const displayUsers = useMemo(() => {
-    if (filteredUsers.length > pageSize) {
-      return filteredUsers.slice(
-        (currentPage - 1) * pageSize,
-        currentPage * pageSize,
-      );
-    }
-    return filteredUsers;
-  }, [filteredUsers, currentPage, pageSize]);
+  const displayUsers = users;
 
   // Toggle user status
   const handleToggleStatus = async (userId: string) => {
     const target = users.find((u) => u.id === userId);
     if (!target) return;
+    const prevStatus = target.status;
     const nextStatus: UserStatus =
       target.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
 
@@ -274,6 +235,14 @@ export default function AdminUsersPage() {
           : `Đã vô hiệu hóa tài khoản của ${target.fullName}.`,
       );
     } catch (err) {
+      setLocalUsers((prev) =>
+        (prev || apiResponse?.data || []).map((u: AdminUserItem) => {
+          if (u.id === userId) {
+            return { ...u, status: prevStatus };
+          }
+          return u;
+        }),
+      );
       showToast(`Lỗi cập nhật trạng thái: ${(err as Error).message}`);
     }
   };
@@ -282,6 +251,7 @@ export default function AdminUsersPage() {
   const handleApproveUser = async (userId: string) => {
     const target = users.find((u) => u.id === userId);
     if (!target) return;
+    const prevStatus = target.status;
 
     setLocalUsers((prev) =>
       (prev || apiResponse?.data || []).map((u: AdminUserItem) => {
@@ -297,6 +267,14 @@ export default function AdminUsersPage() {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       showToast(`Đã duyệt kích hoạt tài khoản cho ${target.fullName}!`);
     } catch (err) {
+      setLocalUsers((prev) =>
+        (prev || apiResponse?.data || []).map((u: AdminUserItem) => {
+          if (u.id === userId) {
+            return { ...u, status: prevStatus };
+          }
+          return u;
+        }),
+      );
       showToast(`Lỗi cập nhật: ${(err as Error).message}`);
     }
   };
@@ -406,7 +384,10 @@ export default function AdminUsersPage() {
             id="search-user"
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="Tìm theo tên hoặc email..."
             className={`${adminFilterControlClass} pl-9`}
             aria-label="Tìm kiếm người dùng"
@@ -417,7 +398,10 @@ export default function AdminUsersPage() {
           <select
             id="filter-status"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setCurrentPage(1);
+            }}
             className={`${adminFilterControlClass} appearance-none pr-10`}
             aria-label="Lọc trạng thái tài khoản"
           >
@@ -433,7 +417,10 @@ export default function AdminUsersPage() {
           <select
             id="filter-role"
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
+            onChange={(e) => {
+              setRoleFilter(e.target.value);
+              setCurrentPage(1);
+            }}
             className={`${adminFilterControlClass} appearance-none pr-10`}
             aria-label="Lọc vai trò người dùng"
           >
@@ -464,7 +451,37 @@ export default function AdminUsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#bccbb9]/50 text-xs sm:text-sm text-[#191c1d]">
-              {displayUsers.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="py-12 text-center text-sm text-[#575e70]"
+                  >
+                    Đang tải danh sách người dùng...
+                  </td>
+                </tr>
+              ) : isError ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-sm">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="flex items-center gap-2 text-[#ba1a1a] font-semibold">
+                        <AlertCircle className="h-5 w-5" />
+                        <span>Không thể tải danh sách người dùng</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => refetch()}
+                        className="flex items-center gap-1.5 border-[#bccbb9] text-[#191c1d] hover:bg-[#f3f4f5]"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        <span>Thử lại</span>
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ) : displayUsers.length === 0 ? (
                 <tr>
                   <td
                     colSpan={6}

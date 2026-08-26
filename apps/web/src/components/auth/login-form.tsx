@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
 import { Eye, EyeOff, LoaderCircle, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 import { fetchCurrentUserProfile } from '@/lib/api';
+import { getSafeReturnPath } from '@/lib/return-path';
 
 type OAuthProvider = 'google' | 'facebook';
 
@@ -58,6 +59,10 @@ function getLoginErrorMessage(message: string) {
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnPath = getSafeReturnPath(
+    searchParams.get('next') ?? searchParams.get('redirect'),
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [oauthProvider, setOauthProvider] = useState<OAuthProvider | null>(
@@ -127,11 +132,7 @@ export function LoginForm() {
         data.user?.app_metadata?.role === 'ADMIN' ||
         data.user?.email?.toLowerCase().startsWith('admin');
 
-      if (isAdmin) {
-        router.replace('/admin');
-      } else {
-        router.replace('/');
-      }
+      router.replace(isAdmin ? '/admin' : (returnPath ?? '/'));
       router.refresh();
     } catch {
       toast.error('Thiếu cấu hình Supabase hoặc kết nối đang gián đoạn.');
@@ -148,7 +149,7 @@ export function LoginForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: `${window.location.origin}${returnPath ?? '/'}`,
         },
       });
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -16,16 +17,35 @@ export function DeleteReviewDialog({
   onConfirm,
   isLoading = false,
 }: DeleteReviewDialogProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isLoading) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isLoading, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-0 duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-0 duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-review-title"
+    >
       <div className="w-full max-w-md bg-white rounded-2xl border border-[#bccbb9]/40 p-6 shadow-2xl animate-in zoom-in-95 duration-200">
         <div className="w-12 h-12 rounded-full bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center mb-4">
           <AlertTriangle className="w-6 h-6 stroke-[2.2]" />
         </div>
 
-        <h3 className="font-['Manrope'] font-bold text-lg text-[#191c1d] mb-2">
+        <h3
+          id="delete-review-title"
+          className="font-['Manrope'] font-bold text-lg text-[#191c1d] mb-2"
+        >
           Xóa bài đánh giá?
         </h3>
         <p className="text-xs sm:text-sm text-[#575e70] leading-relaxed mb-6">

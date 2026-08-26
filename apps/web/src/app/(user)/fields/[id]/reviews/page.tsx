@@ -655,7 +655,7 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
                     <Button
                       onClick={() =>
                         router.push(
-                          `/login?redirect=/fields/${field.id}/reviews`,
+                          `/login?next=/fields/${field.id}/reviews`,
                         )
                       }
                       className="flex-1 bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-bold rounded-xl py-2.5 cursor-pointer"
