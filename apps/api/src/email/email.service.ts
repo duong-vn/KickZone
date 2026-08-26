@@ -115,8 +115,10 @@ export class EmailService {
         text,
         html,
       });
-    } catch {
-      this.logger.error(`Password reset email failed for ${recipient}`);
+    } catch (error) {
+      this.logger.error(
+        `Password reset email failed for ${recipient}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return;
     }
 
@@ -148,8 +150,10 @@ export class EmailService {
         text,
         html,
       });
-    } catch {
-      this.logger.error(`Email failed for booking ${booking.id}`);
+    } catch (error) {
+      this.logger.error(
+        `Email failed for booking ${booking.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return;
     }
 
@@ -173,14 +177,17 @@ export class EmailService {
       );
       return null;
     }
+    const port = Number(process.env.EMAIL_PORT ?? 587);
+    const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
+
     this.transporter = nodemailer.createTransport({
       host,
-      port: 587,
-      secure: false,
-      requireTLS: true,
-      connectionTimeout: 5_000,
-      greetingTimeout: 5_000,
-      socketTimeout: 10_000,
+      port,
+      secure,
+      requireTLS: !secure,
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 20_000,
       auth: { user, pass },
     });
     return this.transporter;
