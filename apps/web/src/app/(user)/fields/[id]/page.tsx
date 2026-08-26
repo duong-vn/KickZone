@@ -480,7 +480,7 @@ export default function FieldDetailPage({
 
   // 3. Favorites state
   const { data: favData } = useFavoriteStatusQuery(fieldId);
-  const toggleFavoriteMutation = useToggleFavoriteMutation(fieldId);
+  const toggleFavoriteMutation = useToggleFavoriteMutation(fieldId, field);
   const isFavorite = favData?.is_favorite ?? false;
 
   const handleToggleFavorite = () => {

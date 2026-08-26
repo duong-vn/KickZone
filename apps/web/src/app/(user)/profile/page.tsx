@@ -145,7 +145,9 @@ export default function ProfilePage() {
   ) => {
     event.preventDefault();
     if (!validatePassword(newPassword)) {
-      toast.error('Mật khẩu cần ít nhất 8 ký tự và đạt 3/4 nhóm bảo mật.');
+      toast.error(
+        'Mật khẩu phải có độ dài tối thiểu 8 ký tự và chứa ít nhất 3 loại: chữ thường, viết hoa, số, ký tự đặc biệt.',
+      );
       return;
     }
     if (newPassword !== confirmPassword) {

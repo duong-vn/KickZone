@@ -8,7 +8,8 @@ import {
   fetchFavoriteStatus,
   toggleFavoriteField,
 } from '@/lib/api';
-import type { FavoritesResponse } from '@/types/favorite';
+import type { Favorite, FavoritesResponse } from '@/types/favorite';
+import type { Field } from '@/types/field';
 
 export const FAVORITES_QUERY_KEY = ['favorites'];
 export const FAVORITE_STATUS_QUERY_KEY = (fieldId: string) => [
@@ -37,7 +38,7 @@ export function useFavoriteStatusQuery(fieldId: string, enabled = true) {
   });
 }
 
-export function useToggleFavoriteMutation(fieldId: string) {
+export function useToggleFavoriteMutation(fieldId: string, field?: Field) {
   const queryClient = useQueryClient();
   const router = useRouter();
 
@@ -60,7 +61,10 @@ export function useToggleFavoriteMutation(fieldId: string) {
       const wasFavorite =
         previousStatus?.is_favorite ??
         previousFavorites.some(([, favorites]) =>
-          favorites?.data.some((favorite) => favorite.field_id === fieldId),
+          favorites?.data?.some(
+            (favorite) =>
+              favorite.field_id === fieldId || favorite.field?.id === fieldId,
+          ),
         );
       const newStatus = !wasFavorite;
 
@@ -69,14 +73,32 @@ export function useToggleFavoriteMutation(fieldId: string) {
         { is_favorite: newStatus },
       );
 
-      if (!newStatus) {
-        queryClient.setQueriesData<FavoritesResponse>(
-          { queryKey: FAVORITES_QUERY_KEY },
-          (favorites) => {
-            if (!favorites) return favorites;
+      queryClient.setQueriesData<FavoritesResponse>(
+        { queryKey: FAVORITES_QUERY_KEY },
+        (favorites) => {
+          if (!favorites) {
+            if (newStatus && field) {
+              return {
+                data: [
+                  {
+                    id: `temp-${fieldId}-${Date.now()}`,
+                    user_id: '',
+                    field_id: fieldId,
+                    field,
+                    created_at: new Date().toISOString(),
+                  },
+                ],
+                meta: { total: 1, page: 1, limit: 12, totalPages: 1 },
+              };
+            }
+            return favorites;
+          }
 
+          if (!newStatus) {
             const data = favorites.data.filter(
-              (favorite) => favorite.field_id !== fieldId,
+              (favorite) =>
+                favorite.field_id !== fieldId &&
+                favorite.field?.id !== fieldId,
             );
             return {
               ...favorites,
@@ -92,9 +114,34 @@ export function useToggleFavoriteMutation(fieldId: string) {
                   }
                 : undefined,
             };
-          },
-        );
-      }
+          } else {
+            const exists = favorites.data.some(
+              (fav) =>
+                fav.field_id === fieldId || fav.field?.id === fieldId,
+            );
+            if (exists) return favorites;
+
+            const newFavoriteItem: Favorite = {
+              id: `temp-${fieldId}-${Date.now()}`,
+              user_id: '',
+              field_id: fieldId,
+              field: field || ({ id: fieldId } as Field),
+              created_at: new Date().toISOString(),
+            };
+
+            return {
+              ...favorites,
+              data: [newFavoriteItem, ...favorites.data],
+              meta: favorites.meta
+                ? {
+                    ...favorites.meta,
+                    total: (favorites.meta.total || 0) + 1,
+                  }
+                : undefined,
+            };
+          }
+        },
+      );
 
       return { previousStatus, previousFavorites };
     },
