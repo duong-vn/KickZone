@@ -2,8 +2,10 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   Prisma,
   booking_status,
@@ -65,10 +67,61 @@ type BookingWithRelations = Prisma.bookingsGetPayload<{
 
 @Injectable()
 export class BookingsService {
+  private readonly logger = new Logger(BookingsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
   ) {}
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async handleAutomaticStatusTransitions() {
+    const now = new Date();
+    try {
+      // 1. CONFIRMED -> COMPLETED when end_time <= now
+      const completedResult = await this.prisma.bookings.updateMany({
+        where: {
+          status: booking_status.CONFIRMED,
+          end_time: { lte: now },
+        },
+        data: {
+          status: booking_status.COMPLETED,
+          updated_at: now,
+        },
+      });
+
+      if (completedResult.count > 0) {
+        this.logger.log(
+          `Auto-completed ${completedResult.count} confirmed booking(s).`,
+        );
+      }
+
+      // 2. PENDING -> REJECTED when start_time <= now
+      const rejectedResult = await this.prisma.bookings.updateMany({
+        where: {
+          status: booking_status.PENDING,
+          start_time: { lte: now },
+        },
+        data: {
+          status: booking_status.REJECTED,
+          rejection_reason:
+            'Tự động từ chối do quá thời gian bắt đầu trận đấu mà chưa được xác nhận.',
+          updated_at: now,
+        },
+      });
+
+      if (rejectedResult.count > 0) {
+        this.logger.log(
+          `Auto-rejected ${rejectedResult.count} expired pending booking(s).`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        'Error during automatic status transitions cron job',
+        error,
+      );
+    }
+  }
 
   async create(dto: CreateBookingDto, profile: AuthenticatedProfile) {
     const interval = parseBookingInterval(dto.startTime, dto.endTime);
