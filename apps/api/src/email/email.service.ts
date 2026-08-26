@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { setDefaultResultOrder } from 'node:dns';
 import { unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,6 +8,8 @@ import { pathToFileURL } from 'node:url';
 import { Injectable, Logger } from '@nestjs/common';
 import nodemailer, { type Transporter } from 'nodemailer';
 import type { BookingResponse } from '../bookings/bookings.service.js';
+
+setDefaultResultOrder('ipv4first');
 
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('vi-VN', {
   dateStyle: 'medium',
