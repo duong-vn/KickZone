@@ -114,15 +114,16 @@ export function FieldCard({
   showFavoriteButton = true,
 }: FieldCardProps) {
   const { data: favoritesData } = useFavoritesQuery(undefined);
-  const toggleFavMutation = useToggleFavoriteMutation(field.id);
+  const toggleFavMutation = useToggleFavoriteMutation(field.id, field);
 
   const isFavorited =
-    isFavorite ??
-    Boolean(
-      favoritesData?.data?.some(
-        (fav) => fav.field_id === field.id || fav.field?.id === field.id,
-      ),
-    );
+    isFavorite !== undefined
+      ? isFavorite
+      : Boolean(
+          favoritesData?.data?.some(
+            (fav) => fav.field_id === field.id || fav.field?.id === field.id,
+          ),
+        );
 
   const [hasImageError, setHasImageError] = useState(false);
   const primaryImage = getFieldPrimaryImage(field);
@@ -166,15 +167,14 @@ export function FieldCard({
           <button
             type="button"
             onClick={handleFavoriteClick}
-            disabled={toggleFavMutation.isPending}
             title={isFavorited ? 'Bỏ khỏi yêu thích' : 'Thêm vào yêu thích'}
             aria-label={`Yêu thích ${field.name}`}
-            className="absolute top-2.5 right-2.5 bg-white/90 backdrop-blur-xs rounded-full p-2 flex items-center justify-center cursor-pointer hover:bg-white shadow-xs transition-all hover:scale-110 active:scale-95 z-10"
+            className="absolute top-2.5 right-2.5 bg-white/90 backdrop-blur-xs rounded-full p-2 flex items-center justify-center cursor-pointer hover:bg-white shadow-xs transition-all hover:scale-110 active:scale-90 z-10"
           >
             <Heart
-              className={`w-4 h-4 transition-colors ${
+              className={`w-4 h-4 transition-all duration-200 ${
                 isFavorited
-                  ? 'fill-[#ba1a1a] text-[#ba1a1a]'
+                  ? 'fill-[#ba1a1a] text-[#ba1a1a] scale-110'
                   : 'text-[#575e70] hover:text-[#ba1a1a]'
               }`}
             />

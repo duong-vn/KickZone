@@ -34,12 +34,50 @@ const TABS: Array<{ label: string; value?: BookingStatus }> = [
   { label: 'Bị từ chối', value: 'REJECTED' },
 ];
 
-const STATUS_LABELS: Record<BookingStatus, string> = {
-  PENDING: 'Chờ xác nhận',
-  CONFIRMED: 'Đã xác nhận',
-  COMPLETED: 'Hoàn thành',
-  CANCELLED: 'Đã hủy',
-  REJECTED: 'Bị từ chối',
+const STATUS_CONFIG: Record<
+  BookingStatus,
+  {
+    label: string;
+    cardClasses: string;
+    badgeClasses: string;
+    dotClasses: string;
+  }
+> = {
+  PENDING: {
+    label: 'Chờ xác nhận',
+    cardClasses:
+      'border-amber-300/80 bg-gradient-to-b from-amber-50/40 via-white to-white hover:border-amber-400',
+    badgeClasses: 'bg-amber-100/80 text-amber-800 border-amber-300/70',
+    dotClasses: 'bg-amber-500 animate-pulse',
+  },
+  CONFIRMED: {
+    label: 'Đã xác nhận',
+    cardClasses:
+      'border-emerald-300/80 bg-gradient-to-b from-emerald-50/40 via-white to-white hover:border-emerald-400',
+    badgeClasses: 'bg-emerald-100/80 text-emerald-800 border-emerald-300/70',
+    dotClasses: 'bg-emerald-600',
+  },
+  COMPLETED: {
+    label: 'Hoàn thành',
+    cardClasses:
+      'border-blue-300/80 bg-gradient-to-b from-blue-50/40 via-white to-white hover:border-blue-400',
+    badgeClasses: 'bg-blue-100/80 text-blue-800 border-blue-300/70',
+    dotClasses: 'bg-blue-600',
+  },
+  CANCELLED: {
+    label: 'Đã hủy',
+    cardClasses:
+      'border-slate-300/80 bg-gradient-to-b from-slate-50/50 via-white to-white hover:border-slate-400 opacity-90',
+    badgeClasses: 'bg-slate-100 text-slate-700 border-slate-300/70',
+    dotClasses: 'bg-slate-400',
+  },
+  REJECTED: {
+    label: 'Bị từ chối',
+    cardClasses:
+      'border-rose-300/80 bg-gradient-to-b from-rose-50/40 via-white to-white hover:border-rose-400 opacity-90',
+    badgeClasses: 'bg-rose-100/80 text-rose-800 border-rose-300/70',
+    dotClasses: 'bg-rose-500',
+  },
 };
 
 export default function MyBookingsPage() {
@@ -155,71 +193,85 @@ export default function MyBookingsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {bookings.map((booking) => (
-              <article
-                key={booking.id}
-                className="flex flex-col justify-between rounded-2xl border border-[#bccbb9]/40 bg-white p-5 shadow-sm hover:shadow-md transition-shadow"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <h2 className="line-clamp-1 font-bold text-sm text-[#191c1d]">
-                      {booking.field.name}
-                    </h2>
-                    <span className="rounded-lg bg-[#f8f9fa] border border-[#bccbb9]/40 px-2 py-1 text-[10px] font-bold text-[#006e2f]">
-                      #{booking.code}
-                    </span>
-                  </div>
-                  <p className="mt-2 flex items-center gap-1 truncate text-xs text-[#575e70]">
-                    <MapPin className="h-3.5 w-3.5 text-[#006e2f] shrink-0" />
-                    {booking.field.address}
-                  </p>
-                  <div className="mt-4 space-y-2 rounded-xl bg-[#f8f9fa] p-3 text-xs border border-[#bccbb9]/30">
-                    <p className="flex items-center gap-2 text-[#191c1d]">
-                      <Calendar className="h-3.5 w-3.5 text-[#006e2f]" />
-                      {formatBusinessDate(booking.startTime)}
+            {bookings.map((booking) => {
+              const statusCfg = STATUS_CONFIG[booking.status] || {
+                label: booking.status,
+                cardClasses: 'border-[#bccbb9]/40 bg-white',
+                badgeClasses: 'bg-slate-100 text-slate-700 border-slate-200',
+                dotClasses: 'bg-slate-500',
+              };
+
+              return (
+                <article
+                  key={booking.id}
+                  className={`flex flex-col justify-between rounded-2xl border p-5 shadow-sm hover:shadow-md transition-all ${statusCfg.cardClasses}`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <h2 className="line-clamp-1 font-bold text-sm text-[#191c1d]">
+                        {booking.field.name}
+                      </h2>
+                      <span className="rounded-lg bg-white/80 border border-[#bccbb9]/50 px-2 py-1 text-[10px] font-bold text-[#006e2f] shadow-xs">
+                        #{booking.code}
+                      </span>
+                    </div>
+                    <p className="mt-2 flex items-center gap-1 truncate text-xs text-[#575e70]">
+                      <MapPin className="h-3.5 w-3.5 text-[#006e2f] shrink-0" />
+                      {booking.field.address}
                     </p>
-                    <p className="flex items-center gap-2 text-[#191c1d]">
-                      <Clock className="h-3.5 w-3.5 text-[#006e2f]" />
-                      {formatBusinessTime(booking.startTime)} -{' '}
-                      {formatBusinessTime(booking.endTime)} (
-                      {durationMinutes(booking.startTime, booking.endTime)}{' '}
-                      phút)
-                    </p>
+                    <div className="mt-4 space-y-2 rounded-xl bg-white/80 p-3 text-xs border border-[#bccbb9]/30 shadow-xs">
+                      <p className="flex items-center gap-2 text-[#191c1d]">
+                        <Calendar className="h-3.5 w-3.5 text-[#006e2f]" />
+                        {formatBusinessDate(booking.startTime)}
+                      </p>
+                      <p className="flex items-center gap-2 text-[#191c1d]">
+                        <Clock className="h-3.5 w-3.5 text-[#006e2f]" />
+                        {formatBusinessTime(booking.startTime)} -{' '}
+                        {formatBusinessTime(booking.endTime)} (
+                        {durationMinutes(booking.startTime, booking.endTime)}{' '}
+                        phút)
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="mt-5 border-t border-[#bccbb9]/30 pt-3">
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-[#575e70]">
-                      {STATUS_LABELS[booking.status] || booking.status}
-                    </span>
-                    <b className="text-[#006e2f] text-sm">
-                      {booking.finalPrice.toLocaleString('vi-VN')}đ
-                    </b>
-                  </div>
-                  <div className="flex gap-2">
-                    <Link href={`/bookings/${booking.id}`} className="flex-1">
-                      <Button
-                        variant="outline"
-                        className="w-full rounded-xl text-xs font-semibold"
+                  <div className="mt-5 border-t border-[#bccbb9]/30 pt-3">
+                    <div className="mb-3 flex items-center justify-between">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusCfg.badgeClasses}`}
                       >
-                        Xem chi tiết
-                      </Button>
-                    </Link>
-                    {booking.status === 'PENDING' && (
-                      <Button
-                        onClick={() => {
-                          setCancelTarget(booking.id);
-                          setReason('');
-                        }}
-                        className="rounded-xl bg-rose-50 text-xs text-rose-700 hover:bg-rose-100 border border-rose-200 font-bold"
-                      >
-                        Hủy
-                      </Button>
-                    )}
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${statusCfg.dotClasses}`}
+                        />
+                        {statusCfg.label}
+                      </span>
+                      <b className="text-[#006e2f] text-sm">
+                        {booking.finalPrice.toLocaleString('vi-VN')}đ
+                      </b>
+                    </div>
+                    <div className="flex gap-2">
+                      <Link href={`/bookings/${booking.id}`} className="flex-1">
+                        <Button
+                          variant="outline"
+                          className="w-full rounded-xl text-xs font-semibold bg-white/80 hover:bg-white"
+                        >
+                          Xem chi tiết
+                        </Button>
+                      </Link>
+                      {booking.status === 'PENDING' && (
+                        <Button
+                          onClick={() => {
+                            setCancelTarget(booking.id);
+                            setReason('');
+                          }}
+                          className="rounded-xl bg-rose-50 text-xs text-rose-700 hover:bg-rose-100 border border-rose-200 font-bold"
+                        >
+                          Hủy
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
         {totalPages > 1 && (

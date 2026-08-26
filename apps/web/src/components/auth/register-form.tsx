@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
-import { ArrowRight, Eye, EyeOff, LoaderCircle } from 'lucide-react';
+import { ArrowRight, Check, Eye, EyeOff, LoaderCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useMemo } from 'react';
 
 import { AuthBrand } from '@/components/auth/auth-brand';
 import { Button } from '@/components/ui/button';
@@ -22,15 +23,28 @@ type RegistrationValues = {
   acceptedTerms: boolean;
 };
 
-function validatePassword(password: string) {
-  const categoryCount = [
-    /[a-z]/.test(password),
-    /[A-Z]/.test(password),
-    /\d/.test(password),
-    /[^A-Za-z0-9]/.test(password),
-  ].filter(Boolean).length;
+function validatePasswordCriteria(password: string) {
+  const hasMinLength = password.length >= 8;
+  const hasLower = /[a-z]/.test(password);
+  const hasUpper = /[A-Z]/.test(password);
+  const hasDigit = /\d/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
 
-  return password.length >= 8 && categoryCount >= 3;
+  const categoryCount = [hasLower, hasUpper, hasDigit, hasSpecial].filter(
+    Boolean,
+  ).length;
+  const hasRequiredCategories = categoryCount >= 3;
+
+  return {
+    hasMinLength,
+    hasLower,
+    hasUpper,
+    hasDigit,
+    hasSpecial,
+    categoryCount,
+    hasRequiredCategories,
+    isValid: hasMinLength && hasRequiredCategories,
+  };
 }
 
 function getRegistrationErrorMessage(message: string) {
@@ -67,9 +81,16 @@ function getRegistrationErrorMessage(message: string) {
 
 export function RegisterForm() {
   const router = useRouter();
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const criteria = useMemo(
+    () => validatePasswordCriteria(password),
+    [password],
+  );
 
   function readFormValues(form: HTMLFormElement): RegistrationValues {
     const formData = new FormData(form);
@@ -78,8 +99,8 @@ export function RegisterForm() {
       fullName: String(formData.get('fullName') ?? '').trim(),
       email: String(formData.get('email') ?? '').trim(),
       phone: String(formData.get('phone') ?? '').trim(),
-      password: String(formData.get('password') ?? ''),
-      confirmPassword: String(formData.get('confirmPassword') ?? ''),
+      password,
+      confirmPassword,
       acceptedTerms: formData.get('terms') === 'on',
     };
   }
@@ -99,8 +120,12 @@ export function RegisterForm() {
       return 'Hãy sử dụng địa chỉ email thật để đăng ký tài khoản.';
     }
 
-    if (!validatePassword(values.password)) {
-      return 'Mật khẩu cần ít nhất 8 ký tự và đạt 3/4 nhóm: chữ thường, chữ hoa, số, ký tự đặc biệt.';
+    if (!criteria.hasMinLength) {
+      return 'Mật khẩu phải có độ dài tối thiểu 8 ký tự.';
+    }
+
+    if (!criteria.hasRequiredCategories) {
+      return 'Mật khẩu phải có ít nhất 3 loại ký tự: chữ thường, viết hoa, số, ký tự đặc biệt.';
     }
 
     if (values.password !== values.confirmPassword) {
@@ -148,16 +173,13 @@ export function RegisterForm() {
         return;
       }
 
-      if (!data.session) {
-        toast.warning(
-          'Supabase đang bật xác nhận email nên chưa thể đăng nhập ngay. Hãy tắt Confirm Email trong cấu hình Auth rồi thử lại bằng email khác.',
-        );
-        return;
+      // If Supabase created a session automatically on signup, sign out so user logs in explicitly
+      if (data.session) {
+        await supabase.auth.signOut();
       }
 
-      toast.success('Tạo tài khoản và đăng nhập thành công');
-      router.replace('/');
-      router.refresh();
+      toast.success('Đăng ký tài khoản thành công! Vui lòng đăng nhập.');
+      router.replace('/login');
     } catch {
       toast.error('Thiếu cấu hình Supabase hoặc kết nối đang gián đoạn.');
     } finally {
@@ -230,21 +252,104 @@ export function RegisterForm() {
           name="password"
           label="Mật khẩu"
           placeholder="Tạo mật khẩu"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
           visible={showPassword}
           onToggle={() => setShowPassword((visible) => !visible)}
           disabled={isSubmitting}
           autoComplete="new-password"
         />
-        <p className="-mt-2 text-xs leading-5 text-muted-foreground">
-          Ít nhất 8 ký tự và đạt 3/4 nhóm: chữ thường, chữ hoa, số, ký tự đặc
-          biệt.
-        </p>
+
+        <div className="space-y-2 rounded-xl border border-border/80 bg-card/60 p-3.5 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-foreground">
+              Yêu cầu mật khẩu an toàn:
+            </span>
+            <span
+              className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                criteria.isValid
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              {criteria.isValid ? 'Đạt chuẩn' : `${criteria.categoryCount}/3 nhóm`}
+            </span>
+          </div>
+          <ul className="space-y-1.5 text-muted-foreground">
+            <li className="flex items-center gap-2">
+              {criteria.hasMinLength ? (
+                <Check className="size-3.5 text-emerald-600 shrink-0" />
+              ) : (
+                <X className="size-3.5 text-muted-foreground/60 shrink-0" />
+              )}
+              <span className={criteria.hasMinLength ? 'text-foreground font-medium' : ''}>
+                Độ dài tối thiểu 8 ký tự ({password.length}/8)
+              </span>
+            </li>
+            <li className="flex items-center gap-2">
+              {criteria.hasRequiredCategories ? (
+                <Check className="size-3.5 text-emerald-600 shrink-0" />
+              ) : (
+                <X className="size-3.5 text-muted-foreground/60 shrink-0" />
+              )}
+              <span
+                className={
+                  criteria.hasRequiredCategories
+                    ? 'text-foreground font-medium'
+                    : ''
+                }
+              >
+                Đạt ít nhất 3 trong 4 loại ký tự:
+              </span>
+            </li>
+          </ul>
+          <div className="grid grid-cols-2 gap-1.5 pt-1 pl-5">
+            <span
+              className={`inline-flex items-center gap-1 text-[11px] ${
+                criteria.hasLower
+                  ? 'text-emerald-700 font-medium'
+                  : 'text-muted-foreground/70'
+              }`}
+            >
+              {criteria.hasLower ? '✓' : '•'} Chữ thường (a-z)
+            </span>
+            <span
+              className={`inline-flex items-center gap-1 text-[11px] ${
+                criteria.hasUpper
+                  ? 'text-emerald-700 font-medium'
+                  : 'text-muted-foreground/70'
+              }`}
+            >
+              {criteria.hasUpper ? '✓' : '•'} Viết hoa (A-Z)
+            </span>
+            <span
+              className={`inline-flex items-center gap-1 text-[11px] ${
+                criteria.hasDigit
+                  ? 'text-emerald-700 font-medium'
+                  : 'text-muted-foreground/70'
+              }`}
+            >
+              {criteria.hasDigit ? '✓' : '•'} Số (0-9)
+            </span>
+            <span
+              className={`inline-flex items-center gap-1 text-[11px] ${
+                criteria.hasSpecial
+                  ? 'text-emerald-700 font-medium'
+                  : 'text-muted-foreground/70'
+              }`}
+            >
+              {criteria.hasSpecial ? '✓' : '•'} Ký tự đặc biệt (!@#$)
+            </span>
+          </div>
+        </div>
 
         <PasswordField
           id="confirmPassword"
           name="confirmPassword"
           label="Xác nhận mật khẩu"
           placeholder="Nhập lại mật khẩu"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
           visible={showConfirmPassword}
           onToggle={() => setShowConfirmPassword((visible) => !visible)}
           disabled={isSubmitting}
@@ -313,6 +418,8 @@ type PasswordFieldProps = {
   name: string;
   label: string;
   placeholder: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   visible: boolean;
   disabled: boolean;
   autoComplete: string;
@@ -324,6 +431,8 @@ function PasswordField({
   name,
   label,
   placeholder,
+  value,
+  onChange,
   visible,
   disabled,
   autoComplete,
@@ -341,6 +450,8 @@ function PasswordField({
           autoComplete={autoComplete}
           required
           minLength={8}
+          value={value}
+          onChange={onChange}
           disabled={disabled}
           className="pr-11"
         />

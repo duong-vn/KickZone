@@ -25,12 +25,35 @@ import { useRequireAuth } from '@/hooks/use-require-auth';
 import type { BookingStatus } from '@/types/booking';
 import { formatFieldTypeName } from '@/lib/utils';
 
-const labels: Record<BookingStatus, string> = {
-  PENDING: 'Chờ xác nhận',
-  CONFIRMED: 'Đã xác nhận',
-  COMPLETED: 'Hoàn thành',
-  CANCELLED: 'Đã hủy',
-  REJECTED: 'Bị từ chối',
+const STATUS_BADGES: Record<
+  BookingStatus,
+  { label: string; badgeClasses: string; dotClasses: string }
+> = {
+  PENDING: {
+    label: 'Chờ xác nhận',
+    badgeClasses: 'bg-amber-100/80 text-amber-800 border-amber-300/80',
+    dotClasses: 'bg-amber-500 animate-pulse',
+  },
+  CONFIRMED: {
+    label: 'Đã xác nhận',
+    badgeClasses: 'bg-emerald-100/80 text-emerald-800 border-emerald-300/80',
+    dotClasses: 'bg-emerald-600',
+  },
+  COMPLETED: {
+    label: 'Hoàn thành',
+    badgeClasses: 'bg-blue-100/80 text-blue-800 border-blue-300/80',
+    dotClasses: 'bg-blue-600',
+  },
+  CANCELLED: {
+    label: 'Đã hủy',
+    badgeClasses: 'bg-slate-100 text-slate-700 border-slate-300/80',
+    dotClasses: 'bg-slate-400',
+  },
+  REJECTED: {
+    label: 'Bị từ chối',
+    badgeClasses: 'bg-rose-100/80 text-rose-800 border-rose-300/80',
+    dotClasses: 'bg-rose-500',
+  },
 };
 
 export default function BookingDetailPage({
@@ -94,8 +117,18 @@ export default function BookingDetailPage({
             <h1 className="text-2xl font-extrabold font-['Manrope']">
               Chi tiết #{booking.code}
             </h1>
-            <span className="rounded-full bg-[#006e2f]/10 px-4 py-1.5 text-xs font-bold text-[#006e2f]">
-              {labels[booking.status]}
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1 text-xs font-bold ${
+                STATUS_BADGES[booking.status]?.badgeClasses ||
+                'bg-slate-100 text-slate-700'
+              }`}
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  STATUS_BADGES[booking.status]?.dotClasses || 'bg-slate-500'
+                }`}
+              />
+              {STATUS_BADGES[booking.status]?.label || booking.status}
             </span>
           </div>
           <p className="mt-1 text-xs text-[#575e70]">

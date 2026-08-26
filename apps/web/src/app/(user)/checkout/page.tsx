@@ -108,13 +108,13 @@ function CheckoutContent() {
         endTime,
         voucherCode: activeVoucher?.code,
       }),
-    onSuccess: async ({ data }) => {
-      await queryClient.invalidateQueries({ queryKey: ['bookings', 'me'] });
-      await queryClient.invalidateQueries({
-        queryKey: ['availability', fieldId, date],
-      });
+    onSuccess: ({ data }) => {
       toast.success(`Đã tạo yêu cầu đặt sân #${data.code}.`);
       router.push(`/bookings/${data.id}`);
+      void queryClient.invalidateQueries({ queryKey: ['bookings', 'me'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['availability', fieldId, date],
+      });
     },
     onError: (error: ApiError) => {
       if (error.code === 'BOOKING_OVERLAP') {
