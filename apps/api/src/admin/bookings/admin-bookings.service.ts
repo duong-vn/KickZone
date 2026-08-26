@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../../email/email.service';
 import {
   QueryAdminBookingsDto,
   RejectBookingDto,
@@ -13,7 +14,10 @@ import { formatBusinessDate } from '../../bookings/booking-rules';
 
 @Injectable()
 export class AdminBookingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+  ) {}
 
   async findAll(query: QueryAdminBookingsDto) {
     const page = Number(query.page) || 1;
@@ -250,7 +254,38 @@ export class AdminBookingsService {
       );
     }
 
-    return this.findOne(id);
+    const result = await this.findOne(id);
+    if (result && (result as { user?: { email?: string } }).user?.email) {
+      this.email.enqueueBookingApproved(
+        (result as { user: { email: string } }).user.email,
+        {
+          id: result.id,
+          code: result.code,
+          field: {
+            id: result.field.id,
+            name: result.field.name,
+            address: result.field.address,
+            city: (result.field as { city?: string }).city || 'Hồ Chí Minh',
+            district: (result.field as { district?: string }).district || '',
+            type: null,
+            primaryImagePath: null,
+          },
+          voucher: null,
+          startTime: result.startTime,
+          endTime: result.endTime,
+          status: booking_status.CONFIRMED,
+          originalPrice: result.originalPrice,
+          discountAmount: result.discountAmount,
+          finalPrice: result.finalPrice,
+          cancellationReason: null,
+          rejectionReason: null,
+          createdAt: result.createdAt,
+          updatedAt: result.updatedAt,
+        },
+      );
+    }
+
+    return result;
   }
 
   async reject(id: string, dto: RejectBookingDto) {
@@ -277,7 +312,38 @@ export class AdminBookingsService {
       );
     }
 
-    return this.findOne(id);
+    const result = await this.findOne(id);
+    if (result && (result as { user?: { email?: string } }).user?.email) {
+      this.email.enqueueBookingRejected(
+        (result as { user: { email: string } }).user.email,
+        {
+          id: result.id,
+          code: result.code,
+          field: {
+            id: result.field.id,
+            name: result.field.name,
+            address: result.field.address,
+            city: (result.field as { city?: string }).city || 'Hồ Chí Minh',
+            district: (result.field as { district?: string }).district || '',
+            type: null,
+            primaryImagePath: null,
+          },
+          voucher: null,
+          startTime: result.startTime,
+          endTime: result.endTime,
+          status: booking_status.REJECTED,
+          originalPrice: result.originalPrice,
+          discountAmount: result.discountAmount,
+          finalPrice: result.finalPrice,
+          cancellationReason: null,
+          rejectionReason: dto.reason?.trim() || 'Admin từ chối đơn đặt sân',
+          createdAt: result.createdAt,
+          updatedAt: result.updatedAt,
+        },
+      );
+    }
+
+    return result;
   }
 
   async getCalendar(from?: string, to?: string, fieldId?: string) {

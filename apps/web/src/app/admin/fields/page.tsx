@@ -15,13 +15,15 @@ import {
   AdminFilterBar,
   adminFilterControlClass,
 } from '@/components/admin/admin-filter-bar';
+import { Button } from '@/components/ui/button';
 import {
   Search,
   Plus,
   Star,
   Eye,
   Edit3,
-  Calendar,
+  AlertCircle,
+  RotateCcw,
   Ban,
   CheckCircle2,
   X,
@@ -61,14 +63,21 @@ export default function AdminFieldsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  const { data: apiResponse } = useQuery({
+  const {
+    data: apiResponse,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: [
       'admin-fields',
       searchQuery,
       typeFilter,
       statusFilter,
       currentPage,
+      pageSize,
     ],
     queryFn: () =>
       fetchAdminFields({
@@ -76,11 +85,13 @@ export default function AdminFieldsPage() {
         type: typeFilter || undefined,
         status: statusFilter || undefined,
         page: currentPage,
+        limit: pageSize,
       }),
     retry: false,
   });
 
   const [localFields, setLocalFields] = useState<AdminFieldItem[] | null>(null);
+
   const fields: AdminFieldItem[] = useMemo(
     () => localFields || apiResponse?.data || [],
     [localFields, apiResponse?.data],
@@ -113,42 +124,8 @@ export default function AdminFieldsPage() {
     return new Intl.NumberFormat('vi-VN').format(value) + 'đ/h';
   };
 
-  // Filtered fields
-  const filteredFields = useMemo(() => {
-    return fields.filter((field) => {
-      // Keyword search (Name or Address)
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesName = field.name.toLowerCase().includes(q);
-        const matchesAddress = field.address.toLowerCase().includes(q);
-        if (!matchesName && !matchesAddress) return false;
-      }
-
-      // Field Type filter
-      if (typeFilter) {
-        if (typeFilter === '5' && field.fieldType !== '5-a-side') return false;
-        if (typeFilter === '7' && field.fieldType !== '7-a-side') return false;
-        if (typeFilter === '11' && field.fieldType !== '11-a-side')
-          return false;
-      }
-
-      // Status filter
-      if (statusFilter) {
-        if (statusFilter === 'active' && field.status !== 'ACTIVE')
-          return false;
-        if (statusFilter === 'disabled' && field.status !== 'INACTIVE')
-          return false;
-      }
-
-      return true;
-    });
-  }, [fields, searchQuery, typeFilter, statusFilter]);
-
-  const [pageSize, setPageSize] = useState(10);
-  const totalRecords = apiResponse?.meta?.total ?? filteredFields.length ?? 0;
-  const totalPages =
-    apiResponse?.meta?.totalPages ??
-    Math.max(1, Math.ceil(totalRecords / pageSize));
+  const totalRecords = apiResponse?.meta?.total ?? 0;
+  const totalPages = apiResponse?.meta?.totalPages ?? 0;
   const startRecord = totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRecord = Math.min(currentPage * pageSize, totalRecords);
   const fieldSummary = useMemo(() => {
@@ -190,21 +167,13 @@ export default function AdminFieldsPage() {
     ];
   };
 
-  // Filtered and paginated fields
-  const displayFields = useMemo(() => {
-    if (filteredFields.length > pageSize) {
-      return filteredFields.slice(
-        (currentPage - 1) * pageSize,
-        currentPage * pageSize,
-      );
-    }
-    return filteredFields;
-  }, [filteredFields, currentPage, pageSize]);
+  const displayFields = fields;
 
   // Toggle field status (Hoạt động <-> Vô hiệu hóa)
   const handleToggleStatus = async (fieldId: string) => {
     const target = fields.find((f) => f.id === fieldId);
     if (!target) return;
+    const prevStatus = target.status;
     const nextStatus: FieldStatus =
       target.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
 
@@ -226,6 +195,14 @@ export default function AdminFieldsPage() {
           : `Đã chuyển ${target.name} sang trạng thái Vô hiệu hóa.`,
       );
     } catch (err) {
+      setLocalFields((prev) =>
+        (prev || apiResponse?.data || []).map((f: AdminFieldItem) => {
+          if (f.id === fieldId) {
+            return { ...f, status: prevStatus };
+          }
+          return f;
+        }),
+      );
       showToast(`Lỗi cập nhật trạng thái: ${(err as Error).message}`);
     }
   };
@@ -437,7 +414,10 @@ export default function AdminFieldsPage() {
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="Tìm kiếm theo tên sân hoặc địa chỉ..."
             className={`${adminFilterControlClass} pl-9`}
             aria-label="Tìm kiếm sân bóng"
@@ -447,7 +427,10 @@ export default function AdminFieldsPage() {
         <div className="relative">
           <select
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
+            onChange={(e) => {
+              setTypeFilter(e.target.value);
+              setCurrentPage(1);
+            }}
             className={`${adminFilterControlClass} appearance-none pr-10`}
             aria-label="Lọc loại sân"
           >
@@ -462,7 +445,10 @@ export default function AdminFieldsPage() {
         <div className="relative">
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setCurrentPage(1);
+            }}
             className={`${adminFilterControlClass} appearance-none pr-10`}
             aria-label="Lọc trạng thái sân"
           >
@@ -491,7 +477,37 @@ export default function AdminFieldsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#bccbb9]/50 text-xs sm:text-sm text-[#191c1d]">
-              {displayFields.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="py-12 text-center text-sm text-[#575e70]"
+                  >
+                    Đang tải danh sách sân bóng...
+                  </td>
+                </tr>
+              ) : isError ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-sm">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="flex items-center gap-2 text-[#ba1a1a] font-semibold">
+                        <AlertCircle className="h-5 w-5" />
+                        <span>Không thể tải danh sách sân bóng</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => refetch()}
+                        className="flex items-center gap-1.5 border-[#bccbb9] text-[#191c1d] hover:bg-[#f3f4f5]"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        <span>Thử lại</span>
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ) : displayFields.length === 0 ? (
                 <tr>
                   <td
                     colSpan={8}

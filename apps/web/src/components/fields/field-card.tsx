@@ -7,7 +7,6 @@ import { Heart, MapPin, Star, Users } from 'lucide-react';
 import { Field } from '@/types/field';
 import { formatFieldTypeName } from '@/lib/utils';
 import {
-  useFavoriteStatusQuery,
   useFavoritesQuery,
   useToggleFavoriteMutation,
 } from '@/hooks/use-favorites';
@@ -114,13 +113,11 @@ export function FieldCard({
   onToggleFavorite,
   showFavoriteButton = true,
 }: FieldCardProps) {
-  const { data: favoritesData } = useFavoritesQuery();
-  const { data: favoriteStatus } = useFavoriteStatusQuery(field.id, false);
+  const { data: favoritesData } = useFavoritesQuery(undefined);
   const toggleFavMutation = useToggleFavoriteMutation(field.id);
 
   const isFavorited =
     isFavorite ??
-    favoriteStatus?.is_favorite ??
     Boolean(
       favoritesData?.data?.some(
         (fav) => fav.field_id === field.id || fav.field?.id === field.id,
@@ -257,20 +254,16 @@ export function FieldCard({
             </div>
           </div>
 
-          <div>
-            <Link href={`/fields/${field.id}`}>
-              <button
-                type="button"
-                className={`px-4 py-1.5 font-['Inter',sans-serif] text-xs font-semibold rounded-lg transition-all shadow-2xs active:scale-95 cursor-pointer ${
-                  isAvailable
-                    ? 'bg-[#006e2f] text-white hover:bg-[#005321]'
-                    : 'border border-[#006e2f] text-[#006e2f] hover:bg-[#006e2f]/10'
-                }`}
-              >
-                {isAvailable ? 'Đặt ngay' : 'Xem chi tiết'}
-              </button>
-            </Link>
-          </div>
+          <Link
+            href={`/fields/${field.id}`}
+            className={`px-4 py-1.5 font-['Inter',sans-serif] text-xs font-semibold rounded-lg transition-all shadow-2xs active:scale-95 inline-flex items-center justify-center ${
+              isAvailable
+                ? 'bg-[#006e2f] text-white hover:bg-[#005321]'
+                : 'border border-[#006e2f] text-[#006e2f] hover:bg-[#006e2f]/10'
+            }`}
+          >
+            {isAvailable ? 'Đặt ngay' : 'Xem chi tiết'}
+          </Link>
         </div>
       </div>
     </article>

@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import React, { useState, use, useMemo, useRef } from 'react';
+import React, { useState, use, useRef } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -70,44 +70,6 @@ export interface UserDetailData {
   recentReviews: UserDetailReview[];
 }
 
-// Sample User Detail Data
-const MOCK_USER_DETAIL: UserDetailData = {
-  id: 'u-1',
-  authUserId: 'auth-1',
-  fullName: 'Nguyễn Văn An',
-  email: 'nguyenvanan@email.com',
-  phone: '0901 234 567',
-  role: 'USER',
-  roleLabel: 'Khách hàng',
-  status: 'ACTIVE',
-  avatarUrl:
-    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-  createdAt: '2023-10-10',
-  totalBookings: 12,
-  totalSpent: 3600000,
-  recentBookings: [
-    {
-      id: 'b-1',
-      code: 'KZ-20231101-01',
-      fieldName: 'Sân bóng Lam Sơn 1',
-      fieldLocation: 'Quận 5, TP. HCM',
-      bookingDate: '2023-11-01',
-      timeRange: '18:00 - 19:30',
-      status: 'COMPLETED',
-    },
-  ],
-  recentReviews: [
-    {
-      id: 'r-1',
-      fieldName: 'Sân bóng Lam Sơn 1',
-      rating: 5,
-      content:
-        'Sân đẹp, mặt cỏ rất êm, hệ thống đèn chiếu sáng cực tốt ban đêm!',
-      date: '2023-11-02',
-    },
-  ],
-};
-
 export default function AdminUserDetailPage({
   params,
 }: {
@@ -117,7 +79,11 @@ export default function AdminUserDetailPage({
   const userId = resolvedParams.id;
   const queryClient = useQueryClient();
 
-  const { data: apiUser, isLoading } = useQuery({
+  const {
+    data: apiUser,
+    isLoading,
+    isError,
+  } = useQuery<UserDetailData>({
     queryKey: ['admin-user', userId],
     queryFn: () => fetchAdminUserById(userId),
     retry: false,
@@ -126,14 +92,7 @@ export default function AdminUserDetailPage({
   const [localUser, setLocalUser] = useState<Partial<UserDetailData> | null>(
     null,
   );
-  const user: UserDetailData = useMemo(() => {
-    return {
-      ...MOCK_USER_DETAIL,
-      ...(apiUser || {}),
-      ...(localUser || {}),
-      id: userId,
-    };
-  }, [apiUser, localUser, userId]);
+  const user = apiUser ? { ...apiUser, ...localUser } : null;
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -167,6 +126,7 @@ export default function AdminUserDetailPage({
   };
 
   const handleStartEdit = () => {
+    if (!user) return;
     setEditFormData({
       fullName: user.fullName,
       phone: user.phone || '',
@@ -339,7 +299,7 @@ export default function AdminUserDetailPage({
     );
   }
 
-  if (!apiUser && userId !== 'u-1') {
+  if (isError || !user) {
     return (
       <div className="mx-auto w-full max-w-7xl py-16 flex flex-col items-center justify-center text-center">
         <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4 text-slate-400">

@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   X,
   Calendar,
@@ -92,8 +92,24 @@ function WriteReviewModalContent({
     onClose();
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSubmitting) {
+        setIsSuccess(false);
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSubmitting, onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-0 duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-0 duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="write-review-title"
+    >
       <div className="relative w-full max-w-2xl bg-white rounded-2xl border border-[#bccbb9]/40 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Close Button */}
         <button
@@ -139,7 +155,10 @@ function WriteReviewModalContent({
           <div className="p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
             {/* Header */}
             <div className="mb-6 pr-8">
-              <h2 className="font-['Manrope'] font-extrabold text-2xl text-[#006e2f] mb-1">
+              <h2
+                id="write-review-title"
+                className="font-['Manrope'] font-extrabold text-2xl text-[#006e2f] mb-1"
+              >
                 {isEditing ? 'Chỉnh sửa đánh giá' : 'Viết đánh giá'}
               </h2>
               <p className="text-xs sm:text-sm text-[#575e70]">

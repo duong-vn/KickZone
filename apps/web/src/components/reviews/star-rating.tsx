@@ -77,7 +77,7 @@ export function StarRating({
                 aria-label={`Chọn ${star} sao - ${RATING_LABELS[star]}`}
                 onClick={() => onChange(star)}
                 onMouseEnter={() => setHoverValue(star)}
-                className="cursor-pointer transition-transform hover:scale-115 focus:outline-none active:scale-95 p-0.5"
+                className="cursor-pointer transition-transform hover:scale-115 rounded-md p-1 outline-none focus-visible:ring-2 focus-visible:ring-[#006e2f] active:scale-95"
               >
                 <Star
                   className={cn(

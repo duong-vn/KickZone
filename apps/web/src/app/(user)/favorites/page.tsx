@@ -178,14 +178,12 @@ export default function FavoritesPage() {
             </p>
           </div>
 
-          <Link href="/fields">
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[#bccbb9] bg-white text-xs font-semibold text-[#191c1d] hover:bg-[#f3f4f5] hover:text-[#006e2f] transition-all shadow-2xs cursor-pointer active:scale-95"
-            >
-              <Compass className="w-4 h-4 text-[#006e2f]" />
-              Khám phá thêm sân
-            </button>
+          <Link
+            href="/fields"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[#bccbb9] bg-white text-xs font-semibold text-[#191c1d] hover:bg-[#f3f4f5] hover:text-[#006e2f] transition-all shadow-2xs cursor-pointer active:scale-95"
+          >
+            <Compass className="w-4 h-4 text-[#006e2f]" />
+            <span>Khám phá thêm sân</span>
           </Link>
         </div>
 
@@ -219,14 +217,12 @@ export default function FavoritesPage() {
               Bạn cần đăng nhập tài khoản để xem và quản lý danh sách các sân
               bóng yêu thích.
             </p>
-            <Link href="/login?redirect=/favorites">
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#006e2f] text-white font-['Inter',sans-serif] text-xs font-semibold rounded-xl hover:bg-[#006e2f]/90 transition-colors shadow-md active:scale-95 cursor-pointer"
-              >
-                <LogIn className="w-4 h-4" />
-                Đăng nhập ngay
-              </button>
+            <Link
+              href="/login?next=/favorites"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#006e2f] text-white font-['Inter',sans-serif] text-xs font-semibold rounded-xl hover:bg-[#006e2f]/90 transition-colors shadow-md active:scale-95 cursor-pointer"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Đăng nhập ngay</span>
             </Link>
           </div>
         )}
@@ -379,14 +375,12 @@ export default function FavoritesPage() {
                   Hãy thả tim các sân bóng bạn thích để dễ dàng đặt lại trong
                   tương lai.
                 </p>
-                <Link href="/fields">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#006e2f] text-white font-['Inter',sans-serif] text-xs font-semibold rounded-xl hover:bg-[#006e2f]/90 transition-colors shadow-md active:scale-95 cursor-pointer"
-                  >
-                    <Compass className="w-4 h-4" />
-                    Khám phá sân bóng
-                  </button>
+                <Link
+                  href="/fields"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#006e2f] text-white font-['Inter',sans-serif] text-xs font-semibold rounded-xl hover:bg-[#006e2f]/90 transition-colors shadow-md active:scale-95 cursor-pointer"
+                >
+                  <Compass className="w-4 h-4" />
+                  <span>Khám phá sân bóng</span>
                 </Link>
               </>
             )}

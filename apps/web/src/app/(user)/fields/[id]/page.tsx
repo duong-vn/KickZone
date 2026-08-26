@@ -598,6 +598,17 @@ export default function FieldDetailPage({
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
+  useEffect(() => {
+    if (!isGalleryOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsGalleryOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isGalleryOpen]);
+
   // 6. Review state & modals
   const [localReviews] = useState<Review[] | null>(null);
   const [isWriteReviewOpen, setIsWriteReviewOpen] = useState(false);
@@ -795,23 +806,29 @@ export default function FieldDetailPage({
       return;
     }
 
-    const freshAvailability = await availabilityQuery.refetch();
-    const freshSlots = freshAvailability.data?.data.slots ?? [];
-    if (!getContiguousAvailableSlots(freshSlots, startTime, endTime).length) {
-      setStartTime('');
-      setEndTime('');
-      setAppliedVoucher(null);
-      toast.error('Khung giờ vừa không còn trống. Vui lòng chọn giờ khác.');
-      return;
-    }
+    try {
+      const freshAvailability = await availabilityQuery.refetch();
+      const freshSlots = freshAvailability.data?.data.slots ?? [];
+      if (!getContiguousAvailableSlots(freshSlots, startTime, endTime).length) {
+        setStartTime('');
+        setEndTime('');
+        setAppliedVoucher(null);
+        toast.error('Khung giờ vừa không còn trống. Vui lòng chọn giờ khác.');
+        return;
+      }
 
-    const queryParams = new URLSearchParams({
-      fieldId: field.id,
-      startTime,
-      endTime,
-      voucher: activeVoucher?.code ?? '',
-    });
-    router.push(`/checkout?${queryParams.toString()}`);
+      const queryParams = new URLSearchParams({
+        fieldId: field.id,
+        startTime,
+        endTime,
+        voucher: activeVoucher?.code ?? '',
+      });
+      router.push(`/checkout?${queryParams.toString()}`);
+    } catch {
+      toast.error(
+        'Không thể kiểm tra trạng thái sân lúc này. Vui lòng thử lại.',
+      );
+    }
   };
 
   // Review eligibility check
@@ -1079,12 +1096,14 @@ export default function FieldDetailPage({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="relative grid grid-cols-1 md:grid-cols-4 gap-3 h-80 sm:h-[420px] md:h-[480px] lg:h-[500px] rounded-3xl overflow-hidden shadow-sm">
           {/* Main Large Image */}
-          <div
-            className="md:col-span-2 relative h-full group cursor-pointer overflow-hidden bg-slate-200"
+          <button
+            type="button"
+            className="md:col-span-2 relative h-full group cursor-pointer overflow-hidden bg-slate-200 text-left p-0 border-0 outline-none focus-visible:ring-2 focus-visible:ring-[#006e2f]"
             onClick={() => {
               setSelectedPhotoIndex(0);
               setIsGalleryOpen(true);
             }}
+            aria-label="Xem ảnh chính phóng to"
           >
             <img
               src={fieldImages[0] || ''}
@@ -1096,65 +1115,73 @@ export default function FieldDetailPage({
                 Xem ảnh phóng to
               </span>
             </div>
-          </div>
+          </button>
 
           {/* Sub images */}
           <div className="hidden md:flex flex-col gap-3 h-full">
-            <div
-              className="relative flex-1 group cursor-pointer overflow-hidden bg-slate-200 rounded-xl"
+            <button
+              type="button"
+              className="relative flex-1 group cursor-pointer overflow-hidden bg-slate-200 rounded-xl text-left p-0 border-0 outline-none focus-visible:ring-2 focus-visible:ring-[#006e2f]"
               onClick={() => {
                 setSelectedPhotoIndex(1);
                 setIsGalleryOpen(true);
               }}
+              aria-label="Xem ảnh phụ 1 phóng to"
             >
               <img
                 src={fieldImages[1] || fieldImages[0] || ''}
                 alt={`${field.name} ảnh phụ 1`}
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
               />
-            </div>
-            <div
-              className="relative flex-1 group cursor-pointer overflow-hidden bg-slate-200 rounded-xl"
+            </button>
+            <button
+              type="button"
+              className="relative flex-1 group cursor-pointer overflow-hidden bg-slate-200 rounded-xl text-left p-0 border-0 outline-none focus-visible:ring-2 focus-visible:ring-[#006e2f]"
               onClick={() => {
                 setSelectedPhotoIndex(2);
                 setIsGalleryOpen(true);
               }}
+              aria-label="Xem ảnh phụ 2 phóng to"
             >
               <img
                 src={fieldImages[2] || fieldImages[0] || ''}
                 alt={`${field.name} ảnh phụ 2`}
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
               />
-            </div>
+            </button>
           </div>
 
           <div className="hidden md:flex flex-col gap-3 h-full">
-            <div
-              className="relative flex-1 group cursor-pointer overflow-hidden bg-slate-200 rounded-xl"
+            <button
+              type="button"
+              className="relative flex-1 group cursor-pointer overflow-hidden bg-slate-200 rounded-xl text-left p-0 border-0 outline-none focus-visible:ring-2 focus-visible:ring-[#006e2f]"
               onClick={() => {
                 setSelectedPhotoIndex(3);
                 setIsGalleryOpen(true);
               }}
+              aria-label="Xem ảnh phụ 3 phóng to"
             >
               <img
                 src={fieldImages[3] || fieldImages[0] || ''}
                 alt={`${field.name} ảnh phụ 3`}
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
               />
-            </div>
-            <div
-              className="relative flex-1 group cursor-pointer overflow-hidden bg-slate-200 rounded-xl"
+            </button>
+            <button
+              type="button"
+              className="relative flex-1 group cursor-pointer overflow-hidden bg-slate-200 rounded-xl text-left p-0 border-0 outline-none focus-visible:ring-2 focus-visible:ring-[#006e2f]"
               onClick={() => {
                 setSelectedPhotoIndex(4);
                 setIsGalleryOpen(true);
               }}
+              aria-label="Xem ảnh phụ 4 phóng to"
             >
               <img
                 src={fieldImages[4] || fieldImages[0] || ''}
                 alt={`${field.name} ảnh phụ 4`}
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
               />
-            </div>
+            </button>
           </div>
 
           <button
@@ -2028,7 +2055,7 @@ export default function FieldDetailPage({
                 <div className="flex flex-col sm:flex-row gap-2.5">
                   <Button
                     onClick={() =>
-                      router.push(`/login?redirect=/fields/${field.id}`)
+                      router.push(`/login?next=/fields/${field.id}`)
                     }
                     className="flex-1 bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-bold rounded-xl py-2.5 cursor-pointer"
                   >
@@ -2056,7 +2083,7 @@ export default function FieldDetailPage({
                 <div className="flex flex-col sm:flex-row gap-2.5">
                   <Button
                     onClick={() =>
-                      router.push(`/login?redirect=/fields/${field.id}`)
+                      router.push(`/login?next=/fields/${field.id}`)
                     }
                     className="flex-1 bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-bold rounded-xl py-2.5 cursor-pointer"
                   >

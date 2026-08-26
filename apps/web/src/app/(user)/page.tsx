@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import {
   Search,
   MapPin,
@@ -14,7 +15,6 @@ import {
   Zap,
   ChevronDown,
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { FieldCard } from '@/components/fields/field-card';
 import { fetchFields } from '@/lib/api';

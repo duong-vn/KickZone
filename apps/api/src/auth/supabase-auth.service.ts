@@ -65,9 +65,12 @@ export class SupabaseAuthService {
           apikey: serviceKey,
           Authorization: `Bearer ${token}`,
         },
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(12000),
       });
-    } catch {
+    } catch (err: unknown) {
+      this.logger.error(
+        `Failed to reach Supabase Auth (${url}): ${err instanceof Error ? err.message : String(err)}`,
+      );
       throw new ServiceUnavailableException({
         code: 'AUTH_PROVIDER_UNAVAILABLE',
         message: 'Authentication service is unavailable.',

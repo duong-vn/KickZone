@@ -143,8 +143,8 @@ export default function AdminSchedulePage() {
       const title = `${day} Tháng ${month}, ${year}`;
 
       return {
-        fromISO: `${dateStr}T00:00:00.000Z`,
-        toISO: `${dateStr}T23:59:59.999Z`,
+        fromISO: `${dateStr}T00:00:00+07:00`,
+        toISO: `${dateStr}T23:59:59+07:00`,
         weekDays: [
           {
             date: new Date(d),
@@ -205,8 +205,8 @@ export default function AdminSchedulePage() {
       const toStr = days[6].dateString;
 
       return {
-        fromISO: `${fromStr}T00:00:00.000Z`,
-        toISO: `${toStr}T23:59:59.999Z`,
+        fromISO: `${fromStr}T00:00:00+07:00`,
+        toISO: `${toStr}T23:59:59+07:00`,
         weekDays: days,
         titleDisplay: monthDisplay,
       };
@@ -245,8 +245,8 @@ export default function AdminSchedulePage() {
       const toStr = days[days.length - 1].dateString;
 
       return {
-        fromISO: `${fromStr}T00:00:00.000Z`,
-        toISO: `${toStr}T23:59:59.999Z`,
+        fromISO: `${fromStr}T00:00:00+07:00`,
+        toISO: `${toStr}T23:59:59+07:00`,
         weekDays: days,
         titleDisplay: `Tháng ${month + 1}, ${year}`,
       };
@@ -255,8 +255,8 @@ export default function AdminSchedulePage() {
     // Year mode
     const year = d.getFullYear();
     return {
-      fromISO: `${year}-01-01T00:00:00.000Z`,
-      toISO: `${year}-12-31T23:59:59.999Z`,
+      fromISO: `${year}-01-01T00:00:00+07:00`,
+      toISO: `${year}-12-31T23:59:59+07:00`,
       weekDays: [],
       titleDisplay: `Năm ${year}`,
     };

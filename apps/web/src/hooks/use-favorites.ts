@@ -134,7 +134,7 @@ export function useToggleFavoriteMutation(fieldId: string) {
                 typeof window !== 'undefined' ? window.location.pathname : '';
               router.push(
                 currentPath
-                  ? `/login?redirect=${encodeURIComponent(currentPath)}`
+                  ? `/login?next=${encodeURIComponent(currentPath)}`
                   : '/login',
               );
             },

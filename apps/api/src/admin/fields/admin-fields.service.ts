@@ -8,6 +8,11 @@ import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 import { CreateFieldDto } from './dto/create-field.dto';
+import {
+  getSqlTimeMinutes,
+  makeLocalDateTime,
+  parseAvailabilityDate,
+} from '../../bookings/booking-rules';
 
 export function slugify(text: string): string {
   return text
@@ -572,20 +577,28 @@ export class AdminFieldsService {
       throw new NotFoundException('Sân bóng không tồn tại hoặc đã bị xóa');
     }
 
-    const targetDate = new Date(dateStr);
-    const dayOfWeek = targetDate.getUTCDay(); // 0 is Sunday
+    const { date, weekday } = parseAvailabilityDate(dateStr);
 
     const opHour = field.field_operating_hours.find(
-      (oh) => oh.day_of_week === dayOfWeek,
+      (oh) => oh.day_of_week === weekday,
     );
 
-    const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
-    const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
+    const openMinutes =
+      opHour?.open_time && !opHour.is_closed
+        ? getSqlTimeMinutes(opHour.open_time)
+        : 6 * 60;
+    const closeMinutes =
+      opHour?.close_time && !opHour.is_closed
+        ? getSqlTimeMinutes(opHour.close_time)
+        : 22 * 60;
+
+    const startOfDay = makeLocalDateTime(date, 0);
+    const endOfDay = makeLocalDateTime(date, 24 * 60);
 
     const bookings = await this.prisma.bookings.findMany({
       where: {
         field_id: id,
-        start_time: { gte: startOfDay, lte: endOfDay },
+        start_time: { gte: startOfDay, lt: endOfDay },
         status: { in: ['PENDING', 'CONFIRMED'] },
       },
       include: {
@@ -594,16 +607,14 @@ export class AdminFieldsService {
       orderBy: { start_time: 'asc' },
     });
 
-    // Generate 30-minute slots between 06:00 and 22:00 (or operating hours)
-    const openTimeStr = opHour?.open_time
-      ? opHour.open_time.toISOString().substring(11, 16)
-      : '06:00';
-    const closeTimeStr = opHour?.close_time
-      ? opHour.close_time.toISOString().substring(11, 16)
-      : '22:00';
+    const formatTime = (minutes: number) => {
+      const h = Math.floor(minutes / 60);
+      const m = minutes % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
 
-    const [openH, openM] = openTimeStr.split(':').map(Number);
-    const [closeH, closeM] = closeTimeStr.split(':').map(Number);
+    const openTimeStr = formatTime(openMinutes);
+    const closeTimeStr = formatTime(closeMinutes);
 
     const slots: Array<{
       startTime: string;
@@ -619,25 +630,16 @@ export class AdminFieldsService {
       };
     }> = [];
 
-    let currentMinutes = openH * 60 + openM;
-    const endMinutes = closeH * 60 + closeM;
+    let currentMinutes = openMinutes;
 
-    while (currentMinutes + 30 <= endMinutes) {
-      const startH = Math.floor(currentMinutes / 60);
-      const startMin = currentMinutes % 60;
-      const endH = Math.floor((currentMinutes + 30) / 60);
-      const endMin = (currentMinutes + 30) % 60;
+    while (currentMinutes + 30 <= closeMinutes) {
+      const slotStartStr = formatTime(currentMinutes);
+      const slotEndStr = formatTime(currentMinutes + 30);
 
-      const formatTime = (h: number, m: number) =>
-        `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      const slotStartTime = makeLocalDateTime(date, currentMinutes);
+      const slotEndTime = makeLocalDateTime(date, currentMinutes + 30);
 
-      const slotStartStr = formatTime(startH, startMin);
-      const slotEndStr = formatTime(endH, endMin);
-
-      const slotStartTime = new Date(`${dateStr}T${slotStartStr}:00.000Z`);
-      const slotEndTime = new Date(`${dateStr}T${slotEndStr}:00.000Z`);
-
-      // Check overlap: newStart < existingEnd AND newEnd > existingStart
+      // Check overlap: slotStartTime < booking.end_time && slotEndTime > booking.start_time
       const matchedBooking = bookings.find(
         (b) => slotStartTime < b.end_time && slotEndTime > b.start_time,
       );
@@ -664,7 +666,7 @@ export class AdminFieldsService {
     return {
       fieldId: field.id,
       fieldName: field.name,
-      date: dateStr,
+      date,
       isClosed: opHour?.is_closed ?? false,
       operatingHours: `${openTimeStr} - ${closeTimeStr}`,
       slots,

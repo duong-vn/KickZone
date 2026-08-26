@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -47,51 +47,6 @@ export interface FieldPricingData {
   priceRules: PriceRuleItem[];
 }
 
-const MOCK_FIELD_PRICING: FieldPricingData = {
-  id: 'green-arena',
-  name: 'Green Arena',
-  fieldType: 'Sân 7 người',
-  status: 'ACTIVE',
-  address: '123 Đường Sân Cỏ, Phường Thể Thao, Quận 1, TP. HCM',
-  imageUrl:
-    'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&auto=format&fit=crop&q=80',
-  priceRules: [
-    {
-      id: 'pr-1',
-      fieldId: 'green-arena',
-      name: 'Ngày thường - Ban ngày',
-      daysDisplay: 'Thứ 2 - Thứ 6',
-      daysOfWeek: [1, 2, 3, 4, 5],
-      startTime: '06:00',
-      endTime: '17:00',
-      pricePerHour: 200000,
-      isActive: true,
-    },
-    {
-      id: 'pr-2',
-      fieldId: 'green-arena',
-      name: 'Ngày thường - Buổi tối',
-      daysDisplay: 'Thứ 2 - Thứ 6',
-      daysOfWeek: [1, 2, 3, 4, 5],
-      startTime: '17:00',
-      endTime: '22:00',
-      pricePerHour: 300000,
-      isActive: true,
-    },
-    {
-      id: 'pr-3',
-      fieldId: 'green-arena',
-      name: 'Cuối tuần',
-      daysDisplay: 'Thứ 7 - CN',
-      daysOfWeek: [6, 0],
-      startTime: '06:00',
-      endTime: '22:00',
-      pricePerHour: 350000,
-      isActive: true,
-    },
-  ],
-};
-
 const DAY_OPTIONS = [
   { label: 'Thứ 2', value: 1 },
   { label: 'Thứ 3', value: 2 },
@@ -111,7 +66,11 @@ export default function AdminFieldPricingPage({
   const fieldId = resolvedParams.id;
   const queryClient = useQueryClient();
 
-  const { data: apiField, isLoading } = useQuery({
+  const {
+    data: apiField,
+    isLoading,
+    isError,
+  } = useQuery<FieldPricingData>({
     queryKey: ['admin-field-pricing', fieldId],
     queryFn: () => fetchAdminFieldById(fieldId),
     retry: false,
@@ -120,15 +79,7 @@ export default function AdminFieldPricingPage({
   const [localFieldData, setLocalFieldData] =
     useState<Partial<FieldPricingData> | null>(null);
 
-  const fieldData: FieldPricingData = useMemo(
-    () => ({
-      ...MOCK_FIELD_PRICING,
-      ...(apiField || {}),
-      ...(localFieldData || {}),
-      id: fieldId,
-    }),
-    [apiField, localFieldData, fieldId],
-  );
+  const fieldData = apiField ? { ...apiField, ...localFieldData } : null;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<PriceRuleItem | null>(null);
@@ -174,6 +125,7 @@ export default function AdminFieldPricingPage({
   };
 
   const performDeleteRule = async (ruleId: string) => {
+    if (!fieldData) return;
     setLocalFieldData((prev) => ({
       ...(prev || {}),
       priceRules: (prev?.priceRules || fieldData.priceRules).filter(
@@ -214,6 +166,7 @@ export default function AdminFieldPricingPage({
 
   const handleSaveRule = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!fieldData) return;
     if (!ruleName.trim()) {
       toast.warning('Vui lòng nhập tên mức giá.');
       return;
@@ -279,23 +232,6 @@ export default function AdminFieldPricingPage({
         showToast(`Lỗi khi lưu quy tắc: ${(err as Error).message}`);
       }
     } else {
-      // Create rule
-      const newRule: PriceRuleItem = {
-        id: `pr-${Date.now()}`,
-        fieldId: fieldData.id,
-        name: ruleName,
-        daysDisplay: daysLabel,
-        daysOfWeek: selectedDays,
-        startTime,
-        endTime,
-        pricePerHour: priceNumber,
-        isActive,
-      };
-      setLocalFieldData((prev) => ({
-        ...(prev || {}),
-        priceRules: [...(prev?.priceRules || fieldData.priceRules), newRule],
-      }));
-
       try {
         await createAdminPriceRule(fieldId, {
           name: ruleName,
@@ -338,7 +274,7 @@ export default function AdminFieldPricingPage({
     );
   }
 
-  if (!apiField && fieldId !== 'green-arena') {
+  if (isError || !fieldData) {
     return (
       <div className="mx-auto w-full max-w-7xl py-16 flex flex-col items-center justify-center text-center">
         <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4 text-slate-400">
