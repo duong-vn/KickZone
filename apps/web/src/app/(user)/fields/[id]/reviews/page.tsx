@@ -654,9 +654,7 @@ export default function FieldAllReviewsPage({ params }: PageProps) {
                   <div className="flex flex-col sm:flex-row gap-2.5">
                     <Button
                       onClick={() =>
-                        router.push(
-                          `/login?next=/fields/${field.id}/reviews`,
-                        )
+                        router.push(`/login?next=/fields/${field.id}/reviews`)
                       }
                       className="flex-1 bg-[#006e2f] hover:bg-[#004b1e] text-white text-xs font-bold rounded-xl py-2.5 cursor-pointer"
                     >

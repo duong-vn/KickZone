@@ -2,6 +2,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { toast } from 'sonner';
 import {
   Reply,
   ShieldCheck,
@@ -65,6 +67,32 @@ export function ReviewCommentItem({
   );
   const canDelete =
     hasLoggedInUser && (isOwner || currentUser?.role === 'ADMIN');
+
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleReplyClick = () => {
+    if (!hasLoggedInUser) {
+      const currentPath =
+        typeof window !== 'undefined'
+          ? pathname || window.location.pathname
+          : '';
+      toast.info('Vui lòng đăng nhập để trả lời bình luận.', {
+        action: {
+          label: 'Đăng nhập',
+          onClick: () => {
+            router.push(
+              currentPath
+                ? `/login?redirect=${encodeURIComponent(currentPath)}`
+                : '/login',
+            );
+          },
+        },
+      });
+      return;
+    }
+    setShowReplyForm((prev) => !prev);
+  };
 
   const handleSendReply = (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,7 +224,7 @@ export function ReviewCommentItem({
           <div className="flex items-center gap-1 mt-1 ml-1">
             <button
               type="button"
-              onClick={() => setShowReplyForm(!showReplyForm)}
+              onClick={handleReplyClick}
               className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#575e70] hover:text-[#006e2f] hover:bg-[#006e2f]/10 px-2 py-1 rounded-lg transition-colors cursor-pointer"
             >
               <Reply className="w-3 h-3" />
@@ -227,7 +255,7 @@ export function ReviewCommentItem({
           </div>
 
           {/* Inline Reply Form */}
-          {showReplyForm && (
+          {showReplyForm && hasLoggedInUser && (
             <form
               onSubmit={handleSendReply}
               className="mt-2.5 p-3 rounded-2xl bg-[#f8f9fa] border border-[#006e2f]/30 shadow-xs flex items-start gap-2 animate-in fade-in-0 duration-200"

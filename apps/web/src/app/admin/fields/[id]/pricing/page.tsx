@@ -178,21 +178,35 @@ export default function AdminFieldPricingPage({
 
     const priceNumber = parseInt(priceInput, 10) || 0;
 
-    // Generate daysDisplay label
-    let daysLabel = 'Tùy chỉnh';
-    if (
-      selectedDays.length === 5 &&
-      [1, 2, 3, 4, 5].every((d) => selectedDays.includes(d))
-    ) {
-      daysLabel = 'Thứ 2 - Thứ 6';
-    } else if (
-      selectedDays.length === 2 &&
-      [6, 0].every((d) => selectedDays.includes(d))
-    ) {
-      daysLabel = 'Thứ 7 - CN';
-    } else if (selectedDays.length === 7) {
-      daysLabel = 'Cả tuần';
-    }
+    const formatDaysDisplay = (days: number[]): string => {
+      if (!days || days.length === 0 || days.length === 7) {
+        return 'Cả tuần';
+      }
+      if (days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d))) {
+        return 'Thứ 2 - Thứ 6';
+      }
+      if (days.length === 2 && [6, 0].every((d) => days.includes(d))) {
+        return 'Thứ 7 - CN';
+      }
+      if (days.length === 1) {
+        return days[0] === 0 ? 'Chủ Nhật' : `Thứ ${days[0] + 1}`;
+      }
+      const dayNames: Record<number, string> = {
+        1: 'Thứ 2',
+        2: 'Thứ 3',
+        3: 'Thứ 4',
+        4: 'Thứ 5',
+        5: 'Thứ 6',
+        6: 'Thứ 7',
+        0: 'CN',
+      };
+      const sorted = [...days].sort(
+        (a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b),
+      );
+      return sorted.map((d) => dayNames[d] ?? `Thứ ${d + 1}`).join(', ');
+    };
+
+    const daysLabel = formatDaysDisplay(selectedDays);
 
     if (editingRule) {
       // Update rule
