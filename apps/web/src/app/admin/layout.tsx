@@ -433,7 +433,7 @@ export default function AdminLayout({
       )}
 
       <div className="flex flex-1 flex-col md:pl-64 min-w-0 overflow-x-hidden">
-        <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-[#bccbb9] bg-white/80 px-6 backdrop-blur-md">
+        <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-[#bccbb9] bg-white/95 px-6 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <button
               type="button"
