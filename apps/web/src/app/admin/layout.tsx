@@ -208,6 +208,7 @@ export default function AdminLayout({
     fullName?: string;
     avatarUrl?: string;
   } | null>(null);
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
 
   const rawPathname = usePathname() || '';
   const pathname = rawPathname.replace(/\/$/, '') || '/admin';
@@ -253,6 +254,19 @@ export default function AdminLayout({
           return;
         }
 
+        const oauthAvatar =
+          (typeof authUser.user_metadata?.avatar_url === 'string' &&
+            authUser.user_metadata.avatar_url.trim()) ||
+          (typeof authUser.user_metadata?.picture === 'string' &&
+            authUser.user_metadata.picture.trim()) ||
+          (typeof authUser.identities?.[0]?.identity_data?.avatar_url ===
+            'string' &&
+            authUser.identities[0].identity_data.avatar_url.trim()) ||
+          (typeof authUser.identities?.[0]?.identity_data?.picture ===
+            'string' &&
+            authUser.identities[0].identity_data.picture.trim()) ||
+          undefined;
+
         // Successfully verified as ACTIVE ADMIN
         setIsAuthorizedAdmin(true);
         setIsAuthChecking(false);
@@ -264,11 +278,7 @@ export default function AdminLayout({
             authUser.user_metadata?.full_name ||
             authUser.user_metadata?.name ||
             'Admin',
-          avatarUrl:
-            profile.avatarUrl ||
-            (typeof authUser.user_metadata?.avatar_url === 'string'
-              ? authUser.user_metadata.avatar_url
-              : undefined),
+          avatarUrl: profile.avatarUrl || oauthAvatar,
         });
       } catch {
         // Fallback check metadata in case of temporary API disconnect
@@ -278,6 +288,19 @@ export default function AdminLayout({
           authUser.email?.toLowerCase().startsWith('admin');
 
         if (isMetaAdmin) {
+          const oauthAvatar =
+            (typeof authUser.user_metadata?.avatar_url === 'string' &&
+              authUser.user_metadata.avatar_url.trim()) ||
+            (typeof authUser.user_metadata?.picture === 'string' &&
+              authUser.user_metadata.picture.trim()) ||
+            (typeof authUser.identities?.[0]?.identity_data?.avatar_url ===
+              'string' &&
+              authUser.identities[0].identity_data.avatar_url.trim()) ||
+            (typeof authUser.identities?.[0]?.identity_data?.picture ===
+              'string' &&
+              authUser.identities[0].identity_data.picture.trim()) ||
+            undefined;
+
           setIsAuthorizedAdmin(true);
           setIsAuthChecking(false);
           setAuthError(null);
@@ -287,10 +310,7 @@ export default function AdminLayout({
               authUser.user_metadata?.full_name ||
               authUser.user_metadata?.name ||
               'Admin',
-            avatarUrl:
-              typeof authUser.user_metadata?.avatar_url === 'string'
-                ? authUser.user_metadata.avatar_url
-                : undefined,
+            avatarUrl: oauthAvatar,
           });
         } else {
           setIsAuthorizedAdmin(false);
@@ -451,11 +471,12 @@ export default function AdminLayout({
           <div className="flex items-center gap-3">
             <AdminNotificationDropdown />
 
-            {adminUser?.avatarUrl ? (
+            {adminUser?.avatarUrl && !avatarLoadError ? (
               <img
                 src={adminUser.avatarUrl}
                 alt={adminUser.fullName || 'Admin'}
                 className="h-9 w-9 rounded-full border border-[#bccbb9] object-cover"
+                onError={() => setAvatarLoadError(true)}
               />
             ) : (
               <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#bccbb9] bg-[#e7e8e9] font-bold text-[#006e2f]">

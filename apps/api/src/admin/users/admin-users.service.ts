@@ -77,6 +77,62 @@ export class AdminUsersService {
       this.prisma.profiles.count({ where }),
     ]);
 
+    // If Supabase Admin is available, populate avatars for OAuth users whose avatar_path is not yet synced
+    if (this.supabase) {
+      const itemsWithoutAvatar = items.filter(
+        (p) => !p.avatar_path && p.auth_user_id,
+      );
+      if (itemsWithoutAvatar.length > 0) {
+        await Promise.allSettled(
+          itemsWithoutAvatar.map(async (p) => {
+            try {
+              const { data: authUser } =
+                await this.supabase!.auth.admin.getUserById(p.auth_user_id);
+              if (authUser?.user) {
+                const u = authUser.user;
+                const metadataAvatar =
+                  (typeof u.user_metadata?.avatar_url === 'string' &&
+                    u.user_metadata.avatar_url.trim()) ||
+                  (typeof u.user_metadata?.picture === 'string' &&
+                    u.user_metadata.picture.trim()) ||
+                  (typeof u.identities?.[0]?.identity_data?.avatar_url ===
+                    'string' &&
+                    u.identities[0].identity_data.avatar_url.trim()) ||
+                  (typeof u.identities?.[0]?.identity_data?.picture ===
+                    'string' &&
+                    u.identities[0].identity_data.picture.trim()) ||
+                  undefined;
+
+                const metadataName =
+                  (typeof u.user_metadata?.full_name === 'string' &&
+                    u.user_metadata.full_name.trim()) ||
+                  (typeof u.user_metadata?.name === 'string' &&
+                    u.user_metadata.name.trim()) ||
+                  undefined;
+
+                if (metadataAvatar || (metadataName && !p.full_name)) {
+                  if (metadataAvatar) p.avatar_path = metadataAvatar;
+                  if (metadataName && !p.full_name) p.full_name = metadataName;
+                  await this.prisma.profiles
+                    .update({
+                      where: { id: p.id },
+                      data: {
+                        ...(metadataAvatar && { avatar_path: metadataAvatar }),
+                        ...(metadataName &&
+                          !p.full_name && { full_name: metadataName }),
+                      },
+                    })
+                    .catch(() => {});
+                }
+              }
+            } catch {
+              // ignore
+            }
+          }),
+        );
+      }
+    }
+
     return {
       data: items.map((p) => ({
         id: p.id,
@@ -121,16 +177,62 @@ export class AdminUsersService {
       throw new NotFoundException('Người dùng không tồn tại');
     }
 
+    let loginProvider = 'Email';
+    let avatarUrl = profile.avatar_path || undefined;
+
+    if (this.supabase && profile.auth_user_id) {
+      try {
+        const { data: authUser } = await this.supabase.auth.admin.getUserById(
+          profile.auth_user_id,
+        );
+        if (authUser?.user) {
+          const u = authUser.user;
+          const rawProvider =
+            u.app_metadata?.provider || u.identities?.[0]?.provider || 'email';
+          if (rawProvider === 'google') loginProvider = 'Google';
+          else if (rawProvider === 'facebook') loginProvider = 'Facebook';
+          else loginProvider = 'Email';
+
+          const metadataAvatar =
+            (typeof u.user_metadata?.avatar_url === 'string' &&
+              u.user_metadata.avatar_url.trim()) ||
+            (typeof u.user_metadata?.picture === 'string' &&
+              u.user_metadata.picture.trim()) ||
+            (typeof u.identities?.[0]?.identity_data?.avatar_url === 'string' &&
+              u.identities[0].identity_data.avatar_url.trim()) ||
+            (typeof u.identities?.[0]?.identity_data?.picture === 'string' &&
+              u.identities[0].identity_data.picture.trim()) ||
+            undefined;
+
+          if (metadataAvatar) {
+            avatarUrl = metadataAvatar;
+            if (!profile.avatar_path) {
+              await this.prisma.profiles
+                .update({
+                  where: { id: profile.id },
+                  data: { avatar_path: metadataAvatar },
+                })
+                .catch(() => {});
+            }
+          }
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Supabase lookup for user ${profile.id} note: ${String(err)}`,
+        );
+      }
+    }
+
     return {
       id: profile.id,
       fullName: profile.full_name || 'Chưa cập nhật',
       email: profile.email,
       phone: profile.phone || '',
       registeredDate: formatBusinessDate(profile.created_at),
-      loginProvider: 'Email',
+      loginProvider,
       status: profile.status,
       avatarUrl:
-        profile.avatar_path ||
+        avatarUrl ||
         'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
       stats: {
         totalBookings: profile.bookings.length,

@@ -18,6 +18,23 @@ export interface AuthenticatedProfile {
 interface SupabaseUserResponse {
   id?: unknown;
   email?: unknown;
+  user_metadata?: {
+    avatar_url?: string;
+    picture?: string;
+    full_name?: string;
+    name?: string;
+    [key: string]: unknown;
+  };
+  identities?: Array<{
+    provider?: string;
+    identity_data?: {
+      avatar_url?: string;
+      picture?: string;
+      full_name?: string;
+      name?: string;
+      [key: string]: unknown;
+    };
+  }>;
 }
 
 @Injectable()
@@ -87,21 +104,103 @@ export class SupabaseAuthService {
     }
 
     const email = providerUser.email.trim().toLowerCase();
-    const profile = await this.prisma.profiles.upsert({
+
+    // Extract OAuth avatar and name from user_metadata or identities (Google, Facebook, etc.)
+    const metaAvatar =
+      (typeof providerUser.user_metadata?.avatar_url === 'string' &&
+        providerUser.user_metadata.avatar_url.trim()) ||
+      (typeof providerUser.user_metadata?.picture === 'string' &&
+        providerUser.user_metadata.picture.trim()) ||
+      (typeof providerUser.identities?.[0]?.identity_data?.avatar_url ===
+        'string' &&
+        providerUser.identities[0].identity_data.avatar_url.trim()) ||
+      (typeof providerUser.identities?.[0]?.identity_data?.picture ===
+        'string' &&
+        providerUser.identities[0].identity_data.picture.trim()) ||
+      undefined;
+
+    const metaName =
+      (typeof providerUser.user_metadata?.full_name === 'string' &&
+        providerUser.user_metadata.full_name.trim()) ||
+      (typeof providerUser.user_metadata?.name === 'string' &&
+        providerUser.user_metadata.name.trim()) ||
+      (typeof providerUser.identities?.[0]?.identity_data?.full_name ===
+        'string' &&
+        providerUser.identities[0].identity_data.full_name.trim()) ||
+      (typeof providerUser.identities?.[0]?.identity_data?.name === 'string' &&
+        providerUser.identities[0].identity_data.name.trim()) ||
+      undefined;
+
+    const existingProfile = await this.prisma.profiles.findUnique({
       where: { auth_user_id: providerUser.id },
-      create: {
-        auth_user_id: providerUser.id,
-        email,
-      },
-      update: { email },
       select: {
         id: true,
         auth_user_id: true,
         email: true,
         role: true,
         status: true,
+        avatar_path: true,
+        full_name: true,
       },
     });
+
+    let profile: {
+      id: string;
+      auth_user_id: string;
+      email: string;
+      role: user_role;
+      status: user_status;
+    };
+
+    if (!existingProfile) {
+      profile = await this.prisma.profiles.create({
+        data: {
+          auth_user_id: providerUser.id,
+          email,
+          ...(metaName && { full_name: metaName }),
+          ...(metaAvatar && { avatar_path: metaAvatar }),
+          role: 'USER',
+          status: 'ACTIVE',
+        },
+        select: {
+          id: true,
+          auth_user_id: true,
+          email: true,
+          role: true,
+          status: true,
+        },
+      });
+    } else {
+      const updateData: {
+        email: string;
+        avatar_path?: string;
+        full_name?: string;
+      } = { email };
+
+      // Sync avatar if existing is empty or if updated OAuth avatar is provided
+      if (
+        metaAvatar &&
+        (!existingProfile.avatar_path ||
+          existingProfile.avatar_path.startsWith('http'))
+      ) {
+        updateData.avatar_path = metaAvatar;
+      }
+      if (metaName && !existingProfile.full_name) {
+        updateData.full_name = metaName;
+      }
+
+      profile = await this.prisma.profiles.update({
+        where: { auth_user_id: providerUser.id },
+        data: updateData,
+        select: {
+          id: true,
+          auth_user_id: true,
+          email: true,
+          role: true,
+          status: true,
+        },
+      });
+    }
 
     return {
       id: profile.id,
