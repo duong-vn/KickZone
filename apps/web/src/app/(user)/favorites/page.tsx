@@ -5,11 +5,8 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Heart,
-  MapPin,
-  Star,
   Search,
   SlidersHorizontal,
-  Users,
   Compass,
   RotateCcw,
   ChevronDown,
@@ -26,17 +23,7 @@ import {
   FAVORITE_STATUS_QUERY_KEY,
 } from '@/hooks/use-favorites';
 import { toggleFavoriteField } from '@/lib/api';
-import { formatFieldTypeName } from '@/lib/utils';
-
-// Helper format VND currency
-function formatVND(amount: number): string {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-  })
-    .format(amount)
-    .replace('₫', 'đ');
-}
+import { FieldCard } from '@/components/fields/field-card';
 
 const SORT_OPTIONS = [
   { value: 'recent', label: 'Mới lưu' },
@@ -344,122 +331,14 @@ export default function FavoritesPage() {
         {/* 4-Column Favorites Grid */}
         {!isLoading && !isUnauthorized && filteredFavorites.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {filteredFavorites.map((item) => {
-              const field = item.field;
-              return (
-                <article
-                  key={item.id}
-                  className="bg-white border border-[#bccbb9]/60 rounded-2xl overflow-hidden shadow-2xs hover:shadow-md hover:-translate-y-1 transition-all duration-300 flex flex-col h-full group"
-                >
-                  {/* Image Container */}
-                  <div className="relative aspect-16/10 w-full overflow-hidden bg-[#e1e3e4]">
-                    <img
-                      src={
-                        field.primary_image_url ||
-                        (field as unknown as { image_url?: string })
-                          .image_url ||
-                        'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=600&auto=format&fit=crop&q=80'
-                      }
-                      alt={field.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      loading="lazy"
-                    />
-
-                    {/* Gradient Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10" />
-
-                    {/* Unfavorite Heart Top-Right */}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFavorite(item)}
-                      title="Bỏ khỏi yêu thích"
-                      aria-label={`Bỏ yêu thích ${field.name}`}
-                      className="absolute top-2.5 right-2.5 bg-white/90 backdrop-blur-xs rounded-full p-2 flex items-center justify-center cursor-pointer hover:bg-white shadow-xs transition-all hover:scale-110 active:scale-95"
-                    >
-                      <Heart className="w-4 h-4 fill-[#ba1a1a] text-[#ba1a1a]" />
-                    </button>
-
-                    {/* Status Pill Bottom-Left */}
-                    <div className="absolute bottom-2.5 left-2.5 bg-[#22c55e] text-[#004b1e] px-2 py-0.5 rounded-md font-['Inter',sans-serif] text-[11px] font-bold shadow-xs flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#004b1e] animate-pulse" />
-                      Sẵn sàng đặt sân
-                    </div>
-                  </div>
-
-                  {/* Card Content */}
-                  <div className="p-4 flex flex-col flex-grow">
-                    {/* Title and Rating */}
-                    <div className="flex items-start justify-between mb-2 gap-2">
-                      <Link
-                        href={`/fields/${field.id}`}
-                        className="hover:text-[#006e2f] transition-colors"
-                      >
-                        <h2 className="font-['Manrope',sans-serif] text-base font-bold text-[#191c1d] line-clamp-1">
-                          {field.name}
-                        </h2>
-                      </Link>
-
-                      {/* Rating pill */}
-                      <div className="flex items-center gap-1 bg-[#edeeef] py-0.5 px-1.5 rounded-md shrink-0">
-                        <Star className="w-3 h-3 fill-[#f59e0b] text-[#f59e0b]" />
-                        <span className="font-['Inter',sans-serif] text-[11px] font-bold text-[#191c1d]">
-                          {field.rating_avg?.toFixed(1) || '4.8'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Location & Types */}
-                    <div className="space-y-1.5 mb-4 flex-grow text-xs text-[#575e70]">
-                      <div className="flex items-start gap-1.5 leading-relaxed">
-                        <MapPin className="w-3.5 h-3.5 shrink-0 text-[#575e70] mt-0.5" />
-                        <p className="line-clamp-2">{field.address}</p>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5 shrink-0 text-[#575e70]" />
-                        <span className="line-clamp-1">
-                          {formatFieldTypeName(
-                            field.field_type?.name ||
-                              (field as unknown as { field_type?: string })
-                                .field_type,
-                          )}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Card Footer */}
-                    <div className="flex items-center justify-between mt-auto pt-3 border-t border-[#bccbb9]/40">
-                      <div>
-                        <span className="font-['Inter',sans-serif] text-[11px] text-[#575e70] block leading-none mb-0.5">
-                          Từ
-                        </span>
-                        <div className="font-['Manrope',sans-serif] text-base font-extrabold text-[#006e2f]">
-                          {formatVND(
-                            field.base_price_per_hour ??
-                              field.basePricePerHour ??
-                              0,
-                          )}
-                          <span className="font-['Inter',sans-serif] text-[11px] font-normal text-[#575e70]">
-                            /giờ
-                          </span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <Link href={`/fields/${field.id}`}>
-                          <button
-                            type="button"
-                            className="px-4 py-1.5 bg-[#006e2f] text-white font-['Inter',sans-serif] text-xs font-semibold rounded-lg hover:bg-[#005321] transition-all shadow-2xs active:scale-95 cursor-pointer"
-                          >
-                            Đặt ngay
-                          </button>
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+            {filteredFavorites.map((item) => (
+              <FieldCard
+                key={item.id}
+                field={item.field}
+                isFavorite={true}
+                onToggleFavorite={() => handleRemoveFavorite(item)}
+              />
+            ))}
           </div>
         )}
 

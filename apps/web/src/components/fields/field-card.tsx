@@ -15,6 +15,56 @@ import {
 export const DEFAULT_FIELD_IMAGE =
   'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80';
 
+// Helper to extract primary representative image for a field
+export function getFieldPrimaryImage(field?: Field | null): string {
+  if (!field) return DEFAULT_FIELD_IMAGE;
+
+  // 1. Search in field_images for is_primary === true or isPrimary === true
+  if (field.field_images && Array.isArray(field.field_images)) {
+    const primary = field.field_images.find(
+      (img) => img.is_primary === true || img.isPrimary === true,
+    );
+    if (primary?.storage_path) return primary.storage_path;
+    if (primary?.storagePath) return primary.storagePath;
+  }
+
+  // 2. Check explicit primary_image_url
+  if (field.primary_image_url) return field.primary_image_url;
+
+  // 3. Check image property
+  if (field.image) return field.image;
+
+  // 4. Check image_url property (used in some API responses)
+  if ((field as unknown as { image_url?: string }).image_url) {
+    return (field as unknown as { image_url?: string }).image_url!;
+  }
+
+  // 5. Check first image in field_images
+  if (
+    field.field_images &&
+    Array.isArray(field.field_images) &&
+    field.field_images.length > 0
+  ) {
+    const first = field.field_images[0];
+    if (first?.storage_path) return first.storage_path;
+    if (first?.storagePath) return first.storagePath;
+  }
+
+  // 6. Check images array
+  if (field.images && Array.isArray(field.images) && field.images.length > 0) {
+    const first = field.images[0];
+    if (typeof first === 'string') return first;
+    if (first && typeof first === 'object') {
+      if ('storage_path' in first && first.storage_path)
+        return first.storage_path;
+      if ('storagePath' in first && first.storagePath)
+        return first.storagePath as string;
+    }
+  }
+
+  return DEFAULT_FIELD_IMAGE;
+}
+
 // Format currency VND
 export function formatVND(amount: number): string {
   return new Intl.NumberFormat('vi-VN', {
@@ -77,9 +127,9 @@ export function FieldCard({
       ),
     );
 
-  const [imgSrc, setImgSrc] = useState(
-    field.primary_image_url || field.image || DEFAULT_FIELD_IMAGE,
-  );
+  const [hasImageError, setHasImageError] = useState(false);
+  const primaryImage = getFieldPrimaryImage(field);
+  const imageSrc = hasImageError ? DEFAULT_FIELD_IMAGE : primaryImage;
 
   const price = field.base_price_per_hour ?? field.pricePerHour ?? 0;
   const rating = field.rating_avg ?? field.rating ?? 0;
@@ -104,13 +154,9 @@ export function FieldCard({
       {/* Image Container */}
       <div className="relative aspect-16/10 w-full overflow-hidden bg-[#e1e3e4]">
         <img
-          src={imgSrc}
+          src={imageSrc}
           alt={field.name}
-          onError={(e) => {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src = DEFAULT_FIELD_IMAGE;
-            setImgSrc(DEFAULT_FIELD_IMAGE);
-          }}
+          onError={() => setHasImageError(true)}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
         />

@@ -900,13 +900,13 @@ export default function FieldDetailPage({
               <div className="w-10 h-10 bg-[#e1e3e4] rounded-full animate-pulse" />
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-96 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 h-80 sm:h-[420px] md:h-[480px] lg:h-[500px] mb-8">
             <div className="md:col-span-2 bg-[#e1e3e4] rounded-2xl animate-pulse h-full" />
-            <div className="hidden md:flex flex-col gap-4">
+            <div className="hidden md:flex flex-col gap-3">
               <div className="bg-[#e1e3e4] rounded-2xl animate-pulse flex-1" />
               <div className="bg-[#e1e3e4] rounded-2xl animate-pulse flex-1" />
             </div>
-            <div className="hidden md:flex flex-col gap-4">
+            <div className="hidden md:flex flex-col gap-3">
               <div className="bg-[#e1e3e4] rounded-2xl animate-pulse flex-1" />
               <div className="bg-[#e1e3e4] rounded-2xl animate-pulse flex-1" />
             </div>
@@ -1077,7 +1077,7 @@ export default function FieldDetailPage({
 
       {/* 2. Photo Gallery Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-        <div className="relative grid grid-cols-1 md:grid-cols-4 gap-3 h-72 sm:h-96 rounded-3xl overflow-hidden shadow-sm">
+        <div className="relative grid grid-cols-1 md:grid-cols-4 gap-3 h-80 sm:h-[420px] md:h-[480px] lg:h-[500px] rounded-3xl overflow-hidden shadow-sm">
           {/* Main Large Image */}
           <div
             className="md:col-span-2 relative h-full group cursor-pointer overflow-hidden bg-slate-200"
@@ -1089,7 +1089,7 @@ export default function FieldDetailPage({
             <img
               src={fieldImages[0] || ''}
               alt={`${field.name} ảnh chính`}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
               <span className="text-white text-xs font-semibold">
@@ -1110,7 +1110,7 @@ export default function FieldDetailPage({
               <img
                 src={fieldImages[1] || fieldImages[0] || ''}
                 alt={`${field.name} ảnh phụ 1`}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
               />
             </div>
             <div
@@ -1123,7 +1123,7 @@ export default function FieldDetailPage({
               <img
                 src={fieldImages[2] || fieldImages[0] || ''}
                 alt={`${field.name} ảnh phụ 2`}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
               />
             </div>
           </div>
@@ -1139,7 +1139,7 @@ export default function FieldDetailPage({
               <img
                 src={fieldImages[3] || fieldImages[0] || ''}
                 alt={`${field.name} ảnh phụ 3`}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
               />
             </div>
             <div
@@ -1152,7 +1152,7 @@ export default function FieldDetailPage({
               <img
                 src={fieldImages[4] || fieldImages[0] || ''}
                 alt={`${field.name} ảnh phụ 4`}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
               />
             </div>
           </div>

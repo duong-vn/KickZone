@@ -14,8 +14,11 @@ import {
   Zap,
   ChevronDown,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { FieldCard } from '@/components/fields/field-card';
+import { fetchFields } from '@/lib/api';
+import type { Field } from '@/types/field';
 
 // Helper format YYYY-MM-DD -> DD/MM/YYYY
 function formatDateDisplay(isoDate: string) {
@@ -23,42 +26,6 @@ function formatDateDisplay(isoDate: string) {
   const [year, month, day] = isoDate.split('-');
   return `${day}/${month}/${year}`;
 }
-
-const FEATURED_FIELDS = [
-  {
-    id: '1',
-    name: 'Sân bóng cỏ nhân tạo ABC',
-    location: 'Quận 7, TP.HCM',
-    type: 'Sân 7 người',
-    rating: 4.8,
-    reviewsCount: 120,
-    pricePerHour: 400000,
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuANovgxyrcGYeOL6TPjw9A9ZZJ-IvrvQbiL1m2mraAG_JALs09yHIuUxL1WovU9bWNRJHVP8_bHWk8LR3N45wTxzw0GPf3hD3cmh0EI1w7shsW-PTkefZE6_7AfXG_ZsEcehpi3ynlfXuZjUYRyMjooSUxfFQrQttwknuFsPLohGOffaUCqq37wCvNQ1n7XPkir8vz2omErzHt2KdkpRL2DEaQnZP_wQUZ3Qz-eNfUHzR2NiakLax6HPQ',
-  },
-  {
-    id: '2',
-    name: 'Futsal Arena Chảo Lửa',
-    location: 'Tân Bình, TP.HCM',
-    type: 'Sân 5 người',
-    rating: 4.9,
-    reviewsCount: 85,
-    pricePerHour: 350000,
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBOe3kouLR8qo191f-LiDKy7M7GPPqm7hPs7bxIyQ_c9J5axjv93uomA5qaYFYDo_f5Z521iwcSCOqD58ZbnPYI-O267f4eN6540fypxYaGVNkHDbAoehoohlCUmymRubuyJCjqXyhCZuuycICMO88LohXfwCtemvVUmKn0T5KFVbpDumUlUhzQT3FJXxpK3VM6gKzaaxtdOGHOt6maB3S9-zB0tKc1kIvZ0WE6jdFZ45YHIXNOFLDOvw',
-  },
-  {
-    id: '3',
-    name: 'Sân vận động Mini K34',
-    location: 'Quận 10, TP.HCM',
-    type: 'Sân 7 người',
-    rating: 4.7,
-    reviewsCount: 210,
-    pricePerHour: 450000,
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDfMU8_YHKjJYoer4phvrmpsW1AF0RVa8j2Em6hX1BPFJmqdoi6Fm3R2LOx4MuYey7NOTsytctNWdyf58B23aFoRHvdLfAR2olmEij3fcQtqVRpiUu55SAPL-vvSaUxIYbOytDsGSkMauq4HjECWFyl7hDlyQ7qCy4Kus9jKGsk2eDsHWJ2R1aYu0MRowk4pS08Z2iRlTVhR6B3KgirZ-NFOs1_LPRXnXP_URRTl8nBcSjrzPnoBkdACQ',
-  },
-];
 
 const HOW_IT_WORKS = [
   {
@@ -105,6 +72,13 @@ export default function HomePage() {
   const [search, setSearch] = useState('');
   const [date, setDate] = useState('');
   const [timeSlot, setTimeSlot] = useState('');
+
+  const { data: fieldsData, isLoading } = useQuery({
+    queryKey: ['featured-fields'],
+    queryFn: () => fetchFields({ limit: 3, sortBy: 'rating' }),
+  });
+
+  const featuredFields = fieldsData?.data ?? [];
 
   const handleHeroSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -242,38 +216,31 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {FEATURED_FIELDS.map((field) => (
-            <FieldCard
-              key={field.id}
-              field={{
-                id: field.id,
-                name: field.name,
-                slug: field.name,
-                address: field.location,
-                location: field.location,
-                city: 'TP.HCM',
-                district: field.location.split(',')[0].trim(),
-                base_price_per_hour: field.pricePerHour,
-                basePricePerHour: field.pricePerHour,
-                pricePerHour: field.pricePerHour,
-                status: 'ACTIVE',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                field_type_id: '1',
-                types: [field.type],
-                type: field.type,
-                rating: field.rating,
-                rating_avg: field.rating,
-                reviews_count: field.reviewsCount,
-                image: field.image,
-                primary_image_url: field.image,
-                available: true,
-                is_available_today: true,
-              }}
-            />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="bg-white border border-[#bccbb9]/40 rounded-2xl p-4 h-80 animate-pulse flex flex-col justify-between"
+              >
+                <div className="aspect-16/10 bg-[#edeeef] rounded-xl mb-3" />
+                <div className="h-4 bg-[#edeeef] rounded w-3/4 mb-2" />
+                <div className="h-3 bg-[#edeeef] rounded w-1/2 mb-4" />
+                <div className="h-6 bg-[#edeeef] rounded w-full mt-auto" />
+              </div>
+            ))}
+          </div>
+        ) : featuredFields.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {featuredFields.map((field: Field) => (
+              <FieldCard key={field.id} field={field} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-sm text-[#575e70]">
+            Chưa có sân bóng nổi bật.
+          </div>
+        )}
       </section>
 
       {/* ================= 3. CÁCH HOẠT ĐỘNG ================= */}

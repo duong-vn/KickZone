@@ -180,6 +180,8 @@ export class FieldsService {
       }
     }
 
+    const isSortingByRating = query.sortBy === 'rating';
+
     let orderBy: Prisma.fieldsOrderByWithRelationInput = { created_at: 'desc' };
     if (query.sortBy === 'price-asc') {
       orderBy = { base_price_per_hour: 'asc' };
@@ -192,8 +194,7 @@ export class FieldsService {
     const [fields, total] = await Promise.all([
       this.prisma.fields.findMany({
         where,
-        skip: (page - 1) * limit,
-        take: limit,
+        ...(isSortingByRating ? {} : { skip: (page - 1) * limit, take: limit }),
         orderBy,
         include: {
           field_types: {
@@ -204,7 +205,7 @@ export class FieldsService {
             },
           },
           field_images: {
-            orderBy: { sort_order: 'asc' },
+            orderBy: [{ is_primary: 'desc' }, { sort_order: 'asc' }],
             select: {
               id: true,
               storage_path: true,
@@ -222,7 +223,7 @@ export class FieldsService {
       this.prisma.fields.count({ where }),
     ]);
 
-    const transformedData = fields.map((field) => {
+    let transformedData = fields.map((field) => {
       const reviews = field.reviews ?? [];
       const reviewsCount = reviews.length;
       const ratingAvg =
@@ -232,7 +233,7 @@ export class FieldsService {
                 reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount
               ).toFixed(1),
             )
-          : 5.0;
+          : 0;
 
       const rawTypeName = field.field_types?.name ?? '7-a-side';
       const fieldTypeName = formatFieldTypeName(rawTypeName);
@@ -274,8 +275,24 @@ export class FieldsService {
       };
     });
 
-    if (query.sortBy === 'rating') {
-      transformedData.sort((a, b) => b.rating - a.rating);
+    if (isSortingByRating) {
+      transformedData.sort((a, b) => {
+        // Sort by rating descending (5.0 > 4.0 > 0)
+        if (b.rating !== a.rating) {
+          return b.rating - a.rating;
+        }
+        // Secondary sort: number of reviews descending
+        if (b.reviews_count !== a.reviews_count) {
+          return b.reviews_count - a.reviews_count;
+        }
+        // Tertiary sort: created_at descending
+        return (
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      });
+
+      const startIndex = (page - 1) * limit;
+      transformedData = transformedData.slice(startIndex, startIndex + limit);
     }
 
     return {
@@ -401,7 +418,7 @@ export class FieldsService {
               reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount
             ).toFixed(1),
           )
-        : 5.0;
+        : 0;
 
     const rawTypeName = field.field_types?.name ?? '7-a-side';
     const fieldTypeName = formatFieldTypeName(rawTypeName);

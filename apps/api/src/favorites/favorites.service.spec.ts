@@ -121,10 +121,27 @@ describe('FavoritesService', () => {
   });
 
   describe('getUserFavorites', () => {
-    it('returns paginated user favorites with mapped fields', async () => {
+    it('returns paginated user favorites with mapped fields and primary image', async () => {
       const { service, findManyFavorites, countFavorites } = createService();
 
       const mockDate = new Date('2023-10-15T10:00:00.000Z');
+      const mockImages = [
+        {
+          id: 'img-1',
+          storage_path: 'https://example.com/primary.jpg',
+          alt_text: 'Primary Image',
+          is_primary: true,
+          sort_order: 0,
+        },
+        {
+          id: 'img-2',
+          storage_path: 'https://example.com/secondary.jpg',
+          alt_text: 'Secondary Image',
+          is_primary: false,
+          sort_order: 1,
+        },
+      ];
+
       findManyFavorites.mockResolvedValue([
         {
           id: 'fav-1',
@@ -143,7 +160,8 @@ describe('FavoritesService', () => {
             status: 'ACTIVE',
             field_types: { name: '5-a-side' },
             field_type_id: 'ft-5',
-            field_images: { storage_path: 'https://example.com/image.jpg' },
+            field_images: mockImages,
+            reviews: [{ rating: 5 }, { rating: 4 }],
           },
         },
       ]);
@@ -167,13 +185,27 @@ describe('FavoritesService', () => {
               slug: 'san-chao-lua',
               description: 'Mô tả',
               address: '30 Phan Thúc Duyện',
+              location: '30 Phan Thúc Duyện',
               city: 'Hồ Chí Minh',
               district: 'Tân Bình',
               base_price_per_hour: 250000,
+              basePricePerHour: 250000,
+              pricePerHour: 250000,
               status: 'ACTIVE',
               field_type: '5-a-side',
+              field_types: { name: '5-a-side' },
               field_type_id: 'ft-5',
-              image_url: 'https://example.com/image.jpg',
+              type: 'Sân 5 người',
+              types: ['Sân 5 người'],
+              image: 'https://example.com/primary.jpg',
+              primary_image_url: 'https://example.com/primary.jpg',
+              image_url: 'https://example.com/primary.jpg',
+              field_images: mockImages,
+              rating: 4.5,
+              rating_avg: 4.5,
+              reviews_count: 2,
+              available: true,
+              is_available_today: true,
             },
           },
         ],

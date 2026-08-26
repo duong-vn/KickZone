@@ -22,6 +22,14 @@ function parsePositiveInteger(
   return max ? Math.min(parsed, max) : parsed;
 }
 
+function formatFieldTypeName(name?: string | null): string {
+  if (!name) return 'Sân 7 người';
+  if (name.includes('5')) return 'Sân 5 người';
+  if (name.includes('7')) return 'Sân 7 người';
+  if (name.includes('11')) return 'Sân 11 người';
+  return name;
+}
+
 @Injectable()
 export class FavoritesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -117,8 +125,26 @@ export class FavoritesService {
         include: {
           fields: {
             include: {
-              field_images: true,
+              field_images: {
+                orderBy: [
+                  { is_primary: 'desc' },
+                  { sort_order: 'asc' },
+                  { created_at: 'asc' },
+                ],
+                select: {
+                  id: true,
+                  storage_path: true,
+                  alt_text: true,
+                  is_primary: true,
+                  sort_order: true,
+                },
+              },
               field_types: true,
+              reviews: {
+                select: {
+                  rating: true,
+                },
+              },
             },
           },
         },
@@ -135,29 +161,68 @@ export class FavoritesService {
     ]);
 
     return {
-      data: items.map((fav) => ({
-        id: fav.id,
-        user_id: fav.user_id,
-        field_id: fav.field_id,
-        created_at: fav.created_at.toISOString(),
-        field: {
-          id: fav.fields.id,
-          name: fav.fields.name,
-          slug: fav.fields.slug,
-          description: fav.fields.description,
-          address: fav.fields.address,
-          city: fav.fields.city,
-          district: fav.fields.district,
-          base_price_per_hour: fav.fields.base_price_per_hour,
-          status: fav.fields.status,
-          field_type: fav.fields.field_types?.name,
-          field_type_id: fav.fields.field_type_id,
-          image_url: Array.isArray(fav.fields.field_images)
-            ? fav.fields.field_images[0]?.storage_path
-            : (fav.fields.field_images as { storage_path?: string } | null)
-                ?.storage_path,
-        },
-      })),
+      data: items.map((fav) => {
+        const reviews = fav.fields.reviews ?? [];
+        const reviewsCount = reviews.length;
+        const ratingAvg =
+          reviewsCount > 0
+            ? Number(
+                (
+                  reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount
+                ).toFixed(1),
+              )
+            : 0;
+
+        const rawTypeName = fav.fields.field_types?.name ?? '7-a-side';
+        const fieldTypeName = formatFieldTypeName(rawTypeName);
+
+        const images = Array.isArray(fav.fields.field_images)
+          ? fav.fields.field_images
+          : fav.fields.field_images
+            ? [fav.fields.field_images]
+            : [];
+
+        const primaryImg = images.find((img) => img.is_primary) ?? images[0];
+
+        const imageUrl =
+          primaryImg?.storage_path ||
+          'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=800&q=80';
+
+        return {
+          id: fav.id,
+          user_id: fav.user_id,
+          field_id: fav.field_id,
+          created_at: fav.created_at.toISOString(),
+          field: {
+            id: fav.fields.id,
+            name: fav.fields.name,
+            slug: fav.fields.slug,
+            description: fav.fields.description,
+            address: fav.fields.address,
+            location: fav.fields.address,
+            city: fav.fields.city,
+            district: fav.fields.district,
+            base_price_per_hour: fav.fields.base_price_per_hour,
+            basePricePerHour: fav.fields.base_price_per_hour,
+            pricePerHour: fav.fields.base_price_per_hour,
+            status: fav.fields.status,
+            field_type: fav.fields.field_types?.name,
+            field_types: fav.fields.field_types,
+            field_type_id: fav.fields.field_type_id,
+            type: fieldTypeName,
+            types: [fieldTypeName],
+            image: imageUrl,
+            primary_image_url: imageUrl,
+            image_url: imageUrl,
+            field_images: images,
+            rating: ratingAvg,
+            rating_avg: ratingAvg,
+            reviews_count: reviewsCount,
+            available: true,
+            is_available_today: true,
+          },
+        };
+      }),
       meta: {
         total,
         page,
