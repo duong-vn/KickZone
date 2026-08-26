@@ -11,10 +11,15 @@ function createPrismaClient() {
     throw new Error('DATABASE_URL is not configured');
   }
 
-  const caCertPath = process.env.DATABASE_CA_CERT_PATH;
+  const caCertContent = process.env.DATABASE_CA_CERT
+    ? process.env.DATABASE_CA_CERT.replace(/\\n/g, '\n')
+    : process.env.DATABASE_CA_CERT_PATH
+      ? readFileSync(resolve(process.env.DATABASE_CA_CERT_PATH), 'utf8')
+      : undefined;
+
   const databaseUrl = new URL(connectionString);
   const poolConfig: PoolConfig = {
-    ...(caCertPath
+    ...(caCertContent
       ? {
           database: databaseUrl.pathname.slice(1),
           host: databaseUrl.hostname,
@@ -22,7 +27,7 @@ function createPrismaClient() {
           port: Number(databaseUrl.port) || 5432,
           user: decodeURIComponent(databaseUrl.username),
           ssl: {
-            ca: readFileSync(resolve(caCertPath), 'utf8'),
+            ca: caCertContent,
             rejectUnauthorized: true,
           },
         }
