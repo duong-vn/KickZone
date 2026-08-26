@@ -58,6 +58,15 @@ export interface RatingBreakdownItem {
   percentage: number; // 0 to 100
 }
 
+export function countTotalComments(
+  comments?: ReviewComment[] | null,
+): number {
+  if (!comments || !Array.isArray(comments)) return 0;
+  return comments.reduce((acc, c) => {
+    return acc + 1 + (c.replies ? countTotalComments(c.replies) : 0);
+  }, 0);
+}
+
 export interface ReviewSummary {
   averageRating: number;
   totalReviews: number;

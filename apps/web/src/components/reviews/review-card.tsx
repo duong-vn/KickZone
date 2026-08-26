@@ -13,7 +13,7 @@ import {
   ArrowUpRight,
   Send,
 } from 'lucide-react';
-import type { Review } from '@/types/review';
+import { type Review, countTotalComments } from '@/types/review';
 import { StarRating } from './star-rating';
 import { ReviewCommentItem } from './review-comment-item';
 import { Button } from '@/components/ui/button';
@@ -80,12 +80,9 @@ export function ReviewCard({
             review.user?.id))),
   );
 
-  // Flatten comments count including nested replies
+  // Recursively count all comments and replies
   const commentsList = review.comments || [];
-  const totalCommentsCount = commentsList.reduce(
-    (acc, c) => acc + 1 + (c.replies?.length || 0),
-    0,
-  );
+  const totalCommentsCount = countTotalComments(commentsList);
 
   const rawDate = review.createdAt || (review as { date?: string }).date || '';
   const formattedDate =

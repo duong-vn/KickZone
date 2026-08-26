@@ -20,6 +20,7 @@ import {
   WriteReviewModal,
   DeleteReviewDialog,
 } from '@/components/reviews';
+import { countTotalComments } from '@/types/review';
 import { Button } from '@/components/ui/button';
 import { formatFieldTypeName } from '@/lib/utils';
 import {
@@ -147,16 +148,13 @@ export default function ReviewDiscussionDetailPage({ params }: PageProps) {
         effectiveCurrentUserId),
   );
 
-  // Count all comments including nested replies
+  // Count all comments including nested replies recursively
   const commentsList = useMemo(
     () => currentReview?.comments || [],
     [currentReview],
   );
   const totalCommentsCount = useMemo(() => {
-    return commentsList.reduce(
-      (acc, c) => acc + 1 + (c.replies?.length || 0),
-      0,
-    );
+    return countTotalComments(commentsList);
   }, [commentsList]);
 
   const rawDate =

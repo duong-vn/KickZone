@@ -30,6 +30,13 @@ import {
   Info,
   Calendar as CalendarIcon,
   Clock as ClockIcon,
+  LayoutGrid,
+  ListFilter,
+  Layers,
+  Sunrise,
+  Sun,
+  Moon,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -490,6 +497,9 @@ export default function FieldDetailPage({
   );
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [timeSelectionTab, setTimeSelectionTab] = useState<
+    'visual' | 'dropdown'
+  >('visual');
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<{
     code: string;
@@ -526,6 +536,63 @@ export default function FieldDetailPage({
     ? getContiguousAvailableSlots(availabilitySlots, startTime)
     : [];
   const isSelectionValid = Boolean(endTime && selectedSlots.length > 0);
+
+  // Group slots by time tiers / sessions (Sáng, Chiều, Tối)
+  const slotGroups = useMemo(() => {
+    const morning: typeof availabilitySlots = [];
+    const afternoon: typeof availabilitySlots = [];
+    const evening: typeof availabilitySlots = [];
+
+    for (const slot of availabilitySlots) {
+      const timeStr = formatBusinessTime(slot.startTime);
+      const hour = parseInt(timeStr.split(':')[0], 10);
+      if (hour < 12) {
+        morning.push(slot);
+      } else if (hour < 17) {
+        afternoon.push(slot);
+      } else {
+        evening.push(slot);
+      }
+    }
+
+    return [
+      {
+        id: 'morning' as const,
+        label: 'Sáng',
+        sublabel: '06:00 - 12:00',
+        icon: Sunrise,
+        iconColor: 'text-amber-500',
+        bgColor: 'bg-amber-50',
+        slots: morning,
+        availableCount: morning.filter((s) => s.available).length,
+      },
+      {
+        id: 'afternoon' as const,
+        label: 'Chiều',
+        sublabel: '12:00 - 17:00',
+        icon: Sun,
+        iconColor: 'text-orange-500',
+        bgColor: 'bg-orange-50',
+        slots: afternoon,
+        availableCount: afternoon.filter((s) => s.available).length,
+      },
+      {
+        id: 'evening' as const,
+        label: 'Tối',
+        sublabel: '17:00 - 23:00',
+        badge: 'Giờ vàng 🔥',
+        icon: Moon,
+        iconColor: 'text-indigo-500',
+        bgColor: 'bg-indigo-50',
+        slots: evening,
+        availableCount: evening.filter((s) => s.available).length,
+      },
+    ].filter((group) => group.slots.length > 0);
+  }, [availabilitySlots]);
+
+  const [sessionFilter, setSessionFilter] = useState<
+    'all' | 'morning' | 'afternoon' | 'evening'
+  >('all');
 
   // 5. Gallery state
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
@@ -624,6 +691,51 @@ export default function FieldDetailPage({
     setStartTime(newStart);
     setEndTime(slots[0]?.endTime ?? '');
     setAppliedVoucher(null);
+  };
+
+  const handleVisualSlotClick = (slot: (typeof availabilitySlots)[number]) => {
+    if (!slot.available) {
+      toast.error('Khung giờ này đã có người đặt hoặc không khả dụng.');
+      return;
+    }
+
+    if (!startTime || !endTime) {
+      handleStartTimeChange(slot.startTime);
+      return;
+    }
+
+    const slotStartMs = new Date(slot.startTime).getTime();
+    const currentStartMs = new Date(startTime).getTime();
+    const currentEndMs = new Date(endTime).getTime();
+
+    if (slot.startTime === startTime) {
+      if (currentEndMs > new Date(slot.endTime).getTime()) {
+        setEndTime(slot.endTime);
+        setAppliedVoucher(null);
+      } else {
+        setStartTime('');
+        setEndTime('');
+        setAppliedVoucher(null);
+      }
+      return;
+    }
+
+    if (slotStartMs > currentStartMs) {
+      const candidateSlots = getContiguousAvailableSlots(
+        availabilitySlots,
+        startTime,
+        slot.endTime,
+      );
+      if (candidateSlots.length > 0) {
+        setEndTime(slot.endTime);
+        setAppliedVoucher(null);
+      } else {
+        handleStartTimeChange(slot.startTime);
+      }
+      return;
+    }
+
+    handleStartTimeChange(slot.startTime);
   };
 
   const handleSetQuickDuration = (minutes: number) => {
@@ -1345,10 +1457,17 @@ export default function FieldDetailPage({
 
               {/* Step 2: Chọn khung giờ từ lịch thực tế */}
               <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-[#191c1d] flex items-center gap-1.5 mb-2">
-                  <ClockIcon className="w-3.5 h-3.5 text-[#006e2f]" />
-                  <span>2. Chọn khung giờ thi đấu</span>
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-[#191c1d] flex items-center gap-1.5">
+                    <ClockIcon className="w-3.5 h-3.5 text-[#006e2f]" />
+                    <span>2. Chọn khung giờ thi đấu</span>
+                  </label>
+                  {startSlots.length > 0 && (
+                    <span className="text-[10px] font-semibold text-[#006e2f] bg-[#006e2f]/10 px-2 py-0.5 rounded-full">
+                      {startSlots.length} slot trống
+                    </span>
+                  )}
+                </div>
 
                 {availabilityQuery.isLoading || availabilityQuery.isFetching ? (
                   <p className="rounded-xl bg-[#f8f9fa] p-3 text-xs text-[#575e70]">
@@ -1375,97 +1494,346 @@ export default function FieldDetailPage({
                   </p>
                 ) : (
                   <>
-                    <p className="mb-2 text-[11px] text-[#575e70]">
-                      {startSlots.length} khung giờ trống · Mở cửa{' '}
-                      {availabilityWindow}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 mb-2.5">
-                      <div>
-                        <label className="block text-[10px] font-bold text-[#575e70] uppercase mb-1">
-                          Giờ bắt đầu
-                        </label>
-                        <select
-                          value={startTime}
-                          onChange={(event) =>
-                            handleStartTimeChange(event.target.value)
-                          }
-                          className="w-full px-2.5 py-2 text-xs font-bold border border-[#bccbb9]/60 rounded-xl bg-white text-[#191c1d] focus:outline-none focus:ring-2 focus:ring-[#006e2f]/20 cursor-pointer"
-                        >
-                          <option value="" disabled>
-                            Chọn giờ
-                          </option>
-                          {startSlots.map((slot) => (
-                            <option key={slot.startTime} value={slot.startTime}>
-                              {formatBusinessTime(slot.startTime)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-[#575e70] uppercase mb-1">
-                          Giờ kết thúc
-                        </label>
-                        <select
-                          value={endTime}
-                          onChange={(event) => {
-                            setEndTime(event.target.value);
-                            setAppliedVoucher(null);
-                          }}
-                          disabled={!endSlots.length}
-                          className="w-full px-2.5 py-2 text-xs font-bold border border-[#bccbb9]/60 rounded-xl bg-white text-[#191c1d] focus:outline-none focus:ring-2 focus:ring-[#006e2f]/20 cursor-pointer disabled:bg-[#edeeef]"
-                        >
-                          <option value="" disabled>
-                            Chọn giờ
-                          </option>
-                          {endSlots.map((slot) => (
-                            <option key={slot.endTime} value={slot.endTime}>
-                              {formatBusinessTime(slot.endTime)} (
-                              {getDurationMinutes(startTime, slot.endTime)}p)
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                    {/* Tab selection: Trực quan / Dropdown */}
+                    <div className="flex bg-[#f1f3f4] p-1 rounded-2xl mb-3 border border-[#bccbb9]/30">
+                      <button
+                        type="button"
+                        onClick={() => setTimeSelectionTab('visual')}
+                        className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          timeSelectionTab === 'visual'
+                            ? 'bg-white text-[#006e2f] shadow-xs'
+                            : 'text-[#575e70] hover:text-[#191c1d]'
+                        }`}
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5" />
+                        <span>Trực quan</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTimeSelectionTab('dropdown')}
+                        className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          timeSelectionTab === 'dropdown'
+                            ? 'bg-white text-[#006e2f] shadow-xs'
+                            : 'text-[#575e70] hover:text-[#191c1d]'
+                        }`}
+                      >
+                        <ListFilter className="w-3.5 h-3.5" />
+                        <span>Danh sách</span>
+                      </button>
                     </div>
 
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <span className="text-[10px] text-[#575e70] font-semibold">
-                        Nhanh:
-                      </span>
-                      {[60, 90, 120].map((minutes) => {
-                        const available = endSlots.some(
-                          (slot) =>
-                            getDurationMinutes(startTime, slot.endTime) ===
-                            minutes,
-                        );
-                        return (
+                    {/* TAB 1: VISUAL GRID (TIERED SESSIONS) */}
+                    {timeSelectionTab === 'visual' && (
+                      <div className="space-y-2.5">
+                        {/* Session Filter Pills */}
+                        <div className="flex items-center gap-1 overflow-x-auto pb-0.5 text-xs no-scrollbar">
                           <button
-                            key={minutes}
                             type="button"
-                            onClick={() => handleSetQuickDuration(minutes)}
-                            disabled={!available}
-                            className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all border disabled:cursor-not-allowed disabled:opacity-40 ${
-                              durationMinutes === minutes
-                                ? 'bg-[#006e2f] text-white border-[#006e2f]'
-                                : 'bg-white border-[#bccbb9]/50 text-[#575e70] hover:border-[#006e2f] hover:text-[#006e2f]'
+                            onClick={() => setSessionFilter('all')}
+                            className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all shrink-0 cursor-pointer ${
+                              sessionFilter === 'all'
+                                ? 'bg-[#006e2f] text-white shadow-2xs'
+                                : 'bg-[#f1f3f4] text-[#575e70] hover:bg-gray-200'
                             }`}
                           >
-                            {minutes} phút
+                            Tất cả ({startSlots.length})
                           </button>
-                        );
-                      })}
-                    </div>
+                          {slotGroups.map((group) => {
+                            const Icon = group.icon;
+                            const isFiltered = sessionFilter === group.id;
+                            return (
+                              <button
+                                key={group.id}
+                                type="button"
+                                onClick={() => setSessionFilter(group.id)}
+                                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${
+                                  isFiltered
+                                    ? 'bg-[#006e2f] text-white shadow-2xs'
+                                    : 'bg-[#f1f3f4] text-[#575e70] hover:bg-gray-200'
+                                }`}
+                              >
+                                <Icon
+                                  className={`w-3 h-3 ${isFiltered ? 'text-white' : group.iconColor}`}
+                                />
+                                <span>{group.label}</span>
+                                <span
+                                  className={`text-[9px] px-1 py-0.2 rounded-full font-medium ${
+                                    isFiltered
+                                      ? 'bg-white/20 text-white'
+                                      : 'bg-gray-200/80 text-[#575e70]'
+                                  }`}
+                                >
+                                  {group.availableCount}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
 
-                    {isSelectionValid && (
-                      <div className="p-2 rounded-xl bg-[#006e2f]/5 border border-[#006e2f]/20 flex items-center justify-between text-xs text-[#006e2f] font-semibold">
-                        <span>
-                          Khung giờ:{' '}
-                          <strong>
-                            {formatBusinessTime(startTime)} -{' '}
-                            {formatBusinessTime(endTime)}
-                          </strong>
+                        {/* Tiered Session Groups */}
+                        <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                          {slotGroups
+                            .filter(
+                              (group) =>
+                                sessionFilter === 'all' ||
+                                sessionFilter === group.id,
+                            )
+                            .map((group) => {
+                              const Icon = group.icon;
+                              return (
+                                <div
+                                  key={group.id}
+                                  className="rounded-2xl border border-[#bccbb9]/40 bg-white p-2.5 shadow-2xs"
+                                >
+                                  {/* Session Header */}
+                                  <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#bccbb9]/20 px-0.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <div
+                                        className={`p-1 rounded-lg ${group.bgColor} border border-[#bccbb9]/30`}
+                                      >
+                                        <Icon
+                                          className={`w-3.5 h-3.5 ${group.iconColor}`}
+                                        />
+                                      </div>
+                                      <div>
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="font-['Manrope'] font-bold text-xs text-[#191c1d]">
+                                            Ca {group.label}
+                                          </span>
+                                          {group.badge && (
+                                            <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-amber-500/15 text-amber-700 border border-amber-500/30">
+                                              {group.badge}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <span className="text-[10px] text-[#72796f] block">
+                                          {group.sublabel}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <span
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                        group.availableCount > 0
+                                          ? 'bg-[#006e2f]/10 text-[#006e2f]'
+                                          : 'bg-gray-100 text-gray-400'
+                                      }`}
+                                    >
+                                      {group.availableCount > 0
+                                        ? `${group.availableCount} slot trống`
+                                        : 'Hết slot'}
+                                    </span>
+                                  </div>
+
+                                  {/* Slots Grid */}
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                                    {group.slots.map((slot) => {
+                                      const isSelected = selectedSlots.some(
+                                        (s) => s.startTime === slot.startTime,
+                                      );
+                                      const isStart =
+                                        slot.startTime === startTime;
+                                      const isEnd = slot.endTime === endTime;
+
+                                      return (
+                                        <button
+                                          key={slot.startTime}
+                                          type="button"
+                                          disabled={!slot.available}
+                                          onClick={() =>
+                                            handleVisualSlotClick(slot)
+                                          }
+                                          className={`relative p-2 rounded-xl text-left transition-all border flex flex-col justify-between cursor-pointer ${
+                                            isSelected
+                                              ? 'bg-[#006e2f] text-white border-[#006e2f] shadow-xs scale-[1.02] z-10'
+                                              : !slot.available
+                                                ? 'bg-gray-100/70 text-gray-400 border-gray-200 cursor-not-allowed opacity-60'
+                                                : 'bg-[#f8f9fa] hover:bg-white text-[#191c1d] border-[#bccbb9]/40 hover:border-[#006e2f] hover:shadow-2xs'
+                                          }`}
+                                        >
+                                          <div className="flex items-center justify-between">
+                                            <span
+                                              className={`text-[11px] font-bold font-['Manrope'] ${
+                                                isSelected
+                                                  ? 'text-white'
+                                                  : !slot.available
+                                                    ? 'text-gray-400 line-through'
+                                                    : 'text-[#191c1d]'
+                                              }`}
+                                            >
+                                              {formatBusinessTime(
+                                                slot.startTime,
+                                              )}{' '}
+                                              -{' '}
+                                              {formatBusinessTime(slot.endTime)}
+                                            </span>
+                                            {isSelected && (
+                                              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                                            )}
+                                          </div>
+                                          <div className="mt-1 flex items-center justify-between text-[10px]">
+                                            <span
+                                              className={
+                                                isSelected
+                                                  ? 'text-green-100 font-semibold'
+                                                  : !slot.available
+                                                    ? 'text-gray-400'
+                                                    : 'text-[#006e2f] font-extrabold'
+                                              }
+                                            >
+                                              {slot.available
+                                                ? `${slot.price.toLocaleString('vi-VN')}đ`
+                                                : 'Đã kín'}
+                                            </span>
+                                            <span
+                                              className={`text-[9px] font-medium ${
+                                                isSelected
+                                                  ? 'text-green-100'
+                                                  : 'text-[#72796f]'
+                                              }`}
+                                            >
+                                              {isStart && isEnd
+                                                ? '30p'
+                                                : isStart
+                                                  ? 'Bắt đầu'
+                                                  : isEnd
+                                                    ? 'Kết thúc'
+                                                    : '30p'}
+                                            </span>
+                                          </div>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+
+                        {/* Legend */}
+                        <div className="flex items-center justify-between text-[10px] text-[#575e70] px-1 pt-1.5 border-t border-[#bccbb9]/20">
+                          <div className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full border border-[#bccbb9] bg-white" />
+                            <span>Trống</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-[#006e2f]" />
+                            <span>Đang chọn</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-gray-300" />
+                            <span>Đã kín</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB 2: DROPDOWN */}
+                    {timeSelectionTab === 'dropdown' && (
+                      <div>
+                        <p className="mb-2 text-[11px] text-[#575e70]">
+                          {startSlots.length} khung giờ trống · Mở cửa{' '}
+                          {availabilityWindow}
+                        </p>
+                        <div className="grid grid-cols-2 gap-2 mb-2.5">
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#575e70] uppercase mb-1">
+                              Giờ bắt đầu
+                            </label>
+                            <select
+                              value={startTime}
+                              onChange={(event) =>
+                                handleStartTimeChange(event.target.value)
+                              }
+                              className="w-full px-2.5 py-2 text-xs font-bold border border-[#bccbb9]/60 rounded-xl bg-white text-[#191c1d] focus:outline-none focus:ring-2 focus:ring-[#006e2f]/20 cursor-pointer"
+                            >
+                              <option value="" disabled>
+                                Chọn giờ
+                              </option>
+                              {startSlots.map((slot) => (
+                                <option
+                                  key={slot.startTime}
+                                  value={slot.startTime}
+                                >
+                                  {formatBusinessTime(slot.startTime)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#575e70] uppercase mb-1">
+                              Giờ kết thúc
+                            </label>
+                            <select
+                              value={endTime}
+                              onChange={(event) => {
+                                setEndTime(event.target.value);
+                                setAppliedVoucher(null);
+                              }}
+                              disabled={!endSlots.length}
+                              className="w-full px-2.5 py-2 text-xs font-bold border border-[#bccbb9]/60 rounded-xl bg-white text-[#191c1d] focus:outline-none focus:ring-2 focus:ring-[#006e2f]/20 cursor-pointer disabled:bg-[#edeeef]"
+                            >
+                              <option value="" disabled>
+                                Chọn giờ
+                              </option>
+                              {endSlots.map((slot) => (
+                                <option key={slot.endTime} value={slot.endTime}>
+                                  {formatBusinessTime(slot.endTime)} (
+                                  {getDurationMinutes(startTime, slot.endTime)}
+                                  p)
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Quick Duration Buttons (shared across tabs when startTime is chosen) */}
+                    {startTime && (
+                      <div className="flex items-center gap-1.5 pt-2 border-t border-[#bccbb9]/20">
+                        <span className="text-[10px] text-[#575e70] font-semibold">
+                          Chọn nhanh:
                         </span>
-                        <span className="font-bold">
+                        {[60, 90, 120].map((minutes) => {
+                          const available = endSlots.some(
+                            (slot) =>
+                              getDurationMinutes(startTime, slot.endTime) ===
+                              minutes,
+                          );
+                          return (
+                            <button
+                              key={minutes}
+                              type="button"
+                              onClick={() => handleSetQuickDuration(minutes)}
+                              disabled={!available}
+                              className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all border disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer ${
+                                durationMinutes === minutes
+                                  ? 'bg-[#006e2f] text-white border-[#006e2f]'
+                                  : 'bg-white border-[#bccbb9]/50 text-[#575e70] hover:border-[#006e2f] hover:text-[#006e2f]'
+                              }`}
+                            >
+                              {minutes} phút
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Selected Interval Summary */}
+                    {isSelectionValid && (
+                      <div className="p-2.5 rounded-xl bg-[#006e2f]/10 border border-[#006e2f]/20 flex items-center justify-between text-xs text-[#006e2f] font-semibold mt-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 shrink-0 text-[#006e2f]" />
+                          <span>
+                            Khung giờ:{' '}
+                            <strong>
+                              {formatBusinessTime(startTime)} -{' '}
+                              {formatBusinessTime(endTime)}
+                            </strong>
+                          </span>
+                        </div>
+                        <span className="font-bold bg-[#006e2f] text-white px-2 py-0.5 rounded-lg text-[10px]">
                           {durationMinutes} phút ({durationHours}h)
                         </span>
                       </div>
