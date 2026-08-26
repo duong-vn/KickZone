@@ -42,6 +42,56 @@ export interface AdminUserItem {
   totalBookings?: number;
 }
 
+function getInitials(name: string) {
+  if (!name) return 'U';
+  const words = name.trim().split(' ');
+  if (words.length === 1) return words[0].charAt(0).toUpperCase();
+  return (
+    words[0].charAt(0) + words[words.length - 1].charAt(0)
+  ).toUpperCase();
+}
+
+function UserAvatar({
+  avatarUrl,
+  name,
+  size = 'md',
+}: {
+  avatarUrl?: string;
+  name: string;
+  size?: 'sm' | 'md' | 'lg';
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  const sizeClasses = {
+    sm: 'h-8 w-8 text-xs',
+    md: 'h-10 w-10 text-xs',
+    lg: 'h-16 w-16 text-xl',
+  }[size];
+
+  if (avatarUrl && !hasError) {
+    return (
+      <div
+        className={`${sizeClasses} shrink-0 overflow-hidden rounded-full border border-[#bccbb9] shadow-sm`}
+      >
+        <img
+          src={avatarUrl}
+          alt={name}
+          className="h-full w-full object-cover"
+          onError={() => setHasError(true)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`flex ${sizeClasses} shrink-0 items-center justify-center rounded-full bg-[#dce2f3] font-bold text-[#151c27] shadow-sm`}
+    >
+      {getInitials(name)}
+    </div>
+  );
+}
+
 export default function AdminUsersPage() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
@@ -103,15 +153,6 @@ export default function AdminUsersPage() {
       return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
     return dateStr;
-  };
-
-  const getInitials = (name: string) => {
-    if (!name) return 'U';
-    const words = name.trim().split(' ');
-    if (words.length === 1) return words[0].charAt(0).toUpperCase();
-    return (
-      words[0].charAt(0) + words[words.length - 1].charAt(0)
-    ).toUpperCase();
   };
 
   // Filtered users list
@@ -443,19 +484,11 @@ export default function AdminUsersPage() {
                     {/* Người dùng */}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        {user.avatarUrl ? (
-                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-[#bccbb9] shadow-sm">
-                            <img
-                              src={user.avatarUrl}
-                              alt={user.fullName}
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dce2f3] font-bold text-[#151c27] shadow-sm">
-                            {getInitials(user.fullName)}
-                          </div>
-                        )}
+                        <UserAvatar
+                          avatarUrl={user.avatarUrl}
+                          name={user.fullName}
+                          size="md"
+                        />
                         <div>
                           <p className="font-bold text-[#191c1d]">
                             {user.fullName}
@@ -640,17 +673,11 @@ export default function AdminUsersPage() {
 
             <div className="my-4 space-y-4 text-xs sm:text-sm">
               <div className="flex items-center gap-4 rounded-xl bg-[#f8f9fa] p-4 border border-[#bccbb9]/40">
-                {viewingUser.avatarUrl ? (
-                  <img
-                    src={viewingUser.avatarUrl}
-                    alt={viewingUser.fullName}
-                    className="h-16 w-16 rounded-full border border-[#bccbb9] object-cover"
-                  />
-                ) : (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#dce2f3] text-xl font-bold text-[#151c27]">
-                    {getInitials(viewingUser.fullName)}
-                  </div>
-                )}
+                <UserAvatar
+                  avatarUrl={viewingUser.avatarUrl}
+                  name={viewingUser.fullName}
+                  size="lg"
+                />
                 <div>
                   <p className="font-bold text-[#191c1d] text-base">
                     {viewingUser.fullName}
