@@ -479,7 +479,7 @@ export default function AdminSchedulePage() {
             className="flex-1 overflow-y-auto relative flex flex-col"
           >
             {/* Top Day Header Row: SUN 23, MON 24, TUE 25... */}
-            <div className="sticky top-0 z-30 grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-[#dadce0] bg-white shrink-0 shadow-2xs">
+            <div className="sticky top-0 z-20 grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b border-[#dadce0] bg-white shrink-0 shadow-2xs">
               {/* GMT Column */}
               <div className="border-r border-[#dadce0] p-2 text-center text-[10px] font-semibold text-[#70757a] flex items-end justify-center pb-2 bg-white">
                 GMT+07
@@ -543,7 +543,7 @@ export default function AdminSchedulePage() {
               {/* Red Current Time Line Indicator */}
               <div
                 style={{ top: `${currentTimeHours * HOUR_ROW_HEIGHT}px` }}
-                className="absolute inset-x-0 z-20 pointer-events-none grid grid-cols-[64px_repeat(7,minmax(0,1fr))]"
+                className="absolute inset-x-0 z-15 pointer-events-none grid grid-cols-[64px_repeat(7,minmax(0,1fr))]"
               >
                 <div className="flex justify-end pr-1 items-center">
                   <span className="h-3 w-3 rounded-full bg-[#ea4335] shadow-xs" />
@@ -579,7 +579,7 @@ export default function AdminSchedulePage() {
                               top: `${topPx + 1}px`,
                               height: `${heightPx - 3}px`,
                             }}
-                            className={`absolute inset-x-1 z-10 cursor-pointer overflow-hidden rounded-lg border px-2.5 py-1 text-xs shadow-2xs transition-all hover:z-30 hover:scale-[1.01] hover:shadow-md ${getGoogleStatusStyle(
+                            className={`absolute inset-x-1 z-10 cursor-pointer overflow-hidden rounded-lg border px-2.5 py-1 text-xs shadow-2xs transition-all hover:z-20 hover:scale-[1.01] hover:shadow-md ${getGoogleStatusStyle(
                               b.status,
                             )}`}
                           >
@@ -615,7 +615,7 @@ export default function AdminSchedulePage() {
             className="flex-1 overflow-y-auto relative flex flex-col"
           >
             {/* Day Header */}
-            <div className="sticky top-0 z-30 grid grid-cols-[64px_1fr] border-b border-[#dadce0] bg-white shrink-0 shadow-2xs">
+            <div className="sticky top-0 z-20 grid grid-cols-[64px_1fr] border-b border-[#dadce0] bg-white shrink-0 shadow-2xs">
               <div className="border-r border-[#dadce0] p-2 text-center text-[10px] font-semibold text-[#70757a] flex items-end justify-center pb-2 bg-white">
                 GMT+07
               </div>
@@ -670,7 +670,7 @@ export default function AdminSchedulePage() {
                           top: `${topPx + 1}px`,
                           height: `${heightPx - 3}px`,
                         }}
-                        className={`absolute inset-x-2 z-10 cursor-pointer overflow-hidden rounded-lg border px-3 py-1.5 text-xs shadow-2xs transition-all hover:z-30 hover:scale-[1.01] hover:shadow-md ${getGoogleStatusStyle(
+                        className={`absolute inset-x-2 z-10 cursor-pointer overflow-hidden rounded-lg border px-3 py-1.5 text-xs shadow-2xs transition-all hover:z-20 hover:scale-[1.01] hover:shadow-md ${getGoogleStatusStyle(
                           b.status,
                         )}`}
                       >
